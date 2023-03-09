@@ -1,4 +1,3 @@
-use std::char;
 use std::error;
 use std::fmt;
 use std::io::Read;
@@ -6,7 +5,7 @@ use super::alts;
 pub mod default;
 
 #[derive(Debug)]
-struct ParserError{
+pub struct ParserError{
     line: u32,
     column: u32,
     message: String

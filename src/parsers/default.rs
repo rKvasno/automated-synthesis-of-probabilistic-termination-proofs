@@ -1,7 +1,6 @@
-use super::{alts, ParserError};
+use super::{alts, ParserError, Read};
 
-pub fn parse<InputStream: Iterator<char>>(input: InputStream)
-                                        -> Result<alts::ALTS, ParserError> {
+pub fn parse<Reader: Read>(input: Reader) -> Result<alts::ALTS, ParserError> {
     todo!();
 }
 
