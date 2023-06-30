@@ -1,6 +1,6 @@
-use super::{alts, ParserError, Read};
+use super::{pts, ParserError, Read};
 
-pub fn parse<Reader: Read>(input: Reader) -> Result<alts::ALTS, ParserError> {
+pub fn parse<'a, Reader: Read>(input: Reader) -> Result<pts::PTS<'a>, ParserError> {
     todo!();
 }
 

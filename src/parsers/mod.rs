@@ -1,7 +1,7 @@
 use std::error;
 use std::fmt;
 use std::io::Read;
-use super::alts;
+use super::pts;
 pub mod default;
 
 #[derive(Debug)]
@@ -22,8 +22,8 @@ pub enum Parser {
     Default
 }
 
-pub fn parse<Reader: Read>(parser: Parser, input: Reader)
-                                        -> Result<alts::ALTS, ParserError> {
+pub fn parse<'a, Reader: Read>(parser: Parser, input: Reader)
+                                        -> Result<pts::PTS<'a>, ParserError> {
     match parser {
         Default => default::parse(input)
     }

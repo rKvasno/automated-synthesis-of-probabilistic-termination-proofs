@@ -1,4 +1,4 @@
-mod alts;
+mod pts;
 mod linear_system;
 
 mod parsers;

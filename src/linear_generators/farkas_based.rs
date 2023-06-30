@@ -1,6 +1,6 @@
-use crate::alts;
+use crate::pts;
 
-// Given an ALTS, return a linear system
+// Given a PTS, return a linear system
 fn generate() {
     todo!();
 }
