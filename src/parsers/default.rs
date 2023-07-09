@@ -1,13 +1,8 @@
-use super::{pts, ParserError, Read};
+use super::{pts, ParserError};
+use crate::parsers::grammars::default::DefaultParser;
+use pest::Parser;
 
-pub fn parse<'a, Reader: Read>(input: Reader) -> Result<pts::PTS<'a>, ParserError> {
+pub fn parse<'a>(input: &str) -> Result<pts::PTS<'a>, ParserError> {
     todo!();
 }
 
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn sanity() {
-        assert_eq!(1, 1);
-    }
-}

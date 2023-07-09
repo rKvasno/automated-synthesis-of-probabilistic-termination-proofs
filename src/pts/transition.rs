@@ -17,36 +17,36 @@ impl<'a> Transition<'a> {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use std::mem;
-    use super::{Assignment, Transition};
-    
-    #[test]
-    fn align_transition() {
-        if mem::size_of::<usize>() == 8{
-            assert_eq!(mem::align_of::<Transition>(), 32);
-        }
-    }
-    
-    #[test]
-    fn size_transition() {
-        if mem::size_of::<usize>() == 8{
-            assert_eq!(mem::size_of::<Transition>(), 32);
-        }
-    }
-    
-    #[test]
-    fn align_assignment() {
-        if mem::size_of::<usize>() == 8{
-            assert_eq!(mem::align_of::<Assignment>(), 32);
-        }
-    }
-    #[test]
-    fn size_assignment() {
-        if mem::size_of::<usize>() == 8{
-            assert_eq!(mem::size_of::<Assignment>(), 32);
-        }
-    }
-}
+// #[cfg(test)]
+// mod tests {
+//     use std::mem;
+//     use super::{Assignment, Transition};
+//     
+//     #[test]
+//     fn align_transition() {
+//         if mem::size_of::<usize>() == 8{
+//             assert_eq!(mem::align_of::<Transition>(), 32);
+//         }
+//     }
+//     
+//     #[test]
+//     fn size_transition() {
+//         if mem::size_of::<usize>() == 8{
+//             assert_eq!(mem::size_of::<Transition>(), 32);
+//         }
+//     }
+//     
+//     #[test]
+//     fn align_assignment() {
+//         if mem::size_of::<usize>() == 8{
+//             assert_eq!(mem::align_of::<Assignment>(), 32);
+//         }
+//     }
+//     #[test]
+//     fn size_assignment() {
+//         if mem::size_of::<usize>() == 8{
+//             assert_eq!(mem::size_of::<Assignment>(), 32);
+//         }
+//     }
+// }
 

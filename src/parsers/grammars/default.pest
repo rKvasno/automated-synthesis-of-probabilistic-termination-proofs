@@ -1,0 +1,32 @@
+program = { SOI ~ locations ~ EOI }
+location = { invariants ~ instruction }
+
+invariants = { ("#" ~ condition ~ NEWLINE)+}
+
+locations = _{ NEWLINE* ~ location ~ NEWLINE+ ~ locations | 
+               NEWLINE* ~ location ~ NEWLINE*             }
+
+instruction = _{ "odds " ~ odds               | 
+                "if " ~ branch                    |
+                "while " ~ dowhile              |
+                "non-det" ~ nondet |
+                assign                       }
+
+odds = { constant ~ (":" ~ odds)? ~ block }
+
+branch = { condition ~ block ~ ( NEWLINE? ~ "else" ~ NEWLINE? ~ elseif)? }
+elseif =  { "if " ~ branch |
+          block     }
+        
+dowhile = { condition ~ block }
+
+nondet = { block ~ ( NEWLINE? ~ "or" ~ NEWLINE? ~ nondet)?}
+
+assign = { variable ~ "=" ~ linear_polynomial}
+
+block = { NEWLINE* ~ "{" ~ locations ~ "}" }
+condition = { linear_polynomial ~ comparator ~ linear_polynomial }
+
+comparator = @{ "<=" | ">=" | "<" | ">" }
+
+COMMENT = _{ "##" ~ (!NEWLINE ~ ANY)* ~ NEWLINE }

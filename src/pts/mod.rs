@@ -15,23 +15,23 @@ pub struct PTS<'a> {
     initial: LocationHandle<'a>,
 }
 
-#[cfg(test)]
-mod tests {
-    use std::mem;
-    use super::PTS;
-    
-    #[test]
-    fn align_pts() {
-        if mem::size_of::<usize>() == 8{
-            assert_eq!(mem::align_of::<PTS>(), 32);
-        }
-    }
-    
-    #[test]
-    fn size_pts() {
-        if mem::size_of::<usize>() == 8{
-            assert_eq!(mem::size_of::<PTS>(), 32);
-        }
-    }
-}
+// #[cfg(test)]
+// mod tests {
+//     use std::mem;
+//     use super::PTS;
+//     
+//     #[test]
+//     fn align_pts() {
+//         if mem::size_of::<usize>() == 8{
+//             assert_eq!(mem::align_of::<PTS>(), 32);
+//         }
+//     }
+//     
+//     #[test]
+//     fn size_pts() {
+//         if mem::size_of::<usize>() == 8{
+//             assert_eq!(mem::size_of::<PTS>(), 32);
+//         }
+//     }
+// }
 

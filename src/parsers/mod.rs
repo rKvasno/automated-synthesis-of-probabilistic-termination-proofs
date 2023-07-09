@@ -3,6 +3,7 @@ use std::fmt;
 use std::io::Read;
 use super::pts;
 pub mod default;
+mod grammars;
 
 #[derive(Debug)]
 pub struct ParserError{
@@ -22,7 +23,7 @@ pub enum Parser {
     Default
 }
 
-pub fn parse<'a, Reader: Read>(parser: Parser, input: Reader)
+pub fn parse<'a>(parser: Parser, input: &str)
                                         -> Result<pts::PTS<'a>, ParserError> {
     match parser {
         Default => default::parse(input)

@@ -1,0 +1,12 @@
+if a >= b {
+  # a > a
+  a = a
+}
+else if b <= c {
+  # a < a
+  a = a
+}
+else {
+  # a > a
+  a = a
+}

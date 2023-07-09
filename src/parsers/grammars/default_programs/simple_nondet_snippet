@@ -1,0 +1,13 @@
+non-det {
+  # a > a
+  a = a
+}
+or {
+  # a > a
+  a = a
+}
+or {
+  # a > a
+  a = a
+}
+

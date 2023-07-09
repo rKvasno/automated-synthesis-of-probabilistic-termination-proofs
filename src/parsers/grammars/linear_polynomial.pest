@@ -1,0 +1,22 @@
+linear_polynomial = ${ additive_op? ~ term ~ ( WHITESPACE* ~ additive_op ~ WHITESPACE* ~ term)* }
+
+term = ${ 
+  variable ~ WHITESPACE* ~ "*" ~ WHITESPACE* ~ constant_expr |
+  constant_expr ~ WHITESPACE* ~ "*" ~ WHITESPACE* ~ variable |
+  constant_expr? ~ variable |
+  constant_expr
+}
+
+constant_expr = !{
+  constant |
+  "(" ~ constant_expr ~ (arithmetic_op ~ constant_expr)* ~ ")"
+}
+
+additive_op = @{ "+" | "-" }
+arithmetic_op = @{ "+" | "-" | "*" | "/" | "^" }
+
+variable = @{ ASCII_ALPHA ~ ( ASCII_ALPHA | ASCII_DIGIT )* }
+constant = @{ ASCII_NONZERO_DIGIT ~ ASCII_DIGIT* |
+              "0"                                }
+
+WHITESPACE = _{ " " }
