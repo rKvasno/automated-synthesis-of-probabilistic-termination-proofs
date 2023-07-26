@@ -15,7 +15,7 @@ mod tests {
     fn single_constant() {
         parses_to! {
             parser: LinearPolynomialTestParser,
-            input: "-123",
+            input: "-1.2",
             rule: Rule::linear_polynomial,
             tokens: [
                 linear_polynomial(0, 4, [

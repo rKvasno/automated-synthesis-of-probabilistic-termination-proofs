@@ -1,4 +1,4 @@
-non-det {
+nondet {
   # a > a
   a = a
 }

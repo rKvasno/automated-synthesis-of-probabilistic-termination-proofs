@@ -1,0 +1,4 @@
+while nondet {
+    # a > a
+    a = b
+}

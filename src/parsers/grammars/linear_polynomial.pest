@@ -15,8 +15,10 @@ constant_expr = !{
 additive_op = @{ "+" | "-" }
 arithmetic_op = @{ "+" | "-" | "*" | "/" | "^" }
 
-variable = @{ ASCII_ALPHA ~ ( ASCII_ALPHA | ASCII_DIGIT )* }
-constant = @{ ASCII_NONZERO_DIGIT ~ ASCII_DIGIT* |
-              "0"                                }
+variable = @{ ASCII_ALPHA ~ ( ASCII_ALPHA | ASCII_DIGIT | "_" | "-" )* }
+constant = @{ ASCII_NONZERO_DIGIT ~ ASCII_DIGIT* ~ decimal_part? |
+              "0" ~ decimal_part?                          }
+
+decimal_part = _{ ("." | ",") ~ ASCII_DIGIT ~ ASCII_DIGIT* }
 
 WHITESPACE = _{ " " }

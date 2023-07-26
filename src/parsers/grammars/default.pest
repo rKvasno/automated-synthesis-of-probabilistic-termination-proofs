@@ -1,32 +1,35 @@
-program = { SOI ~ locations ~ EOI }
+program = { SOI ~ locations ~ invariants ~ EOI }
 location = { invariants ~ instruction }
 
-invariants = { ("#" ~ condition ~ NEWLINE)+}
+invariants = { ("#" ~ logic_condition ~ NEWLINE)+}
 
 locations = _{ NEWLINE* ~ location ~ NEWLINE+ ~ locations | 
                NEWLINE* ~ location ~ NEWLINE*             }
 
-instruction = _{ "odds " ~ odds               | 
-                "if " ~ branch                    |
-                "while " ~ dowhile              |
-                "non-det" ~ nondet |
-                assign                       }
+block = { NEWLINE* ~ "{" ~ locations ~ "}" }
 
-odds = { constant ~ (":" ~ odds)? ~ block }
+instruction = _{ "if "    ~ branch   |
+                 "odds "  ~ odds     | 
+                 "nondet" ~ nondet   |
+                 "while " ~ dowhile  |
+                 assign              }
 
-branch = { condition ~ block ~ ( NEWLINE? ~ "else" ~ NEWLINE? ~ elseif)? }
+branch = { logic_condition ~ block ~ ( NEWLINE? ~ "else" ~ NEWLINE? ~ elseif)? }
 elseif =  { "if " ~ branch |
-          block     }
-        
+            block          }
+odds = { constant ~ ":" ~ ( odds | constant ) ~ block }
+nondet = { block ~ ( NEWLINE? ~ "or" ~ NEWLINE? ~ nondet )?}
 dowhile = { condition ~ block }
-
-nondet = { block ~ ( NEWLINE? ~ "or" ~ NEWLINE? ~ nondet)?}
-
 assign = { variable ~ "=" ~ linear_polynomial}
 
-block = { NEWLINE* ~ "{" ~ locations ~ "}" }
-condition = { linear_polynomial ~ comparator ~ linear_polynomial }
+condition = _{ logic_condition   |
+               prob_condition    |
+               nondet_condition  }
+logic_condition = { inequality ~ ( "and" ~ inequality )* }
+prob_condition = { constant ~ ":" ~ constant }
+nondet_condition = { "nondet" }
 
+inequality = _{ linear_polynomial ~ comparator ~ linear_polynomial }
 comparator = @{ "<=" | ">=" | "<" | ">" }
 
 COMMENT = _{ "##" ~ (!NEWLINE ~ ANY)* ~ NEWLINE }

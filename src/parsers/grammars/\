@@ -15,7 +15,7 @@ mod tests {
     use std::env::var;
     use pest::Parser;
     
-    fn _print_rule_parsing<R: RuleType, P: Parser<R>>(input: &str, rule: R) {
+    fn print_rule_parsing<R: RuleType, P: Parser<R>>(input: &str, rule: R) {
         let parsed = P::parse(rule, input).unwrap();
         for pair in parsed.clone().flatten() {
             print!("{:?}:\n{}\n######################## ", pair.as_rule(), pair.as_str());
@@ -617,8 +617,12 @@ mod tests {
     #[test]
     fn complex_program() {
         let input = read_test_input("complex_program");
-        assert!(DefaultParser::parse(Rule::program, &input).is_ok());
+        
+        assert(DefaultParser::parse(&input, Rule::Program).is_ok());
     }
     
+    //TODO: navrhnut ako sa prekladaju jednotlive neterminaly na prechodovy system, f.e. nondet s 1
+    //case funguje ako do or nothing a s viacerymi case ako choose one, aby som mal moznost rozumne
+    //modelovat vsetky mozne pripady co tam vznikaju
 }
 

@@ -1,6 +1,0 @@
-macro_rules! program_file {
-    ($name:literal) => {"/src/parsers/grammars/default_programs/$(name)"}
-}
-
-
-[odds(5, 79, [constant(5, 6), odds(7, 56, [constant(7, 8), odds(9, 33, [constant(9, 10), block(11, 33, [location(15, 31, [invariants(15, 26, [condition(17, 23, [linear_polynomial(17, 18, [term(17, 18, [variable(17, 18)])]), comparator(19, 21), linear_polynomial(22, 23, [term(22, 23, [constant_expr(22, 23, [constant(22, 23)])])])])]), assign(26, 31, [variable(26, 27), linear_polynomial(30, 31, [term(30, 31, [constant_expr(30, 31, [constant(30, 31)])])])])])])]), block(33, 56, [location(38, 54, [invariants(38, 49, [condition(40, 46, [linear_polynomial(40, 41, [term(40, 41, [variable(40, 41)])]), comparator(42, 44), linear_polynomial(45, 46, [term(45, 46, [constant_expr(45, 46, [constant(45, 46)])])])])]), assign(49, 54, [variable(49, 50), linear_polynomial(53, 54, [term(53, 54, [constant_expr(53, 54, [constant(53, 54)])])])])])])]), block(56, 79, [location(61, 77, [invariants(61, 72, [condition(63, 69, [linear_polynomial(63, 64, [term(63, 64, [variable(63, 64)])]), comparator(65, 67), linear_polynomial(68, 69, [term(68, 69, [constant_expr(68, 69, [constant(68, 69)])])])])]), assign(72, 77, [variable(72, 73), linear_polynomial(76, 77, [term(76, 77, [constant_expr(76, 77, [constant(76, 77)])])])])])])])]

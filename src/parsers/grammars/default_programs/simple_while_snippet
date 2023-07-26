@@ -1,4 +1,0 @@
-while a > a {
-    # a > a
-    a = b
-}
