@@ -2,9 +2,11 @@ use crate::pts::location::LocationHandle;
 use crate::pts::{Variable, LinearPolynomial};
 
 
+#[derive(Debug)]
 #[repr(align(32))] // 32 bytes
 struct Assignment(Variable, LinearPolynomial);
 
+#[derive(Debug)]
 #[repr(align(32))] // 32 bytes
 pub struct Transition<'a> { 
     assignments: Vec<Assignment>,

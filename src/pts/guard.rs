@@ -4,6 +4,7 @@ use crate::pts::LinearPolynomial;
 pub type Odds = u64;
 
 // 32 bytes
+#[derive(Debug)]
 pub enum Guards<'a>{
     Logic(Vec<(LinearPolynomial, Transition<'a>)>),
     Probabilistic(Vec<(Odds, Transition<'a>)>),
