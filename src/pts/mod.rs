@@ -2,15 +2,11 @@ mod guard;
 mod location;
 mod transition;
 mod variables;
+mod linear_polynomial;
 
 use crate::pts::location::{Location, LocationHandle};
-use crate::pts::variables::{Variable, VariableMap, VariableError};
+use crate::pts::variables::VariableMap;
 use std::cell::RefCell;
-
-#[derive(Debug)]
-pub struct LinearPolynomial {
-    coefficients: Vec<f64>
-}
 
 #[derive(Debug)]
 #[repr(align(32))] // 32 bytes
@@ -25,36 +21,6 @@ impl<'a> PTS<'a> {
         PTS { locations: vec!(), variables: VariableMap::new(), initial }
     }
 }
-
-impl LinearPolynomial {
-    pub fn new() -> Self {
-        LinearPolynomial { coefficients: vec!() }
-    }
-
-    fn len(&self) -> usize {
-        self.coefficients.len()
-    }
-
-    pub fn add_term(&mut self, 
-                map: &VariableMap,
-                var: &Variable,
-                coefficient: f64) -> Result<(), VariableError>{
-        let index = map.variable_to_index(var.as_str());
-
-        // if variable is not in the map, its not a program variable
-        if index.is_none() {
-            Err(VariableError::new(var))   
-        }
-        else {
-            if self.len() < map.len() {
-                self.coefficients.resize(map.len(), 0.0);
-            }
-            self.coefficients[index.unwrap()] += coefficient;
-            Ok(())
-        }
-    }
-}
-
 
 
 // #[cfg(test)]

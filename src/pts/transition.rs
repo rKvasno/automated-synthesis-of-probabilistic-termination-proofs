@@ -1,5 +1,6 @@
 use crate::pts::location::LocationHandle;
-use crate::pts::{Variable, LinearPolynomial};
+use crate::pts::variables::Variable;
+use crate::pts::linear_polynomial::LinearPolynomial;
 
 
 #[derive(Debug)]

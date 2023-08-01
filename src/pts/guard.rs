@@ -1,5 +1,5 @@
 use crate::pts::transition::Transition;
-use crate::pts::LinearPolynomial;
+use crate::pts::linear_polynomial::LinearPolynomial;
 
 pub type Odds = u64;
 

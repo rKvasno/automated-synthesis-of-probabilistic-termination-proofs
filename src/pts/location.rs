@@ -1,6 +1,6 @@
 use crate::pts::guard::Guards;
 use std::cell::RefCell;
-use crate::pts::LinearPolynomial;
+use crate::pts::linear_polynomial::LinearPolynomial;
 
 #[derive(Debug)]
 #[repr(align(64))] // 64 bytes
