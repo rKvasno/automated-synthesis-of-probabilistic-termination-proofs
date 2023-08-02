@@ -1,6 +1,6 @@
 use std::fmt;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Variable {
     name: Box<str>
 }
@@ -44,7 +44,7 @@ impl VariableMap {
 
     // Find variable and return its index, if not found, add it
     pub fn find_or_add(&mut self, var: Variable) -> usize {
-        let index = self.variables.iter().enumerate().find(|x| x.1.name.as_ref() == var.as_str()).map(|x| x.0 + 1);
+        let index = self.get_index(&var);
         if index.is_none() {
             self.variables.push(Variable::new(var.as_str()));
             // -1 because its after push, +1 because the polynomial indexing is shifted
@@ -58,7 +58,7 @@ impl VariableMap {
 
     // Find variable and return its index, if not found, return None 
     pub fn get_index(&self, var: &Variable) -> Option<usize> {
-        self.variables.iter().enumerate().find(|x| x.1.name.as_ref() == var.as_str()).map(|x| x.0 + 1)
+        self.variables.iter().enumerate().find(|(_, element)| element == &var).map(|(index, _)| index + 1)
     }
 }
 
