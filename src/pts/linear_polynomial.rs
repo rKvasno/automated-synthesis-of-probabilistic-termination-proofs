@@ -1,4 +1,4 @@
-use crate::pts::variables::{Variable, VariableMap, VariableError};
+use crate::pts::variable_map::{Variable, VariableMap, VariableError};
 
 #[derive(Debug)]
 pub struct LinearPolynomial {

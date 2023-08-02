@@ -62,7 +62,7 @@ impl VariableMap {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct VariableError(Variable);
 
 impl VariableError {
@@ -76,4 +76,3 @@ impl fmt::Display for VariableError {
         write!(f, "\"{}\" is not a program variable!", self.0)
     }
 }
-

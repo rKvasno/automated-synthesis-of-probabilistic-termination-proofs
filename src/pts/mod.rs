@@ -1,11 +1,11 @@
 mod guard;
 mod location;
 mod transition;
-mod variables;
+mod variable_map;
 mod linear_polynomial;
 
 use crate::pts::location::{Location, LocationHandle};
-use crate::pts::variables::VariableMap;
+use crate::pts::variable_map::VariableMap;
 use std::cell::RefCell;
 
 #[derive(Debug)]
