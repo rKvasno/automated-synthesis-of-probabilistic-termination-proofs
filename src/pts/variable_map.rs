@@ -39,7 +39,12 @@ impl VariableMap {
 
     // Return the variable with specified index in a polynomial
     pub fn get_variable(&self, index: usize) -> Option<&Variable> {
-        self.variables.get(index - 1)
+        if index == 0 {
+            None
+        }
+        else {
+            self.variables.get(index - 1)
+        }
     }
 
     // Find variable and return its index, if not found, add it
@@ -76,3 +81,39 @@ impl fmt::Display for VariableError {
         write!(f, "\"{}\" is not a program variable!", self.0)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{VariableMap, Variable};
+
+    #[test]
+    fn out_of_bounds() {
+        let mut map = VariableMap::new();
+        let a = Variable::new("a");
+        assert_eq!(map.get_index(&a), None);
+        assert_eq!(map.get_variable(0), None);
+        assert_eq!(map.get_variable(1), None);
+        map.find_or_add(Variable::new("b"));
+        assert_eq!(map.get_index(&a), None);
+        assert_eq!(map.get_variable(0), None);
+        assert_eq!(map.get_variable(2), None);
+    }
+
+    #[test]
+    fn basic() {
+        let mut map = VariableMap::new();
+        let a = Variable::new("a");
+        assert_eq!(map.find_or_add(a.clone()), 1);
+        assert_eq!(map.get_variable(1), Some(&a));
+        assert_eq!(map.find_or_add(a.clone()), 1);
+        assert_eq!(map.get_variable(1), Some(&a));
+        let b = Variable::new("b");
+        assert_eq!(map.find_or_add(b.clone()), 2);
+        let c = Variable::new("c");
+        assert_eq!(map.find_or_add(c.clone()), 3);
+        assert_eq!(map.get_variable(1), Some(&a));
+        assert_eq!(map.get_variable(2), Some(&b));
+        assert_eq!(map.get_variable(3), Some(&c));
+    }
+}
+
