@@ -38,20 +38,15 @@ impl VariableMap {
     }
 
     // Return the variable with specified index in a polynomial
-    pub fn index_to_variable(&self, index: usize) -> Option<&str> {
-        if index - 1 < self.variables.len() {
-            Some(&self.variables[index - 1].name)
-        }
-        else {
-            None
-        }
+    pub fn get_variable(&self, index: usize) -> Option<&Variable> {
+        self.variables.get(index - 1)
     }
 
     // Find variable and return its index, if not found, add it
-    pub fn find_or_add(&mut self, var: &str) -> usize {
-        let index = self.variables.iter().enumerate().find(|x| x.1.name.as_ref() == var).map(|x| x.0 + 1);
+    pub fn find_or_add(&mut self, var: Variable) -> usize {
+        let index = self.variables.iter().enumerate().find(|x| x.1.name.as_ref() == var.as_str()).map(|x| x.0 + 1);
         if index.is_none() {
-            self.variables.push(Variable::new(var));
+            self.variables.push(Variable::new(var.as_str()));
             // -1 because its after push, +1 because the polynomial indexing is shifted
             self.variables.len() - 1 + 1
         }
@@ -62,9 +57,8 @@ impl VariableMap {
 
 
     // Find variable and return its index, if not found, return None 
-    pub fn variable_to_index(&self, variable: &str) -> Option<usize> {
-        self.variables.iter().enumerate().find(|x| x.1.name.as_ref() == variable).map(|x| x.0 + 1)
-
+    pub fn get_index(&self, var: &Variable) -> Option<usize> {
+        self.variables.iter().enumerate().find(|x| x.1.name.as_ref() == var.as_str()).map(|x| x.0 + 1)
     }
 }
 

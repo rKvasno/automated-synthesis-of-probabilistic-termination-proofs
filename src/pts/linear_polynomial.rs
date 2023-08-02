@@ -18,7 +18,7 @@ impl LinearPolynomial {
                 map: &VariableMap,
                 var: &Variable,
                 coefficient: f64) -> Result<(), VariableError>{
-        let index = map.variable_to_index(var.as_str());
+        let index = map.get_index(&var);
 
         // if variable is not in the map, its not a program variable
         if index.is_none() {
@@ -32,4 +32,5 @@ impl LinearPolynomial {
             Ok(())
         }
     }
+
 }
