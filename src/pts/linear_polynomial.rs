@@ -33,4 +33,8 @@ impl LinearPolynomial {
         }
     }
 
+    pub fn get_coefficient(&self, index: usize) -> Option<f64> {
+        self.coefficients.get(index).map(|x| x.clone())
+    }
+
 }
