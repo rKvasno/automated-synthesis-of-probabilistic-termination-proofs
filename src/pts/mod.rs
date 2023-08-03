@@ -1,8 +1,8 @@
 mod guard;
 mod location;
 mod transition;
-mod variable_map;
-mod linear_polynomial;
+pub mod variable_map;
+pub mod linear_polynomial;
 
 use crate::pts::location::{Location, LocationHandle};
 use crate::pts::variable_map::VariableMap;
