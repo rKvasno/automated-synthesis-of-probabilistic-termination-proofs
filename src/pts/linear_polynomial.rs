@@ -1,8 +1,10 @@
 use crate::pts::variable_map::{Variable, VariableMap, VariableError};
 
+pub type Constant = f64;
+
 #[derive(Debug)]
 pub struct LinearPolynomial {
-    coefficients: Vec<f64>
+    coefficients: Vec<Constant>
 }
 
 impl LinearPolynomial {
@@ -24,7 +26,7 @@ impl LinearPolynomial {
     pub fn add_term(&mut self, 
                     map: &VariableMap,
                     var: Option<&Variable>,
-                    coefficient: f64) -> Result<(), VariableError> {
+                    coefficient: Constant) -> Result<(), VariableError> {
         self.resize(map);
         if var.is_none() {
             self.coefficients[0] += coefficient;
@@ -43,7 +45,7 @@ impl LinearPolynomial {
         }
     }
 
-    pub fn get_coefficient(&self, index: usize) -> Option<f64> {
+    pub fn get_coefficient(&self, index: usize) -> Option<Constant> {
         self.coefficients.get(index).map(|x| x.clone())
     }
 
@@ -51,7 +53,7 @@ impl LinearPolynomial {
 
 #[cfg(test)]
 mod tests {
-    use super::{LinearPolynomial, VariableMap, Variable, VariableError};
+    use super::{LinearPolynomial, VariableMap, Variable, VariableError, Constant};
 
     fn setup_map() -> VariableMap {
         let mut map = VariableMap::new();
@@ -61,7 +63,7 @@ mod tests {
         map
     }
 
-    fn check_terms(pol: &LinearPolynomial, map: &VariableMap, vec: Vec<Option<f64>>) {
+    fn check_terms(pol: &LinearPolynomial, map: &VariableMap, vec: Vec<Option<Constant>>) {
         assert_eq!(map.len() +1, vec.len());
         assert!(map.len() <= pol.len());
         for (index, element) in vec.iter().enumerate() {
