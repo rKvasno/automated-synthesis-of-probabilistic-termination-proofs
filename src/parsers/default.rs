@@ -5,8 +5,12 @@ use pest::iterators::{Pair, Pairs};
 use pest::error::Error as PestError;
 use crate::pts::variable_map::Variable;
 use crate::pts::linear_polynomial::Constant;
-use std::f64;
 
+macro_rules! invariant_error {
+    () => {
+        "Programmer error: Function invariants not upheld."
+    };
+}
 
 type PestResult<'a> = Result<Pairs<'a, Rule>, PestError<Rule>>;
 
@@ -14,13 +18,15 @@ pub fn parse<'a>(input: &str) -> Result<pts::PTS<'a>, ParserError> {
     todo!();
 }
 
+// assumes the parses rule is Rule::variable
 fn parse_variable<'a>(parse: Pair<'a, Rule>) -> Variable {
     Variable::new(parse.as_str())
 }
 
+// assumes the parses rule is Rule::constant
 fn parse_constant<'a>(parse: Pair<'a, Rule>) -> Constant {
     // all parses have to follow f64 grammar, no need to handle errors
-    parse.as_str().parse::<f64>().unwrap()
+    parse.as_str().parse::<f64>().expect(invariant_error!())
 }
 
 #[cfg(test)]
