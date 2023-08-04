@@ -12,6 +12,15 @@ macro_rules! invariant_error {
     };
 }
 
+#[derive(Debug, PartialEq, Eq)]
+enum Operation {
+    Addition,
+    Subtraction,
+    Multiplication,
+    Division,
+    Power
+}
+
 type PestResult<'a> = Result<Pairs<'a, Rule>, PestError<Rule>>;
 
 pub fn parse<'a>(input: &str) -> Result<pts::PTS<'a>, ParserError> {
@@ -29,9 +38,24 @@ fn parse_constant<'a>(parse: Pair<'a, Rule>) -> Constant {
     parse.as_str().parse::<f64>().expect(invariant_error!())
 }
 
+// assumes the parses rule is Rule::arithmetic_op or Rule::additive_op
+fn parse_operation<'a>(parse: Pair<'a, Rule>) -> Operation {
+    match parse.as_str() {
+        "+" => Operation::Addition,
+        "-" => Operation::Subtraction,
+        "*" => Operation::Multiplication,
+        "/" => Operation::Division,
+        "^" => Operation::Power,
+        _ => panic!(invariant_error!()),
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{DefaultParser, Rule, Parser, parse_variable, parse_constant};
+    use crate::parsers::default::parse_operation;
+
+    use super::{DefaultParser, Rule, Parser, parse_variable, parse_constant, Operation};
+    use std::iter::zip;
 
     #[test]
     fn variable_sanity() {
@@ -48,6 +72,18 @@ mod tests {
         let constant = parse_constant(parse.next().unwrap());
         assert!(parse.next().is_none());
         assert_eq!(constant, 123.0);
+    }
+
+    #[test]
+    fn operation_sanity() {
+        let inputs = vec!("+", "-", "*", "/", "^");
+        let ops = vec!(Operation::Addition, Operation::Subtraction, Operation::Multiplication, Operation::Division, Operation::Power);
+
+        for (input, op) in zip(inputs, ops) {
+            let mut parse = DefaultParser::parse(Rule::arithmetic_op, input).unwrap();
+            assert_eq!(parse_operation(parse.next().unwrap()), op);
+            assert!(parse.next().is_none());
+        }
     }
 }
 
