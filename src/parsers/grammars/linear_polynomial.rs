@@ -4,12 +4,13 @@ use pest_derive::Parser;
 #[grammar = "parsers/grammars/linear_polynomial.pest"]
 pub struct LinearPolynomialTestParser;
 
-
+    
 #[cfg(test)]
 mod tests {
     use super::LinearPolynomialTestParser;
     use super::Rule;
     use pest::{ parses_to, fails_with, consumes_to};
+    use crate::parsers::grammars::misc::print_rule_parsing;
 
     #[test]
     fn single_constant() {
@@ -50,38 +51,39 @@ mod tests {
     fn complex_term() {
         parses_to! {
             parser: LinearPolynomialTestParser,
-            input: "( 3 * 0 - (1^2)/12 )a",
+            input: "( 3 * 0 - (1^2/12) )a",
             rule: Rule::linear_polynomial,
             tokens: [
                 linear_polynomial(0, 21, [
                     term(0, 21, [
-                         constant_expr(0, 20, [
+                        constant_expr(0, 20, [
                             constant_expr(2, 3, [
                                 constant(2, 3)
                             ]),
-                            arithmetic_op(4, 5),
+                            multiplicative_op(4, 5),
                             constant_expr(6, 7, [
-                                constant(6, 7),
+                                constant(6, 7)
                             ]),
-                            arithmetic_op(8, 9),
-                            constant_expr(10, 15, [
+                            additive_op(8, 9),
+                            constant_expr(10, 18, [
                                 constant_expr(11, 12, [
-                                    constant(11, 12),
+                                    constant(11, 12)
                                 ]),
-                                arithmetic_op(12, 13),
+                                power_op(12, 13),
                                 constant_expr(13, 14, [
-                                    constant(13, 14),
+                                    constant(13, 14)
                                 ]),
-                            ]),
-                            arithmetic_op(15, 16),
-                            constant_expr(16, 18, [
-                                constant(16, 18),
-                            ]),
-                         ]),
-                         variable(20, 21)
+                                multiplicative_op(14, 15),
+                                constant_expr(15, 17, [
+                                    constant(15, 17)
+                                ])
+                            ])
+                        ]),
+                        variable(20, 21)
                     ])
                 ])
             ]
+
         };
     }
 
@@ -248,6 +250,7 @@ mod tests {
                 ])
             ]
         };
+
         fails_with! {
         parser: LinearPolynomialTestParser,
         input: "* 5",
@@ -266,6 +269,55 @@ mod tests {
         pos: 0
         };
 
+    }
+
+    #[test]
+    fn invalid_constant_expr() {
+        fails_with! {
+            parser: LinearPolynomialTestParser,
+            input: "-1",
+            rule: Rule::constant_expr,
+            positives: vec![Rule::constant],
+            negatives: vec![],
+            pos: 0
+        };
+        
+        fails_with! {
+            parser: LinearPolynomialTestParser,
+            input: "(-1)",
+            rule: Rule::constant_expr,
+            positives: vec![Rule::constant],
+            negatives: vec![],
+            pos: 1
+        }
+
+        parses_to! {
+            parser: LinearPolynomialTestParser,
+            input: "2 - 2",
+            rule: Rule::constant_expr,
+            tokens: [
+               constant_expr(0, 1, [
+                    constant(0, 1)
+               ])
+            ]
+        };
+
+        parses_to! {
+            parser: LinearPolynomialTestParser,
+            input: "(3 + 4)(3 * 0)",
+            rule: Rule::constant_expr,
+            tokens: [
+                constant_expr(0, 7, [
+                    constant_expr(1, 2, [
+                        constant(1, 2)
+                    ]),
+                    additive_op(3, 4),
+                    constant_expr(5, 6, [
+                        constant(5, 6)
+                    ])
+                ])
+            ]
+        };
     }
 }
 

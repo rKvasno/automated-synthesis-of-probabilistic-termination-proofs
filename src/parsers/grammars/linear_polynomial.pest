@@ -9,11 +9,14 @@ term = ${
 
 constant_expr = !{
   constant |
-  "(" ~ constant_expr ~ (arithmetic_op ~ constant_expr)* ~ ")"
+  "(" ~ constant_expr ~ (power_op ~ constant_expr)* 
+      ~ (multiplicative_op ~ constant_expr)*
+      ~ (additive_op ~ constant_expr)* ~ ")"
 }
 
 additive_op = @{ "+" | "-" }
-arithmetic_op = @{ "+" | "-" | "*" | "/" | "^" }
+multiplicative_op = @{ "*" | "/" }
+power_op = @{ "^" }
 
 variable = @{ ASCII_ALPHA ~ ( ASCII_ALPHA | ASCII_DIGIT | "_" | "-" )* }
 constant = @{ ASCII_NONZERO_DIGIT ~ ASCII_DIGIT* ~ decimal_part? |

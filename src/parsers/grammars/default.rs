@@ -9,24 +9,9 @@ pub struct DefaultParser;
 mod tests {
     use super::DefaultParser;
     use super::Rule;
-    use pest::RuleType;
     use pest::{ parses_to, consumes_to};
-    use std::fs::read_to_string;
-    use std::env::var;
     use pest::Parser;
-    
-    fn _print_rule_parsing<R: RuleType, P: Parser<R>>(input: &str, rule: R) {
-        let parsed = P::parse(rule, input).unwrap();
-        for pair in parsed.clone().flatten() {
-            print!("{:?}:\n{}\n######################## ", pair.as_rule(), pair.as_str());
-        }
-        panic!("{}", parsed);
-    }
-
-    fn read_test_input(input_file: &str) -> String {
-        let dir = var("CARGO_MANIFEST_DIR").unwrap() + "/src/parsers/grammars/default_programs/" + input_file;
-        read_to_string(dir.clone()).unwrap_or_else(|_| panic!("Can't find {}", dir))
-    }
+    use crate::parsers::grammars::misc::read_test_input;
 
     #[test]
     fn simple_program() {

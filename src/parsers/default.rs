@@ -38,7 +38,7 @@ fn parse_constant<'a>(parse: Pair<'a, Rule>) -> Constant {
     parse.as_str().parse::<f64>().expect(invariant_error!())
 }
 
-// assumes the parses rule is Rule::arithmetic_op or Rule::additive_op
+// assumes the parses rule is Rule::power_op, Rule::multiplicative_op or Rule::additive_op
 fn parse_operation<'a>(parse: Pair<'a, Rule>) -> Operation {
     match parse.as_str() {
         "+" => Operation::Addition,
@@ -104,9 +104,12 @@ mod tests {
     fn operation_sanity() {
         let inputs = vec!("+", "-", "*", "/", "^");
         let ops = vec!(Operation::Addition, Operation::Subtraction, Operation::Multiplication, Operation::Division, Operation::Power);
+        let rules = vec!(Rule::additive_op, Rule::additive_op, Rule::multiplicative_op, Rule::multiplicative_op, Rule::power_op);
 
-        for (input, op) in zip(inputs, ops) {
-            let mut parse = DefaultParser::parse(Rule::arithmetic_op, input).unwrap();
+        let zipped = zip(zip(inputs, ops), rules);
+
+        for ((input, op), rule) in zipped {
+            let mut parse = DefaultParser::parse(rule, input).unwrap();
             assert_eq!(parse_operation(parse.next().unwrap()), op);
             assert!(parse.next().is_none());
         }
