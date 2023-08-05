@@ -4,7 +4,7 @@ use pest::Parser;
 use pest::iterators::{Pair, Pairs};
 use pest::error::Error as PestError;
 use crate::pts::variable_map::Variable;
-use crate::pts::linear_polynomial::Constant;
+use crate::pts::linear_polynomial::{Constant, Term};
 
 macro_rules! invariant_error {
     () => {
@@ -52,8 +52,6 @@ fn parse_operation<'a>(parse: Pair<'a, Rule>) -> Operation {
 
 // assumes the parses rule is Rule::constant_expr
 fn parse_constant_expr<'a>(parse: Pair<'a, Rule>) -> Constant {
-    
-    //TODO: doesn't do operation priority when chaining multiplicative and additive operations
     let mut iter = parse.into_inner().into_iter();
     let first = iter.next().unwrap();
     let mut acc = match first.as_rule() {
@@ -78,18 +76,35 @@ fn parse_constant_expr<'a>(parse: Pair<'a, Rule>) -> Constant {
     // unreachable!();
 }
 
+// assumes the parses rule is Rule::term
+fn parse_term<'a>(parse: Pair<'a, Rule>) -> Term {
+    let mut pairs = parse.into_inner();
+    // TODO: replace the hard coded defaults
+    let mut variable: Option<Variable> = None;
+    let mut coefficient = 1.0;
+    for pair in pairs {
+        match pair.as_rule() {
+            Rule::variable => variable = Some(parse_variable(pair)),
+            Rule::constant_expr => coefficient = parse_constant_expr(pair),
+            _ => panic!(invariant_error!()),
+        }
+    }
+    Term::new(variable, coefficient)
+}
+
+
 #[cfg(test)]
 mod tests {
-    use super::{DefaultParser, Rule, Parser, parse_variable, parse_constant, Operation, parse_operation, parse_constant_expr};
+    use super::{DefaultParser, Rule, Parser, Variable, parse_variable, parse_constant, Operation, parse_operation, parse_constant_expr, Term, parse_term};
     use std::iter::zip;
 
     #[test]
     fn variable_sanity() {
-        let variable_name = "abc";
-        let mut parse = DefaultParser::parse(Rule::variable, variable_name).unwrap();
+        let variable = Variable::new("abc");
+        let mut parse = DefaultParser::parse(Rule::variable, variable.as_str()).unwrap();
         let var = parse_variable(parse.next().unwrap());
         assert!(parse.next().is_none());
-        assert_eq!(var.as_str(), variable_name);
+        assert_eq!(var.as_str(), variable.as_str());
     }
 
     #[test]
@@ -121,5 +136,23 @@ mod tests {
         assert_eq!(parse_constant_expr(parse.next().unwrap()), 19.0);
         assert!(parse.next().is_none());
     }
+
+    #[test]
+    fn term_sanity() {
+        let mut parse = DefaultParser::parse(Rule::term, "5a").unwrap();
+        assert_eq!(parse_term(parse.next().unwrap()), Term::new(Some(Variable::new("a")), 5.0));
+        assert!(parse.next().is_none());
+        parse = DefaultParser::parse(Rule::term, "a * 5").unwrap();
+        assert_eq!(parse_term(parse.next().unwrap()), Term::new(Some(Variable::new("a")), 5.0));
+        assert!(parse.next().is_none());
+        parse = DefaultParser::parse(Rule::term, "a").unwrap();
+        assert_eq!(parse_term(parse.next().unwrap()), Term::new(Some(Variable::new("a")), 1.0));
+        assert!(parse.next().is_none());
+        parse = DefaultParser::parse(Rule::term, "5").unwrap();
+        assert_eq!(parse_term(parse.next().unwrap()), Term::new(None, 5.0));
+        assert!(parse.next().is_none());
+        
+    }
+
 }
 
