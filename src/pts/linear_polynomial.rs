@@ -1,4 +1,5 @@
 use crate::pts::variable_map::{Variable, VariableMap, VariableError};
+use std::ops::Neg;
 
 // TODO: make struct and interface for Constant
 pub type Constant = f64;
@@ -20,17 +21,25 @@ impl Term {
     }
 }
 
+impl Neg for Term {
+    type Output = Self;
+
+    fn neg(self) -> Self::Output {
+        Self::new(self.variable, -self.coefficient)
+    }
+}
+
 impl LinearPolynomial {
     pub fn new() -> Self {
         LinearPolynomial { coefficients: vec!(0.0) }
     }
 
-    fn len(&self) -> usize {
+    pub fn len(&self) -> usize {
         self.coefficients.len()
     }
 
     fn resize(&mut self, map: &VariableMap) {
-        if self.len() < map.len() {
+        if self.len() < map.len() + 1 {
             // +1 for constant term
             self.coefficients.resize(map.len() + 1, 0.0);
         }
@@ -80,24 +89,7 @@ impl LinearPolynomial {
 #[cfg(test)]
 mod tests {
     use super::{LinearPolynomial, Term, VariableMap, Variable, VariableError, Constant};
-
-    fn setup_map() -> VariableMap {
-        let mut map = VariableMap::new();
-        map.find_or_add(Variable::new("a"));
-        map.find_or_add(Variable::new("b"));
-        map.find_or_add(Variable::new("c"));
-        map
-    }
-
-    fn check_terms(pol: &LinearPolynomial, map: &VariableMap, vec: Vec<Option<Constant>>) {
-        assert_eq!(map.len() +1, vec.len());
-        assert!(map.len() <= pol.len());
-        for (index, element) in vec.iter().enumerate() {
-            if element.is_some() {
-                assert_eq!(pol.get_coefficient(index).unwrap(), element.unwrap());
-            }
-        }
-    }
+    use crate::pts::misc::{check_terms, setup_map};
 
     #[test]
     fn add_resizing() {

@@ -29,6 +29,21 @@ mod tests {
                 ])
             ]
         };
+        parses_to! {
+            parser: LinearPolynomialTestParser,
+            input: "- 1.2",
+            rule: Rule::linear_polynomial,
+            tokens: [
+                linear_polynomial(0, 5, [
+                    additive_op(0, 1),
+                    term(2, 5, [
+                         constant_expr(2, 5, [
+                            constant(2, 5)
+                         ])
+                    ])
+                ])
+            ]
+        };
     }
 
     #[test]

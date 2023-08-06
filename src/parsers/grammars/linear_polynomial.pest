@@ -1,4 +1,4 @@
-linear_polynomial = ${ additive_op? ~ term ~ ( WHITESPACE* ~ additive_op ~ WHITESPACE* ~ term)* }
+linear_polynomial = ${ additive_op? ~ WHITESPACE* ~ term ~ ( WHITESPACE* ~ additive_op ~ WHITESPACE* ~ term)* }
 
 term = ${ 
   variable ~ WHITESPACE* ~ "*" ~ WHITESPACE* ~ constant_expr |

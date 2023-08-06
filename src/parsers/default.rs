@@ -3,8 +3,8 @@ use crate::parsers::grammars::default::{DefaultParser, Rule};
 use pest::Parser;
 use pest::iterators::{Pair, Pairs};
 use pest::error::Error as PestError;
-use crate::pts::variable_map::Variable;
-use crate::pts::linear_polynomial::{Constant, Term};
+use crate::pts::variable_map::{Variable, VariableMap};
+use crate::pts::linear_polynomial::{Constant, Term, LinearPolynomial};
 
 macro_rules! invariant_error {
     () => {
@@ -92,11 +92,28 @@ fn parse_term<'a>(parse: Pair<'a, Rule>) -> Term {
     Term::new(variable, coefficient)
 }
 
+// assumes the parses rule is Rule::linear_polynomial
+fn parse_linear_polynomial<'a>(map: &mut VariableMap, parse: Pair<'a, Rule>) -> LinearPolynomial {
+    let mut op = Operation::Addition;
+    let mut pairs = parse.into_inner();
+    let mut pol = LinearPolynomial::new();
+    for pair in pairs {
+        match pair.as_rule() {
+            Rule::additive_op => op = parse_operation(pair),
+            Rule::term if op == Operation::Addition => pol.add_term(map, parse_term(pair)),
+            Rule::term if op == Operation::Subtraction => pol.add_term(map, -parse_term(pair)),
+            _ => panic!(invariant_error!()),
+        }
+    }
+    pol
+}
+
 
 #[cfg(test)]
 mod tests {
-    use super::{DefaultParser, Rule, Parser, Variable, parse_variable, parse_constant, Operation, parse_operation, parse_constant_expr, Term, parse_term};
+    use super::{DefaultParser, Rule, Parser, Variable, parse_variable, parse_constant, Operation, parse_operation, parse_constant_expr, Term, parse_term, parse_linear_polynomial, VariableMap};
     use std::iter::zip;
+    use crate::pts::misc::{check_terms};
 
     #[test]
     fn variable_sanity() {
@@ -152,6 +169,15 @@ mod tests {
         assert_eq!(parse_term(parse.next().unwrap()), Term::new(None, 5.0));
         assert!(parse.next().is_none());
         
+    }
+
+    #[test]
+    fn linear_polynomial_sanity() {
+        let mut parse = DefaultParser::parse(Rule::linear_polynomial, "- a + 5 -(1/2) * b").unwrap();
+        let mut map = VariableMap::new();
+        let pol = parse_linear_polynomial(&mut map, parse.next().unwrap());
+        assert!(parse.next().is_none());
+        check_terms(&pol, &map, vec!(Some(5.0), Some(-1.0), Some(-0.5)));
     }
 
 }
