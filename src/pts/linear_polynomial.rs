@@ -1,5 +1,6 @@
 use crate::pts::variable_map::{Variable, VariableMap, VariableError};
 
+// TODO: make struct and interface for Constant
 pub type Constant = f64;
 
 #[derive(Debug)]
@@ -35,7 +36,7 @@ impl LinearPolynomial {
         }
     }
 
-    pub fn add_term(&mut self, 
+    pub fn try_add_term(&mut self, 
                     map: &VariableMap,
                     term: Term) -> Result<(), VariableError> {
         self.resize(map);
@@ -53,6 +54,20 @@ impl LinearPolynomial {
                 self.coefficients[index.unwrap()] += term.coefficient;
                 Ok(())
             }
+        }
+    }
+
+    pub fn add_term(&mut self, 
+                    map: &mut VariableMap,
+                    term: Term) {
+        if term.variable.is_none() {
+            self.coefficients[0] += term.coefficient;
+            self.resize(map);
+        }
+        else{
+            let index = map.find_or_add(term.variable.unwrap());
+            self.resize(map);
+            self.coefficients[index] += term.coefficient;
         }
     }
 
@@ -88,8 +103,9 @@ mod tests {
     fn add_resizing() {
         let mut pol = LinearPolynomial::new();
         assert_eq!(pol.len(), 1);
-        let map = setup_map();
-        pol.add_term(&map, Term::new(Option::<&Variable>::cloned(map.get_variable(1)), 0.0)).unwrap();
+        let mut map = setup_map();
+        let var = Option::<&Variable>::cloned(map.get_variable(1));
+        pol.add_term(&mut map, Term::new(var, 0.0));
         assert_eq!(pol.len(), map.len() + 1);
         check_terms(&pol, &map, vec!(Some(0.0), Some(0.0), Some(0.0), Some(0.0)));
     }
@@ -97,31 +113,72 @@ mod tests {
     #[test]
     fn add_variable() {
         let mut pol = LinearPolynomial::new();
-        let map = setup_map();
+        let mut map = setup_map();
         let b = Variable::new("b");
-        pol.add_term(&map, Term::new(Some(b.clone()), 1.0)).unwrap();
-        check_terms(&pol, &map, vec!(Some(0.0), Some(0.0), Some(1.0), Some(0.0)));
-        pol.add_term(&map, Term::new(Some(b), 1.0)).unwrap();
+        pol.add_term(&mut map, Term::new(Some(b.clone()), 1.0));
+        check_terms(&pol, &mut map, vec!(Some(0.0), Some(0.0), Some(1.0), Some(0.0)));
+        pol.add_term(&mut map, Term::new(Some(b), 1.0));
         check_terms(&pol, &map, vec!(Some(0.0), Some(0.0), Some(2.0), Some(0.0)));
     }
 
     #[test]
     fn add_constant() {
         let mut pol = LinearPolynomial::new();
-        let map = setup_map();
-        pol.add_term(&map, Term::new(None, 1.0)).unwrap();
+        let mut map = setup_map();
+        pol.add_term(&mut map, Term::new(None, 1.0));
         check_terms(&pol, &map, vec!(Some(1.0), Some(0.0), Some(0.0), Some(0.0)));
-        pol.add_term(&map, Term::new(None, 1.0)).unwrap();
+        pol.add_term(&mut map, Term::new(None, 1.0));
         check_terms(&pol, &map, vec!(Some(2.0), Some(0.0), Some(0.0), Some(0.0)));
     }
 
     #[test]
     fn add_out_of_bounds() {
         let mut pol = LinearPolynomial::new();
+        let mut map = setup_map();
+        let e = Variable::new("e");
+        pol.add_term(&mut map, Term::new(Some(e), 1.0));
+        check_terms(&pol, &map, vec!(Some(0.0), Some(0.0), Some(0.0), Some(0.0), Some(1.0)));
+    }
+
+    #[test]
+    fn try_add_resizing() {
+        let mut pol = LinearPolynomial::new();
+        assert_eq!(pol.len(), 1);
+        let map = setup_map();
+        assert_eq!(pol.try_add_term(&map, Term::new(Option::<&Variable>::cloned(map.get_variable(1)), 0.0)), Ok(()));
+        assert_eq!(pol.len(), map.len() + 1);
+        check_terms(&pol, &map, vec!(Some(0.0), Some(0.0), Some(0.0), Some(0.0)));
+    }
+    
+    #[test]
+    fn try_add_variable() {
+        let mut pol = LinearPolynomial::new();
+        let map = setup_map();
+        let b = Variable::new("b");
+        pol.try_add_term(&map, Term::new(Some(b.clone()), 1.0)).unwrap();
+        check_terms(&pol, &map, vec!(Some(0.0), Some(0.0), Some(1.0), Some(0.0)));
+        pol.try_add_term(&map, Term::new(Some(b), 1.0)).unwrap();
+        check_terms(&pol, &map, vec!(Some(0.0), Some(0.0), Some(2.0), Some(0.0)));
+    }
+
+    #[test]
+    fn try_add_constant() {
+        let mut pol = LinearPolynomial::new();
+        let map = setup_map();
+        pol.try_add_term(&map, Term::new(None, 1.0)).unwrap();
+        check_terms(&pol, &map, vec!(Some(1.0), Some(0.0), Some(0.0), Some(0.0)));
+        pol.try_add_term(&map, Term::new(None, 1.0)).unwrap();
+        check_terms(&pol, &map, vec!(Some(2.0), Some(0.0), Some(0.0), Some(0.0)));
+    }
+
+    #[test]
+    fn try_add_out_of_bounds() {
+        let mut pol = LinearPolynomial::new();
         let map = setup_map();
         let e = Variable::new("e");
-        assert_eq!(pol.add_term(&map, Term::new(Some(e.clone()), 1.0)), Err(VariableError::new(&e)));
+        assert_eq!(pol.try_add_term(&map, Term::new(Some(e.clone()), 1.0)), Err(VariableError::new(&e)));
         check_terms(&pol, &map, vec!(Some(0.0), Some(0.0), Some(0.0), Some(0.0)));
     }
 
 }
+
