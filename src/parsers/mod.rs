@@ -1,9 +1,9 @@
-use std::error;
-use std::fmt;
-use std::io::Read;
-use super::pts;
 pub mod default;
 mod grammars;
+use crate::pts::PTS;
+
+use std::error;
+use std::fmt;
 
 #[derive(Debug)]
 pub struct ParserError{
@@ -24,7 +24,7 @@ pub enum Parser {
 }
 
 pub fn parse<'a>(parser: Parser, input: &str)
-                                        -> Result<pts::PTS<'a>, ParserError> {
+                                        -> Result<PTS<'a>, ParserError> {
     match parser {
         Default => default::parse(input)
     }

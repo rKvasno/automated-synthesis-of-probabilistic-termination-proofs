@@ -1,10 +1,13 @@
-use super::{pts, ParserError};
-use crate::parsers::grammars::default::{DefaultParser, Rule};
+use crate::{pts, parsers};
+use parsers::grammars::default::{DefaultParser, Rule};
+use parsers::ParserError;
 use pest::Parser;
 use pest::iterators::{Pair, Pairs};
 use pest::error::Error as PestError;
-use crate::pts::variable_map::{Variable, VariableMap};
-use crate::pts::linear_polynomial::{Constant, Term, LinearPolynomial};
+use pts::variable_map::{Variable, VariableMap};
+use pts::linear_polynomial::LinearPolynomial;
+use pts::linear_polynomial::term::Term;
+use pts::linear_polynomial::constant::{ONE, Constant};
 
 macro_rules! invariant_error {
     () => {
@@ -35,7 +38,7 @@ fn parse_variable<'a>(parse: Pair<'a, Rule>) -> Variable {
 // assumes the parses rule is Rule::constant
 fn parse_constant<'a>(parse: Pair<'a, Rule>) -> Constant {
     // all parses have to follow f64 grammar, no need to handle errors
-    parse.as_str().parse::<f64>().expect(invariant_error!())
+    parse.as_str().parse::<Constant>().expect(invariant_error!())
 }
 
 // assumes the parses rule is Rule::power_op, Rule::multiplicative_op or Rule::additive_op
@@ -70,7 +73,7 @@ fn parse_constant_expr<'a>(parse: Pair<'a, Rule>) -> Constant {
             Operation::Subtraction => acc -= parse_constant_expr(iter.next().unwrap()),
             Operation::Multiplication => acc *= parse_constant_expr(iter.next().unwrap()),
             Operation::Division => acc /= parse_constant_expr(iter.next().unwrap()),
-            Operation::Power => acc = acc.powf(parse_constant_expr(iter.next().unwrap())),
+            Operation::Power => acc = acc.pow(parse_constant_expr(iter.next().unwrap())),
         }
     }
     // unreachable!();
@@ -79,9 +82,8 @@ fn parse_constant_expr<'a>(parse: Pair<'a, Rule>) -> Constant {
 // assumes the parses rule is Rule::term
 fn parse_term<'a>(parse: Pair<'a, Rule>) -> Term {
     let mut pairs = parse.into_inner();
-    // TODO: replace the hard coded defaults
     let mut variable: Option<Variable> = None;
-    let mut coefficient = 1.0;
+    let mut coefficient = ONE;
     for pair in pairs {
         match pair.as_rule() {
             Rule::variable => variable = Some(parse_variable(pair)),
@@ -111,9 +113,10 @@ fn parse_linear_polynomial<'a>(map: &mut VariableMap, parse: Pair<'a, Rule>) -> 
 
 #[cfg(test)]
 mod tests {
-    use super::{DefaultParser, Rule, Parser, Variable, parse_variable, parse_constant, Operation, parse_operation, parse_constant_expr, Term, parse_term, parse_linear_polynomial, VariableMap};
+    use super::{DefaultParser, Rule, Operation, Variable, Parser, Term, VariableMap, Constant,
+    parse_variable, parse_constant, parse_operation, parse_constant_expr, parse_term, parse_linear_polynomial};
     use std::iter::zip;
-    use crate::pts::misc::{check_terms};
+    use crate::misc::check_terms;
 
     #[test]
     fn variable_sanity() {
@@ -129,7 +132,7 @@ mod tests {
         let mut parse = DefaultParser::parse(Rule::constant, "123").unwrap();
         let constant = parse_constant(parse.next().unwrap());
         assert!(parse.next().is_none());
-        assert_eq!(constant, 123.0);
+        assert_eq!(constant, Constant::new(123.0));
     }
 
     #[test]
@@ -150,23 +153,23 @@ mod tests {
     #[test]
     fn constant_expr_sanity() {
         let mut parse = DefaultParser::parse(Rule::constant_expr, "((4^2 + 5) - (2 * 2 / 2))").unwrap();
-        assert_eq!(parse_constant_expr(parse.next().unwrap()), 19.0);
+        assert_eq!(parse_constant_expr(parse.next().unwrap()), Constant::new(19.0));
         assert!(parse.next().is_none());
     }
 
     #[test]
     fn term_sanity() {
         let mut parse = DefaultParser::parse(Rule::term, "5a").unwrap();
-        assert_eq!(parse_term(parse.next().unwrap()), Term::new(Some(Variable::new("a")), 5.0));
+        assert_eq!(parse_term(parse.next().unwrap()), Term::new(Some(Variable::new("a")), Constant::new(5.0)));
         assert!(parse.next().is_none());
         parse = DefaultParser::parse(Rule::term, "a * 5").unwrap();
-        assert_eq!(parse_term(parse.next().unwrap()), Term::new(Some(Variable::new("a")), 5.0));
+        assert_eq!(parse_term(parse.next().unwrap()), Term::new(Some(Variable::new("a")), Constant::new(5.0)));
         assert!(parse.next().is_none());
         parse = DefaultParser::parse(Rule::term, "a").unwrap();
-        assert_eq!(parse_term(parse.next().unwrap()), Term::new(Some(Variable::new("a")), 1.0));
+        assert_eq!(parse_term(parse.next().unwrap()), Term::new(Some(Variable::new("a")), Constant::new(1.0)));
         assert!(parse.next().is_none());
         parse = DefaultParser::parse(Rule::term, "5").unwrap();
-        assert_eq!(parse_term(parse.next().unwrap()), Term::new(None, 5.0));
+        assert_eq!(parse_term(parse.next().unwrap()), Term::new(None, Constant::new(5.0)));
         assert!(parse.next().is_none());
         
     }
@@ -177,7 +180,7 @@ mod tests {
         let mut map = VariableMap::new();
         let pol = parse_linear_polynomial(&mut map, parse.next().unwrap());
         assert!(parse.next().is_none());
-        check_terms(&pol, &map, vec!(Some(5.0), Some(-1.0), Some(-0.5)));
+        check_terms(&pol, &map, vec!(Some(Constant::new(5.0)), Some(Constant::new(-1.0)), Some(Constant::new(-0.5))));
     }
 
 }

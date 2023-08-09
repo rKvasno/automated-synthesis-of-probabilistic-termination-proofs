@@ -1,5 +1,8 @@
-use crate::pts::linear_polynomial::{LinearPolynomial, Constant};
-use crate::pts::variable_map::{VariableMap, Variable};
+use crate::pts::{linear_polynomial, variable_map};
+use linear_polynomial::LinearPolynomial;
+use linear_polynomial::constant::Constant;
+use variable_map::{VariableMap, Variable};
+
 pub fn setup_map() -> VariableMap {
     let mut map = VariableMap::new();
     map.find_or_add(Variable::new("a"));

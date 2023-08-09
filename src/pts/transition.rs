@@ -1,6 +1,7 @@
-use crate::pts::location::LocationHandle;
-use crate::pts::variable_map::Variable;
-use crate::pts::linear_polynomial::LinearPolynomial;
+use crate::pts::{location, variable_map, linear_polynomial};
+use location::LocationHandle;
+use variable_map::Variable;
+use linear_polynomial::LinearPolynomial;
 
 
 #[derive(Debug)]

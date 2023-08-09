@@ -3,10 +3,10 @@ mod location;
 mod transition;
 pub mod variable_map;
 pub mod linear_polynomial;
-pub mod misc;
 
-use crate::pts::location::{Location, LocationHandle};
-use crate::pts::variable_map::VariableMap;
+use location::{Location, LocationHandle};
+use variable_map::VariableMap;
+
 use std::cell::RefCell;
 
 #[derive(Debug)]
