@@ -6,7 +6,13 @@ use linear_polynomial::LinearPolynomial;
 
 #[derive(Debug)]
 #[repr(align(32))] // 32 bytes
-struct Assignment(Variable, LinearPolynomial);
+pub struct Assignment(pub Variable, pub LinearPolynomial);
+
+impl Assignment {
+    pub fn new(var: Variable, pol: LinearPolynomial) -> Self {
+        Assignment( var, pol )
+    }
+}
 
 #[derive(Debug)]
 #[repr(align(32))] // 32 bytes

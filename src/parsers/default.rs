@@ -8,6 +8,7 @@ use pts::variable_map::{Variable, VariableMap};
 use pts::linear_polynomial::LinearPolynomial;
 use pts::linear_polynomial::term::Term;
 use pts::linear_polynomial::constant::{ONE, Constant};
+use pts::transition::Assignment;
 
 macro_rules! invariant_error {
     () => {
@@ -110,13 +111,21 @@ fn parse_linear_polynomial<'a>(map: &mut VariableMap, parse: Pair<'a, Rule>) -> 
     pol
 }
 
+// assumes the parses rule is Rule::assign
+fn parse_assign<'a>(map: &mut VariableMap, parse: Pair<'a, Rule>) -> Assignment {
+    let mut pairs = parse.into_inner();
+    let var: Variable = parse_variable(pairs.next().unwrap());
+    map.find_or_add(var.clone());
+    let pol: LinearPolynomial = parse_linear_polynomial(map, pairs.next().unwrap());
+    Assignment::new(var, pol)
+}
 
 #[cfg(test)]
 mod tests {
     use super::{DefaultParser, Rule, Operation, Variable, Parser, Term, VariableMap, Constant,
     parse_variable, parse_constant, parse_operation, parse_constant_expr, parse_term, parse_linear_polynomial};
     use std::iter::zip;
-    use crate::misc::check_terms;
+    use crate::{misc::check_terms, parsers::default::parse_assign};
 
     #[test]
     fn variable_sanity() {
@@ -181,6 +190,16 @@ mod tests {
         let pol = parse_linear_polynomial(&mut map, parse.next().unwrap());
         assert!(parse.next().is_none());
         check_terms(&pol, &map, vec!(Some(Constant::new(5.0)), Some(Constant::new(-1.0)), Some(Constant::new(-0.5))));
+    }
+
+    #[test]
+    fn assignment_sanity() {
+        let mut parse = DefaultParser::parse(Rule::assign, "x = -2a + 4b - 0c - 2").unwrap();
+        let mut map = VariableMap::new();
+        let assign = parse_assign(&mut map, parse.next().unwrap());
+        assert!(parse.next().is_none());
+        assert_eq!(assign.0, Variable::new("x"));
+        check_terms(&assign.1, &map, vec!(Some(Constant::new(-2.0)), Some(Constant::new(0.0)), Some(Constant::new(-2.0)), Some(Constant::new(4.0)), Some(Constant::new(0.0))));
     }
 
 }

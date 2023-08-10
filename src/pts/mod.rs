@@ -1,6 +1,6 @@
 mod guard;
 mod location;
-mod transition;
+pub mod transition;
 pub mod variable_map;
 pub mod linear_polynomial;
 
