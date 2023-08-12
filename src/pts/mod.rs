@@ -1,4 +1,4 @@
-mod guard;
+pub mod guard;
 mod location;
 pub mod transition;
 pub mod variable_map;

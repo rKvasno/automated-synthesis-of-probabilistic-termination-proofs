@@ -3,8 +3,9 @@ pub mod term;
 use crate::pts::variable_map::{VariableMap, VariableError};
 use constant::{Constant, ZERO};
 use term::Term;
+use std::{ops::{AddAssign, SubAssign, Add, Sub}, iter::zip};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct LinearPolynomial {
     coefficients: Vec<Constant>
 }
@@ -63,14 +64,49 @@ impl LinearPolynomial {
     pub fn get_coefficient(&self, index: usize) -> Option<Constant> {
         self.coefficients.get(index).map(|x| x.clone())
     }
+}
 
+impl AddAssign for LinearPolynomial {
+    fn add_assign(&mut self, other: Self) {
+        let iter = zip(self.coefficients.iter_mut(), other.coefficients.into_iter());
+        for (lhs, rhs) in iter {
+            *lhs += rhs;
+        }
+    }
+}
+
+impl Add for LinearPolynomial {
+    type Output = Self;
+
+    fn add(mut self, other: Self) -> Self::Output {
+        self += other;
+        self
+    }
+}
+
+impl SubAssign for LinearPolynomial {
+    fn sub_assign(&mut self, other: Self) {
+        let iter = zip(self.coefficients.iter_mut(), other.coefficients.into_iter());
+        for (lhs, rhs) in iter {
+            *lhs -= rhs;
+        }
+    }
+}
+
+impl Sub for LinearPolynomial {
+    type Output = Self;
+
+    fn sub(mut self, other: Self) -> Self::Output {
+        self -= other;
+        self
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::{LinearPolynomial, Term, VariableError, Constant, ZERO};
     use crate::pts::linear_polynomial::constant::ONE;
-    use crate::misc::{check_terms, setup_test_map};
+    use crate::misc::{check_terms, setup_test_map, setup_test_polynomial};
     use crate::pts::variable_map::Variable;
 
     #[test]
@@ -154,5 +190,38 @@ mod tests {
         check_terms(&pol, &map, vec!(Some(ZERO), Some(ZERO), Some(ZERO), Some(ZERO)));
     }
 
+    #[test]
+    fn arithmetic_add() {
+        let mut map = setup_test_map();
+        let one = Constant::new(1.0);
+        let two = Constant::new(2.0);
+        let three = Constant::new(3.0);
+        let four = Constant::new(4.0);
+        let mut lhs = setup_test_polynomial(&mut map, one, two, three, four);
+        let rhs = setup_test_polynomial(&mut map, four, three, two, one);
+        let five = Constant::new(5.0);
+        let sum = lhs.clone() + rhs.clone();
+        check_terms(&sum, &map, vec!(Some(five), Some(five), Some(five), Some(five)));
+        lhs += rhs;
+        check_terms(&lhs, &map, vec!(Some(five), Some(five), Some(five), Some(five)));
+    }
+    
+    #[test]
+    fn arithmetic_sub() {
+        let mut map = setup_test_map();
+        let one = Constant::new(1.0);
+        let two = Constant::new(2.0);
+        let three = Constant::new(3.0);
+        let four = Constant::new(4.0);
+        let five = Constant::new(5.0);
+        let mut lhs = setup_test_polynomial(&mut map, two, three, four, five);
+        let rhs = setup_test_polynomial(&mut map, one, one, one, one);
+        let diff = lhs.clone() - rhs.clone();
+        check_terms(&diff, &map, vec!(Some(one), Some(two), Some(three), Some(four)));
+        lhs -= rhs;
+        check_terms(&lhs, &map, vec!(Some(one), Some(two), Some(three), Some(four)));
+    }
+
 }
+
 
