@@ -70,14 +70,14 @@ impl LinearPolynomial {
 mod tests {
     use super::{LinearPolynomial, Term, VariableError, Constant, ZERO};
     use crate::pts::linear_polynomial::constant::ONE;
-    use crate::misc::{check_terms, setup_map};
+    use crate::misc::{check_terms, setup_test_map};
     use crate::pts::variable_map::Variable;
 
     #[test]
     fn add_resizing() {
         let mut pol = LinearPolynomial::new();
         assert_eq!(pol.len(), 1);
-        let mut map = setup_map();
+        let mut map = setup_test_map();
         let var = Option::<&Variable>::cloned(map.get_variable(1));
         pol.add_term(&mut map, Term::new(var, ZERO));
         assert_eq!(pol.len(), map.len() + 1);
@@ -87,7 +87,7 @@ mod tests {
     #[test]
     fn add_variable() {
         let mut pol = LinearPolynomial::new();
-        let mut map = setup_map();
+        let mut map = setup_test_map();
         let b = Variable::new("b");
         pol.add_term(&mut map, Term::new(Some(b.clone()), ONE));
         check_terms(&pol, &mut map, vec!(Some(ZERO), Some(ZERO), Some(ONE), Some(ZERO)));
@@ -98,7 +98,7 @@ mod tests {
     #[test]
     fn add_constant() {
         let mut pol = LinearPolynomial::new();
-        let mut map = setup_map();
+        let mut map = setup_test_map();
         pol.add_term(&mut map, Term::new(None, ONE));
         check_terms(&pol, &map, vec!(Some(ONE), Some(ZERO), Some(ZERO), Some(ZERO)));
         pol.add_term(&mut map, Term::new(None, ONE));
@@ -108,7 +108,7 @@ mod tests {
     #[test]
     fn add_out_of_bounds() {
         let mut pol = LinearPolynomial::new();
-        let mut map = setup_map();
+        let mut map = setup_test_map();
         let e = Variable::new("e");
         pol.add_term(&mut map, Term::new(Some(e), ONE));
         check_terms(&pol, &map, vec!(Some(ZERO), Some(ZERO), Some(ZERO), Some(ZERO), Some(ONE)));
@@ -118,7 +118,7 @@ mod tests {
     fn try_add_resizing() {
         let mut pol = LinearPolynomial::new();
         assert_eq!(pol.len(), 1);
-        let map = setup_map();
+        let map = setup_test_map();
         assert_eq!(pol.try_add_term(&map, Term::new(Option::<&Variable>::cloned(map.get_variable(1)), ZERO)), Ok(()));
         assert_eq!(pol.len(), map.len() + 1);
         check_terms(&pol, &map, vec!(Some(ZERO), Some(ZERO), Some(ZERO), Some(ZERO)));
@@ -127,7 +127,7 @@ mod tests {
     #[test]
     fn try_add_variable() {
         let mut pol = LinearPolynomial::new();
-        let map = setup_map();
+        let map = setup_test_map();
         let b = Variable::new("b");
         pol.try_add_term(&map, Term::new(Some(b.clone()), ONE)).unwrap();
         check_terms(&pol, &map, vec!(Some(ZERO), Some(ZERO), Some(ONE), Some(ZERO)));
@@ -138,7 +138,7 @@ mod tests {
     #[test]
     fn try_add_constant() {
         let mut pol = LinearPolynomial::new();
-        let map = setup_map();
+        let map = setup_test_map();
         pol.try_add_term(&map, Term::new(None, ONE)).unwrap();
         check_terms(&pol, &map, vec!(Some(ONE), Some(ZERO), Some(ZERO), Some(ZERO)));
         pol.try_add_term(&map, Term::new(None, ONE)).unwrap();
@@ -148,7 +148,7 @@ mod tests {
     #[test]
     fn try_add_out_of_bounds() {
         let mut pol = LinearPolynomial::new();
-        let map = setup_map();
+        let map = setup_test_map();
         let e = Variable::new("e");
         assert_eq!(pol.try_add_term(&map, Term::new(Some(e.clone()), ONE)), Err(VariableError::new(&e)));
         check_terms(&pol, &map, vec!(Some(ZERO), Some(ZERO), Some(ZERO), Some(ZERO)));
