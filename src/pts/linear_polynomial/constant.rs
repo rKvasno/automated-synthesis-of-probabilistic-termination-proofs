@@ -38,6 +38,15 @@ impl Neg for Constant {
     }
 }
 
+impl Neg for &mut Constant {
+    type Output = Self;
+
+    fn neg(self) -> Self::Output {
+        self.value = -self.value;
+        self
+    }
+}
+
 impl AddAssign for Constant {
     fn add_assign(&mut self, other: Self) {
         self.value += other.value;

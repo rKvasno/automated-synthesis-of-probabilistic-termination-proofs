@@ -24,3 +24,12 @@ impl Neg for Term {
     }
 }
 
+impl Neg for &mut Term {
+    type Output = Self;
+
+    fn neg(self) -> Self::Output {
+        self.coefficient = -self.coefficient;
+        self
+    }
+}
+
