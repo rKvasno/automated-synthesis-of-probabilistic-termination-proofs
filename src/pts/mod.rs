@@ -1,5 +1,5 @@
 pub mod guard;
-mod location;
+pub mod location;
 pub mod transition;
 pub mod inequality;
 pub mod variable_map;

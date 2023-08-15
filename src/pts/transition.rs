@@ -18,11 +18,11 @@ impl Assignment {
 #[repr(align(32))] // 32 bytes
 pub struct Transition<'a> { 
     assignments: Vec<Assignment>,
-    target: Option<LocationHandle<'a>>
+    target: LocationHandle<'a>
 }
 
 impl<'a> Transition<'a> {
-    fn new(target: Option<LocationHandle<'a>>) -> Self {
+    fn new(target: LocationHandle<'a>) -> Self {
         Transition { assignments: vec!(),  target }
     }
 }

@@ -1,3 +1,4 @@
+use crate::pts::PTS;
 use crate::{pts, parsers};
 use parsers::grammars::default::{DefaultParser, Rule};
 use parsers::ParserError;
@@ -10,6 +11,7 @@ use pts::linear_polynomial::term::Term;
 use pts::linear_polynomial::constant::{ONE, Constant};
 use pts::transition::Assignment;
 use pts::inequality::{Inequality, ComparisonOperator, InequalitySystem};
+use pts::location::LocationHandle;
 
 macro_rules! invariant_error {
     () => {
@@ -148,6 +150,30 @@ fn parse_inequality_system<'a>(map: &mut VariableMap, parse: Pair<'a, Rule>) -> 
         system.push(parse_inequality(map, &mut pairs));
     }
     system
+}
+
+fn parse_program<'a>(pts: &mut PTS, parse: Pair<'a, Rule>, start: LocationHandle, end: LocationHandle) {
+    todo!()
+}
+
+fn parse_locations<'a>(pts: &mut PTS, parse: Pair<'a, Rule>, start: LocationHandle, end: LocationHandle) {
+    todo!()
+}
+
+fn parse_while<'a>(pts: &mut PTS, parse: Pair<'a, Rule>, start: LocationHandle, end: LocationHandle) {
+    todo!()
+}
+
+fn parse_nondet<'a>(pts: &mut PTS, parse: Pair<'a, Rule>, start: LocationHandle, end: LocationHandle) {
+    
+}
+
+fn parse_if<'a>(pts: &mut PTS, parse: Pair<'a, Rule>, start: LocationHandle, end: LocationHandle) {
+    todo!()
+}
+
+fn parse_odds<'a>(pts: &mut PTS, parse: Pair<'a, Rule>, start: LocationHandle, end: LocationHandle) {
+    todo!()
 }
 
 
