@@ -1,13 +1,13 @@
-use crate::pts::{guard, linear_polynomial};
-use guard::Guards;
-use linear_polynomial::LinearPolynomial;
+use crate::pts;
+use pts::guard::Guards;
+use pts::inequality::InequalitySystem;
 
 use std::cell::RefCell;
 
 #[derive(Debug)]
 #[repr(align(64))] // 64 bytes
 pub struct Location<'a> {
-    pub invariant: Vec<LinearPolynomial>,
+    pub invariant: InequalitySystem,
     pub outgoing: Guards<'a>,
 }
 

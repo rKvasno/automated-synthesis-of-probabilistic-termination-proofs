@@ -9,7 +9,7 @@ use pts::linear_polynomial::LinearPolynomial;
 use pts::linear_polynomial::term::Term;
 use pts::linear_polynomial::constant::{ONE, Constant};
 use pts::transition::Assignment;
-use pts::guard::{Inequality, ComparisonOperator};
+use pts::inequality::{Inequality, ComparisonOperator};
 
 macro_rules! invariant_error {
     () => {
@@ -139,6 +139,7 @@ fn parse_inequality<'a>(map: &mut VariableMap, pairs: &mut Pairs<'a, Rule>) -> I
     let rhs: LinearPolynomial = parse_linear_polynomial(map, pairs.next().unwrap());
     Inequality::new(lhs, op, rhs)
 }
+
 
 #[cfg(test)]
 mod tests {
