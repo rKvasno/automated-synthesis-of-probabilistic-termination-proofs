@@ -9,6 +9,7 @@ use pts::linear_polynomial::LinearPolynomial;
 use pts::linear_polynomial::term::Term;
 use pts::linear_polynomial::constant::{ONE, Constant};
 use pts::transition::Assignment;
+use pts::guard::{Inequality, ComparisonOperator};
 
 macro_rules! invariant_error {
     () => {
@@ -17,7 +18,7 @@ macro_rules! invariant_error {
 }
 
 #[derive(Debug, PartialEq, Eq)]
-enum Operation {
+pub enum Operation {
     Addition,
     Subtraction,
     Multiplication,
@@ -120,12 +121,31 @@ fn parse_assign<'a>(map: &mut VariableMap, parse: Pair<'a, Rule>) -> Assignment 
     Assignment::new(var, pol)
 }
 
+// assumes the parses rule is Rule::comparison_op
+fn parse_comparison_op<'a> (parse: Pair<'a, Rule>) -> ComparisonOperator {
+    match parse.as_str(){
+        ">" => ComparisonOperator::GT,
+        ">=" => ComparisonOperator::GE,
+        "<" => ComparisonOperator::LT,
+        "<=" => ComparisonOperator::LE,
+        _ => panic!(invariant_error!()),
+    }
+}
+
+// assumes pairs is the iterator of a parse with rule Rule::logic_condition
+fn parse_inequality<'a>(map: &mut VariableMap, pairs: &mut Pairs<'a, Rule>) -> Inequality {
+    let lhs: LinearPolynomial = parse_linear_polynomial(map, pairs.next().unwrap());
+    let op = parse_comparison_op(pairs.next().unwrap());
+    let rhs: LinearPolynomial = parse_linear_polynomial(map, pairs.next().unwrap());
+    Inequality::new(lhs, op, rhs)
+}
+
 #[cfg(test)]
 mod tests {
     use super::{DefaultParser, Rule, Operation, Variable, Parser, Term, VariableMap, Constant,
     parse_variable, parse_constant, parse_operation, parse_constant_expr, parse_term, parse_linear_polynomial};
     use std::iter::zip;
-    use crate::{misc::check_terms, parsers::default::parse_assign};
+    use crate::{misc::check_terms, parsers::default::{parse_assign, parse_inequality}};
 
     #[test]
     fn variable_sanity() {
@@ -202,5 +222,15 @@ mod tests {
         check_terms(&assign.1, &map, vec!(Some(Constant::new(-2.0)), Some(Constant::new(0.0)), Some(Constant::new(-2.0)), Some(Constant::new(4.0)), Some(Constant::new(0.0))));
     }
 
+    #[test]
+    fn inequality_sanity() {
+        let mut map = VariableMap::new();
+        let mut parse = DefaultParser::parse(Rule::logic_condition, "3a - 4 + b < 0").unwrap();
+        let mut pairs = parse.next().unwrap().into_inner();
+        assert!(parse.next().is_none());
+        let cond = parse_inequality(&mut map, &mut pairs);
+        assert!(pairs.next().is_none());
+        check_terms(&cond.as_linear_polynomial(), &map, vec!(Some(Constant::new(-4.0)), Some(Constant::new(3.0)), Some(Constant::new(1.0))));
+    }
 }
 

@@ -29,7 +29,7 @@ logic_condition = { inequality ~ ( "and" ~ inequality )* }
 prob_condition = { constant ~ ":" ~ constant }
 nondet_condition = { "nondet" }
 
-inequality = _{ linear_polynomial ~ comparator ~ linear_polynomial }
-comparator = @{ "<=" | ">=" | "<" | ">" }
+inequality = _{ linear_polynomial ~ comparison_op ~ linear_polynomial }
+comparison_op = @{ "<=" | ">=" | "<" | ">" }
 
 COMMENT = _{ "##" ~ (!NEWLINE ~ ANY)* ~ NEWLINE }

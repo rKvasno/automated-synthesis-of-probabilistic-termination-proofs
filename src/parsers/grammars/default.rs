@@ -33,7 +33,7 @@ mod tests {
                                         ])
                                     ])
                                 ]),
-                                comparator(4, 5),
+                                comparison_op(4, 5),
                                 linear_polynomial(6, 7, [
                                     term(6, 7, [
                                         constant_expr(6, 7, [
@@ -63,7 +63,7 @@ mod tests {
                                     ])
                                 ])
                             ]),
-                            comparator(18, 19),
+                            comparison_op(18, 19),
                             linear_polynomial(20, 21, [
                                 term(20, 21, [
                                     constant_expr(20, 21, [
@@ -102,7 +102,7 @@ mod tests {
                                                 variable(17, 18)
                                             ])
                                         ]),
-                                        comparator(19, 20),
+                                        comparison_op(19, 20),
                                         linear_polynomial(21, 22, [
                                             term(21, 22, [
                                                 variable(21, 22)
@@ -130,7 +130,7 @@ mod tests {
                                             variable(39, 40)
                                         ])
                                     ]),
-                                    comparator(41, 43),
+                                    comparison_op(41, 43),
                                     linear_polynomial(44, 45, [
                                         term(44, 45, [
                                             variable(44, 45)
@@ -169,7 +169,7 @@ mod tests {
                                 variable(3, 4)
                             ])
                         ]), 
-                        comparator(5, 7),
+                        comparison_op(5, 7),
                         linear_polynomial(8, 9, [
                             term(8, 9, [
                                 variable(8, 9)
@@ -185,7 +185,7 @@ mod tests {
                                             variable(16, 17)
                                         ])
                                     ]),
-                                    comparator(18, 19),
+                                    comparison_op(18, 19),
                                     linear_polynomial(20, 21, [
                                         term(20, 21, [
                                             variable(20, 21)
@@ -211,7 +211,7 @@ mod tests {
                                         variable(40, 41)
                                     ])
                                 ]), 
-                                comparator(42, 44),
+                                comparison_op(42, 44),
                                 linear_polynomial(45, 46, [
                                     term(45, 46, [
                                         variable(45, 46)
@@ -227,7 +227,7 @@ mod tests {
                                                     variable(53, 54)
                                                 ])
                                             ]),
-                                            comparator(55, 56),
+                                            comparison_op(55, 56),
                                             linear_polynomial(57, 58, [
                                                 term(57, 58, [
                                                     variable(57, 58)
@@ -255,7 +255,7 @@ mod tests {
                                                         variable(80, 81)
                                                     ])
                                                 ]),
-                                                comparator(82, 83),
+                                                comparison_op(82, 83),
                                                 linear_polynomial(84, 85, [
                                                     term(84, 85, [
                                                         variable(84, 85)
@@ -299,7 +299,7 @@ mod tests {
                                             variable(13, 14)
                                         ])
                                     ]),
-                                    comparator(15, 16),
+                                    comparison_op(15, 16),
                                     linear_polynomial(17, 18, [
                                         term(17, 18, [
                                             variable(17, 18)
@@ -327,7 +327,7 @@ mod tests {
                                                 variable(38, 39)
                                             ])
                                         ]),
-                                        comparator(40, 41),
+                                        comparison_op(40, 41),
                                         linear_polynomial(42, 43, [
                                             term(42, 43, [
                                                 variable(42, 43)
@@ -355,7 +355,7 @@ mod tests {
                                                     variable(63, 64)
                                                 ])
                                             ]),
-                                            comparator(65, 66),
+                                            comparison_op(65, 66),
                                             linear_polynomial(67, 68, [
                                                 term(67, 68, [
                                                     variable(67, 68)
@@ -396,7 +396,7 @@ mod tests {
                                 variable(6, 7)
                             ])
                         ]),
-                        comparator(8, 9),
+                        comparison_op(8, 9),
                         linear_polynomial(10, 11, [
                             term(10, 11, [
                                 variable(10, 11)
@@ -407,7 +407,7 @@ mod tests {
                                 variable(16, 17)
                             ])
                         ]),
-                        comparator(18, 19),
+                        comparison_op(18, 19),
                         linear_polynomial(20, 21, [
                             term(20, 21, [
                                 variable(20, 21)
@@ -423,7 +423,7 @@ mod tests {
                                             variable(30, 31)
                                         ])
                                     ]),
-                                    comparator(32, 33),
+                                    comparison_op(32, 33),
                                     linear_polynomial(34, 35, [
                                         term(34, 35, [
                                             variable(34, 35)
@@ -469,7 +469,7 @@ mod tests {
                                             variable(20, 21)
                                         ])
                                     ]),
-                                    comparator(22, 23),
+                                    comparison_op(22, 23),
                                     linear_polynomial(24, 25, [
                                         term(24, 25, [
                                             variable(24, 25)
@@ -512,7 +512,7 @@ mod tests {
                                             variable(21, 22)
                                         ])
                                     ]),
-                                    comparator(23, 24),
+                                    comparison_op(23, 24),
                                     linear_polynomial(25, 26, [
                                         term(25, 26, [
                                             variable(25, 26)
@@ -552,7 +552,7 @@ mod tests {
                                     variable(2, 3)
                                 ])
                             ]),
-                            comparator(4, 5),
+                            comparison_op(4, 5),
                             linear_polynomial(6, 7, [
                                 term(6, 7, [
                                     variable(6, 7)
@@ -565,7 +565,7 @@ mod tests {
                                     variable(10, 11)
                                 ])
                             ]),
-                            comparator(12, 13),
+                            comparison_op(12, 13),
                             linear_polynomial(14, 15, [
                                 term(14, 15, [
                                     variable(14, 15)
@@ -578,7 +578,7 @@ mod tests {
                                     variable(18, 19)
                                 ])
                             ]),
-                            comparator(20, 21),
+                            comparison_op(20, 21),
                             linear_polynomial(22, 23, [
                                 term(22, 23, [
                                     variable(22, 23)
