@@ -9,7 +9,7 @@ use pts::linear_polynomial::LinearPolynomial;
 use pts::linear_polynomial::term::Term;
 use pts::linear_polynomial::constant::{ONE, Constant};
 use pts::transition::Assignment;
-use pts::inequality::{Inequality, ComparisonOperator};
+use pts::inequality::{Inequality, ComparisonOperator, InequalitySystem};
 
 macro_rules! invariant_error {
     () => {
@@ -140,13 +140,23 @@ fn parse_inequality<'a>(map: &mut VariableMap, pairs: &mut Pairs<'a, Rule>) -> I
     Inequality::new(lhs, op, rhs)
 }
 
+// assumes the parses rule is Rule::logic_condition
+fn parse_inequality_system<'a>(map: &mut VariableMap, parse: Pair<'a, Rule>) -> InequalitySystem {
+    let mut pairs = parse.into_inner();
+    let mut system = InequalitySystem::new();
+    while pairs.peek().is_some() {
+        system.push(parse_inequality(map, &mut pairs));
+    }
+    system
+}
+
 
 #[cfg(test)]
 mod tests {
     use super::{DefaultParser, Rule, Operation, Variable, Parser, Term, VariableMap, Constant,
     parse_variable, parse_constant, parse_operation, parse_constant_expr, parse_term, parse_linear_polynomial};
     use std::iter::zip;
-    use crate::{misc::check_terms, parsers::default::{parse_assign, parse_inequality}};
+    use crate::{misc::{check_terms, setup_test_map}, parsers::default::{parse_assign, parse_inequality, parse_inequality_system}};
 
     #[test]
     fn variable_sanity() {
@@ -231,7 +241,23 @@ mod tests {
         assert!(parse.next().is_none());
         let cond = parse_inequality(&mut map, &mut pairs);
         assert!(pairs.next().is_none());
+        assert!(cond.is_strict());
         check_terms(&cond.as_linear_polynomial(), &map, vec!(Some(Constant::new(-4.0)), Some(Constant::new(3.0)), Some(Constant::new(1.0))));
+    }
+
+    #[test]
+    fn inequality_system_sanity() {
+        let mut map = setup_test_map();
+        let mut parse = DefaultParser::parse(Rule::logic_condition, "- 2b - 4 < - a and 0 >= 0").unwrap();
+        let system = parse_inequality_system(&mut map, parse.next().unwrap());
+        assert!(parse.next().is_none());
+        let cond = system.get(0).unwrap();
+        check_terms(&cond.as_linear_polynomial(), &map, vec!(Some(Constant::new(-4.0)), Some(Constant::new(1.0)), Some(Constant::new(-2.0)), Some(Constant::new(0.0))));
+        assert!(cond.is_strict());
+        let cond = system.get(1).unwrap();
+        check_terms(&cond.as_linear_polynomial(), &map, vec!(Some(Constant::new(0.0)), Some(Constant::new(0.0)), Some(Constant::new(0.0)), Some(Constant::new(0.0))));
+        assert!(!cond.is_strict());
+        assert!(system.get(2).is_none());
     }
 }
 
