@@ -19,6 +19,15 @@ pub struct PTS<'a> {
 }
 
 impl<'a> PTS<'a> {
+    pub fn new_location(&'a mut self) -> LocationHandle<'a> {
+        self.locations.push(RefCell::<Location>::default());
+        self.locations.last()
+    }
+
+    pub fn add_location(&'a mut self, location: Location<'a>) -> LocationHandle<'a> {
+        self.locations.push(RefCell::new(location));
+        self.locations.last()
+    }
 }
 
 
