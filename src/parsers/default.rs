@@ -114,7 +114,7 @@ fn parse_linear_polynomial<'a>(map: &mut VariableMap, parse: Pair<'a, Rule>) -> 
     pol
 }
 
-// assumes the parses rule is Rule::assign
+// assumes the parses rule is Rule::assign_inst
 fn parse_assign<'a>(map: &mut VariableMap, parse: Pair<'a, Rule>) -> Assignment {
     let mut pairs = parse.into_inner();
     let var: Variable = parse_variable(pairs.next().unwrap());
@@ -251,7 +251,7 @@ mod tests {
 
     #[test]
     fn assignment_sanity() {
-        let mut parse = DefaultParser::parse(Rule::assign, "x = -2a + 4b - 0c - 2").unwrap();
+        let mut parse = DefaultParser::parse(Rule::assign_inst, "x = -2a + 4b - 0c - 2").unwrap();
         let mut map = VariableMap::default();
         let assign = parse_assign(&mut map, parse.next().unwrap());
         assert!(parse.next().is_none());

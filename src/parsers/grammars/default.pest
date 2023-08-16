@@ -1,26 +1,30 @@
 program = { SOI ~ locations ~ invariants ~ EOI }
 location = { invariants ~ instruction }
 
-invariants = { ("#" ~ logic_condition ~ NEWLINE)+}
+invariants = { ("#" ~ logic_condition ~ NEWLINE)+ }
 
-locations = _{ NEWLINE* ~ location ~ NEWLINE+ ~ locations | 
-               NEWLINE* ~ location ~ NEWLINE*             }
+locations = { NEWLINE* ~ location ~ NEWLINE+ ~ locations | 
+              NEWLINE* ~ location ~ NEWLINE*             }
 
-block = { NEWLINE* ~ "{" ~ locations ~ "}" }
+block = _{ NEWLINE* ~ "{" ~ locations ~ "}" }
 
-instruction = _{ "if "    ~ branch   |
-                 "odds "  ~ odds     | 
-                 "nondet" ~ nondet   |
-                 "while " ~ dowhile  |
-                 assign              }
+instruction = _{ if_inst     |
+                 prob_inst   | 
+                 nondet_inst |
+                 while_inst  |
+                 assign_inst }
 
-branch = { logic_condition ~ block ~ ( NEWLINE? ~ "else" ~ NEWLINE? ~ elseif)? }
-elseif =  { "if " ~ branch |
-            block          }
-odds = { constant ~ ":" ~ ( odds | constant ) ~ block }
-nondet = { block ~ ( NEWLINE? ~ "or" ~ NEWLINE? ~ nondet )?}
-dowhile = { condition ~ block }
-assign = { variable ~ "=" ~ linear_polynomial}
+if_inst = { "if " ~ if }
+if = _{ logic_condition ~ block ~ ( NEWLINE? ~ "else" ~ NEWLINE? ~ else)? }
+else =  _{ "if " ~ if |
+           block      }
+
+prob_inst = { "odds " ~ odds }
+odds = _{ constant ~ ":" ~ ( odds | constant ) ~ block }
+
+nondet_inst = { "nondet" ~ block ~ ( NEWLINE? ~ "or" ~ NEWLINE? ~ block )*}
+while_inst = { "while " ~ condition ~ block }
+assign_inst = { variable ~ "=" ~ linear_polynomial}
 
 condition = _{ logic_condition   |
                prob_condition    |
