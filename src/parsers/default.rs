@@ -243,7 +243,7 @@ mod tests {
     #[test]
     fn linear_polynomial_sanity() {
         let mut parse = DefaultParser::parse(Rule::linear_polynomial, "- a + 5 -(1/2) * b").unwrap();
-        let mut map = VariableMap::new();
+        let mut map = VariableMap::default();
         let pol = parse_linear_polynomial(&mut map, parse.next().unwrap());
         assert!(parse.next().is_none());
         check_terms(&pol, &map, vec!(Some(Constant::new(5.0)), Some(Constant::new(-1.0)), Some(Constant::new(-0.5))));
@@ -252,7 +252,7 @@ mod tests {
     #[test]
     fn assignment_sanity() {
         let mut parse = DefaultParser::parse(Rule::assign, "x = -2a + 4b - 0c - 2").unwrap();
-        let mut map = VariableMap::new();
+        let mut map = VariableMap::default();
         let assign = parse_assign(&mut map, parse.next().unwrap());
         assert!(parse.next().is_none());
         assert_eq!(assign.0, Variable::new("x"));
@@ -261,7 +261,7 @@ mod tests {
 
     #[test]
     fn inequality_sanity() {
-        let mut map = VariableMap::new();
+        let mut map = VariableMap::default();
         let mut parse = DefaultParser::parse(Rule::logic_condition, "3a - 4 + b < 0").unwrap();
         let mut pairs = parse.next().unwrap().into_inner();
         assert!(parse.next().is_none());

@@ -10,7 +10,7 @@ use variable_map::VariableMap;
 
 use std::cell::RefCell;
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 #[repr(align(32))] // 32 bytes
 pub struct PTS<'a> {
     locations: Vec<RefCell<Location<'a>>>,
@@ -19,9 +19,6 @@ pub struct PTS<'a> {
 }
 
 impl<'a> PTS<'a> {
-    fn new(initial: Option<LocationHandle<'a>>) -> Self {
-        PTS { locations: vec!(), variables: VariableMap::new(), initial }
-    }
 }
 
 

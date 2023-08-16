@@ -13,6 +13,12 @@ pub enum Guards<'a>{
     Unguarded(Box<Transition<'a>>)
 }
 
+impl <'a> Default for Guards<'a> {
+    fn default() -> Self {
+        Guards::Unguarded(Box::new(Transition::default()))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::mem;

@@ -5,13 +5,6 @@ pub struct Variable {
     name: Box<str>
 }
 
-// linear search in Vec is faster than logarithmic for small number of elements,
-// mostly due to caching
-#[derive(Debug)]
-pub struct VariableMap {
-    variables: Vec<Variable>
-}
-
 impl Variable {
     pub fn new(name: &str) -> Self {
         Variable{ name: name.to_string().into_boxed_str() }
@@ -28,11 +21,14 @@ impl fmt::Display for Variable {
     }
 }
 
-impl VariableMap {
-    pub fn new() -> Self {
-        VariableMap { variables: vec!() }
-    }
+// linear search in Vec is faster than logarithmic for small number of elements,
+// mostly due to caching
+#[derive(Debug, Default)]
+pub struct VariableMap {
+    variables: Vec<Variable>
+}
 
+impl VariableMap {
     pub fn len(&self) -> usize {
         self.variables.len()
     }
@@ -88,7 +84,7 @@ mod tests {
 
     #[test]
     fn out_of_bounds() {
-        let mut map = VariableMap::new();
+        let mut map = VariableMap::default();
         let a = Variable::new("a");
         assert_eq!(map.get_index(&a), None);
         assert_eq!(map.get_variable(0), None);
@@ -101,7 +97,7 @@ mod tests {
 
     #[test]
     fn basic() {
-        let mut map = VariableMap::new();
+        let mut map = VariableMap::default();
         let a = Variable::new("a");
         assert_eq!(map.find_or_add(a.clone()), 1);
         assert_eq!(map.get_variable(1), Some(&a));

@@ -4,7 +4,7 @@ use pts::inequality::InequalitySystem;
 
 use std::cell::RefCell;
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 #[repr(align(64))] // 64 bytes
 pub struct Location<'a> {
     pub invariant: InequalitySystem,

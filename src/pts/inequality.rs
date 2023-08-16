@@ -9,10 +9,11 @@ pub enum ComparisonOperator {
 }
 
 // (a_1 + a_2 + ... + a_n) * x + b < 0
-#[derive(Debug)]
+// default 0 <= 0
+#[derive(Debug, Default)]
 pub struct Inequality {
-    strict: bool,
-    pol: LinearPolynomial,
+    strict: bool, // default false
+    pol: LinearPolynomial, // default 0
 }
 
 impl Inequality {
@@ -37,7 +38,7 @@ impl Inequality {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct InequalitySystem {
     inequalities: Vec<Inequality>,
 }

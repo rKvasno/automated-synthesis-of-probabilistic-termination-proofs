@@ -5,7 +5,7 @@ use constant::{Constant, ZERO};
 use term::Term;
 use std::{ops::{AddAssign, SubAssign, Add, Sub}, iter::zip};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Default, Clone)]
 pub struct LinearPolynomial {
     coefficients: Vec<Constant>
 }

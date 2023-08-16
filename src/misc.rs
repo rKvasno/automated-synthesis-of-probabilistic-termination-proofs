@@ -4,7 +4,7 @@ use linear_polynomial::constant::Constant;
 use variable_map::{VariableMap, Variable};
 
 pub fn setup_test_map() -> VariableMap {
-    let mut map = VariableMap::new();
+    let mut map = VariableMap::default();
     map.find_or_add(Variable::new("a"));
     map.find_or_add(Variable::new("b"));
     map.find_or_add(Variable::new("c"));

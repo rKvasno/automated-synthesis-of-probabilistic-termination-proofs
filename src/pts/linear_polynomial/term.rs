@@ -4,7 +4,8 @@ use linear_polynomial::constant::Constant;
 
 use std::ops::Neg;
 
-#[derive(Debug, PartialEq)]
+// default: constant term 0
+#[derive(Debug, Default, PartialEq)]
 pub struct Term {
     pub variable: Option<Variable>,
     pub coefficient: Constant

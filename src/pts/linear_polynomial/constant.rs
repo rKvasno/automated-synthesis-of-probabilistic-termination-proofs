@@ -4,7 +4,7 @@ use std::ops::{Neg,
     Add, Sub, Mul, Div};
 use std::str::FromStr;
 
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, Default, PartialEq, Clone, Copy)]
 pub struct Constant {
     value:f64
 }
