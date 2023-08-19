@@ -7,6 +7,7 @@ pub mod linear_polynomial;
 
 use location::{Location, LocationHandle};
 use variable_map::VariableMap;
+use inequality::InequalitySystem;
 
 use std::cell::RefCell;
 
@@ -15,7 +16,8 @@ use std::cell::RefCell;
 pub struct PTS<'a> {
     locations: Vec<RefCell<Location<'a>>>,
     variables: VariableMap,
-    initial: Option<LocationHandle<'a>>,
+    pub initial: LocationHandle<'a>,
+    pub final_invariant: InequalitySystem
 }
 
 impl<'a> PTS<'a> {
@@ -27,6 +29,10 @@ impl<'a> PTS<'a> {
     pub fn add_location(&'a mut self, location: Location<'a>) -> LocationHandle<'a> {
         self.locations.push(RefCell::new(location));
         self.locations.last()
+    }
+
+    pub fn as_variables_mut(&mut self) -> &mut VariableMap {
+        &mut self.variables
     }
 }
 

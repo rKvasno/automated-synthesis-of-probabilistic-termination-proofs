@@ -17,8 +17,8 @@ impl Assignment {
 #[derive(Debug, Default)]
 #[repr(align(32))] // 32 bytes
 pub struct Transition<'a> { 
-    assignments: Vec<Assignment>,
-    target: LocationHandle<'a>
+    pub assignments: Vec<Assignment>,
+    pub target: LocationHandle<'a>
 }
 
 // #[cfg(test)]

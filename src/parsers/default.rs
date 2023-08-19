@@ -1,4 +1,5 @@
 use crate::pts::PTS;
+use crate::pts::transition::Transition;
 use crate::{pts, parsers};
 use parsers::grammars::default::{DefaultParser, Rule};
 use parsers::ParserError;
@@ -152,12 +153,18 @@ fn parse_inequality_system<'a>(map: &mut VariableMap, parse: Pair<'a, Rule>) -> 
     system
 }
 
-fn parse_program<'a>(pts: &mut PTS, parse: Pair<'a, Rule>, start: LocationHandle, end: LocationHandle) {
-    todo!()
+// assumes the parses rule is Rule::program
+fn parse_program<'a, 'b>(pts: &'a mut PTS<'a>, parse: Pair<'b, Rule>) {
+    let mut transition = Transition::default();
+    let mut iter = parse.into_inner();
+    parse_locations(pts, iter.next().unwrap(), &mut transition, None);
+    pts.initial = transition.target;
+    pts.final_invariant = parse_inequality_system(pts.as_variables_mut(), iter.next().unwrap()); 
 }
 
-fn parse_locations<'a>(pts: &mut PTS, parse: Pair<'a, Rule>, start: LocationHandle, end: LocationHandle) {
+fn parse_locations<'a>(pts: &mut PTS, parse: Pair<'a, Rule>, start_transition: &mut Transition, end: LocationHandle) {
     todo!()
+    
 }
 
 fn parse_while<'a>(pts: &mut PTS, parse: Pair<'a, Rule>, start: LocationHandle, end: LocationHandle) {
