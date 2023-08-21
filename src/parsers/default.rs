@@ -15,6 +15,7 @@ use pts::location::LocationHandle;
 use pest::Parser;
 use pest::iterators::{Pair, Pairs};
 use pest::error::Error as PestError;
+use std::default::default;
 use std::iter::{zip, once};
 
 macro_rules! invariant_error {
@@ -209,8 +210,14 @@ fn parse_while<'a>(pts: &mut PTS, parse: Pair<'a, Rule>, start: LocationHandle, 
     todo!()
 }
 
-fn parse_nondet<'a>(pts: &mut PTS, parse: Pair<'a, Rule>, start: LocationHandle, end: LocationHandle) {
-    todo!()
+// assumes the parses rule is Rule::nondet_inst
+fn parse_nondet<'a, 'b>(pts: &'a mut PTS, parse: Pair<'b, Rule>, start: LocationHandle, end: LocationHandle) {
+    let transitions = vec!();
+    for locations_parse in parse.into_inner() {
+        transitions.push(Default::default());
+        parse_locations(pts, locations_parse, transitions.last_mut().unwrap(), end);
+    }
+    pts.locations.set_outgoing(start, Guards::Nondeterministic(transitions));
 }
 
 fn parse_if<'a>(pts: &mut PTS, parse: Pair<'a, Rule>, start: LocationHandle, end: LocationHandle) {
