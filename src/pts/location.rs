@@ -1,17 +1,27 @@
 use crate::pts;
-use pts::guard::Guards;
+use pts::guard::{Guards, GuardsError};
 use pts::inequality::InequalitySystem;
+
+use std::cell::RefCell;
+use std::iter::Map;
+use std::ops::Range;
+
+// use of handles across different instances of Locations is undefined
+pub type LocationHandle = Option<usize>;
+pub type LocationIter = Map<Range<usize>, fn(usize) -> LocationHandle>;
 
 #[derive(Debug, Default)]
 #[repr(align(64))] // 64 bytes
-pub struct Location {
-    pub invariant: InequalitySystem,
-    pub outgoing: Guards,
+struct Location {
+    invariant: InequalitySystem,
+    outgoing: Guards,
 }
 
 #[derive(Debug, Default)]
 pub struct Locations {
     data: Vec<Location>,
+    pub initial: LocationHandle,
+    terminating_invariant: InequalitySystem
 }
 
 
@@ -21,12 +31,40 @@ impl<'a> Locations {
         Some(self.data.len()-1)
     }
 
-    pub fn terminating_location(&self) -> LocationHandle {
+    pub fn get_initial_location(&self) -> LocationHandle {
+        self.initial
+    }
+
+    pub fn get_terminating_location(&self) -> LocationHandle {
         None
     }
+
+    pub fn new_n_locations(&mut self, n: usize) -> LocationIter {
+        self.data.resize_with(self.data.len() + n, Default::default);
+        Range{ start: self.data.len(), end: self.data.len() + n }.map(|x| Some(x))
+    }
+
+    pub fn set_outgoing(&mut self, location: LocationHandle, guards: Guards) -> Result<(), GuardsError> {
+        if location.is_none() {
+            return Err(GuardsError::TerminatingLocation);
+        }
+
+        if guards.is_empty() {
+            return Err(GuardsError::Empty);
+        }
+
+        self.data[location.unwrap()].outgoing = guards;
+        Ok(())
+    }
+    
+    pub fn set_invariant(&mut self, location: LocationHandle, invariant: InequalitySystem) {
+        if location.is_none() {
+            self.terminating_invariant = invariant;
+        }
+        else {
+            self.data[location.unwrap()].invariant = invariant;
+        }
+    }
+
 }
-
-
-
-pub type LocationHandle = Option<usize>;
 

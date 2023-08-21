@@ -1,11 +1,9 @@
 use crate::pts::PTS;
+use crate::pts::guard::Guards;
 use crate::pts::transition::Transition;
 use crate::{pts, parsers};
 use parsers::grammars::default::{DefaultParser, Rule};
 use parsers::ParserError;
-use pest::Parser;
-use pest::iterators::{Pair, Pairs};
-use pest::error::Error as PestError;
 use pts::variable_map::{Variable, VariableMap};
 use pts::linear_polynomial::LinearPolynomial;
 use pts::linear_polynomial::term::Term;
@@ -13,6 +11,11 @@ use pts::linear_polynomial::constant::{ONE, Constant};
 use pts::transition::Assignment;
 use pts::inequality::{Inequality, ComparisonOperator, InequalitySystem};
 use pts::location::LocationHandle;
+
+use pest::Parser;
+use pest::iterators::{Pair, Pairs};
+use pest::error::Error as PestError;
+use std::iter::{zip, once};
 
 macro_rules! invariant_error {
     () => {
@@ -157,14 +160,49 @@ fn parse_inequality_system<'a>(map: &mut VariableMap, parse: Pair<'a, Rule>) -> 
 fn parse_program<'a, 'b>(pts: &'a mut PTS, parse: Pair<'b, Rule>) {
     let mut transition = Transition::default();
     let mut iter = parse.into_inner();
-    parse_locations(pts, iter.next().unwrap(), &mut transition, pts.locations.terminating_location());
-    pts.initial = transition.target;
-    pts.final_invariant = parse_inequality_system(&mut pts.variables, iter.next().unwrap()); 
+    parse_locations(pts, iter.next().unwrap(), &mut transition, pts.locations.get_terminating_location());
+    pts.locations.initial = transition.target;
+    pts.locations.set_invariant(pts.locations.get_terminating_location(), parse_inequality_system(&mut pts.variables, iter.next().unwrap())) ; 
 }
 
+// assumes the parses rule is Rule::locations
 fn parse_locations<'a, 'b>(pts: &'a mut PTS, parse: Pair<'b, Rule>, start_transition: &mut Transition, end: LocationHandle) {
-    todo!()
-    
+    let parse_locations = parse.into_inner();
+    let mut pts_locations = pts.locations.new_n_locations(parse_locations.len()).peekable();
+
+    // locations nonterminal always has atleast one location
+    start_transition.target = pts_locations.peek().unwrap().clone();
+
+    for ((local_start, local_end), pair) in zip(zip(pts_locations.clone(), pts_locations.skip(1).chain(once(end))), parse_locations) {
+        let mut location_iter = pair.into_inner();
+        pts.locations.set_invariant(local_start, parse_inequality_system(&mut pts.variables, location_iter.next().unwrap()));
+
+        let instruction_parse = location_iter.next().unwrap();
+        match instruction_parse.as_rule() {
+            Rule::if_inst => parse_if(pts, instruction_parse, local_start, local_end),
+            Rule::prob_inst => parse_odds(pts, instruction_parse, local_start, local_end),
+            Rule::nondet_inst => parse_nondet(pts, instruction_parse, local_start, local_end),
+            Rule::while_inst => parse_while(pts, instruction_parse, local_start, local_end),
+            // can unwrap here, since local_start can't be None and parse_assign always returns
+            Rule::assign_inst => pts.locations.set_outgoing(
+                                    local_start,
+                                    Guards::Unguarded(
+                                        Box::new(
+                                            Transition {
+                                                assignments: vec!(
+                                                    parse_assign(
+                                                        &mut pts.variables,
+                                                        instruction_parse
+                                                    )
+                                                ),
+                                                target: local_end 
+                                            }
+                                        )
+                                    )
+                                ).unwrap(),
+            _=> panic!(invariant_error!()),
+        }
+    }
 }
 
 fn parse_while<'a>(pts: &mut PTS, parse: Pair<'a, Rule>, start: LocationHandle, end: LocationHandle) {
@@ -172,7 +210,7 @@ fn parse_while<'a>(pts: &mut PTS, parse: Pair<'a, Rule>, start: LocationHandle, 
 }
 
 fn parse_nondet<'a>(pts: &mut PTS, parse: Pair<'a, Rule>, start: LocationHandle, end: LocationHandle) {
-    
+    todo!()
 }
 
 fn parse_if<'a>(pts: &mut PTS, parse: Pair<'a, Rule>, start: LocationHandle, end: LocationHandle) {

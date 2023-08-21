@@ -14,8 +14,6 @@ use inequality::InequalitySystem;
 pub struct PTS {
     pub locations: Locations,
     pub variables: VariableMap,
-    pub initial: LocationHandle,
-    pub final_invariant: InequalitySystem
 }
 
 

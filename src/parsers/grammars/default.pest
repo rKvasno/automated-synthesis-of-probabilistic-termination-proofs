@@ -3,7 +3,7 @@ location = { invariants ~ instruction }
 
 invariants = { ("#" ~ logic_condition ~ NEWLINE)+ }
 
-locations = { NEWLINE* ~ location ~ NEWLINE+ ~ locations | 
+locations = { NEWLINE* ~ location ~ (NEWLINE+ ~ location)* ~ NEWLINE* | 
               NEWLINE* ~ location ~ NEWLINE*             }
 
 block = _{ NEWLINE* ~ "{" ~ locations ~ "}" }
