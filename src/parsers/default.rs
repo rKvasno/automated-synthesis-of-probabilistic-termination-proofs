@@ -31,7 +31,7 @@ pub enum Operation {
 
 type PestResult<'a> = Result<Pairs<'a, Rule>, PestError<Rule>>;
 
-pub fn parse<'a>(input: &str) -> Result<pts::PTS<'a>, ParserError> {
+pub fn parse<'a>(input: &str) -> Result<pts::PTS, ParserError> {
     todo!();
 }
 
@@ -154,15 +154,15 @@ fn parse_inequality_system<'a>(map: &mut VariableMap, parse: Pair<'a, Rule>) -> 
 }
 
 // assumes the parses rule is Rule::program
-fn parse_program<'a, 'b>(pts: &'a mut PTS<'a>, parse: Pair<'b, Rule>) {
+fn parse_program<'a, 'b>(pts: &'a mut PTS, parse: Pair<'b, Rule>) {
     let mut transition = Transition::default();
     let mut iter = parse.into_inner();
-    parse_locations(pts, iter.next().unwrap(), &mut transition, None);
+    parse_locations(pts, iter.next().unwrap(), &mut transition, pts.locations.terminating_location());
     pts.initial = transition.target;
-    pts.final_invariant = parse_inequality_system(pts.as_variables_mut(), iter.next().unwrap()); 
+    pts.final_invariant = parse_inequality_system(&mut pts.variables, iter.next().unwrap()); 
 }
 
-fn parse_locations<'a>(pts: &mut PTS, parse: Pair<'a, Rule>, start_transition: &mut Transition, end: LocationHandle) {
+fn parse_locations<'a, 'b>(pts: &'a mut PTS, parse: Pair<'b, Rule>, start_transition: &mut Transition, end: LocationHandle) {
     todo!()
     
 }

@@ -8,14 +8,14 @@ pub type Probability = Constant;
 
 // 32 bytes
 #[derive(Debug)]
-pub enum Guards<'a>{
-    Logic(Vec<(InequalitySystem, Transition<'a>)>),
-    Probabilistic(Vec<(Probability, Transition<'a>)>),
-    Nondeterministic(Vec<Transition<'a>>),
-    Unguarded(Box<Transition<'a>>)
+pub enum Guards{
+    Logic(Vec<(InequalitySystem, Transition)>),
+    Probabilistic(Vec<(Probability, Transition)>),
+    Nondeterministic(Vec<Transition>),
+    Unguarded(Box<Transition>)
 }
 
-impl <'a> Default for Guards<'a> {
+impl Default for Guards {
     fn default() -> Self {
         Guards::Unguarded(Box::new(Transition::default()))
     }
