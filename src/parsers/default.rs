@@ -239,7 +239,7 @@ fn parse_if<'a>(pts: &mut PTS, parse: Pair<'a, Rule>, start: LocationHandle, end
                 let mut new_cond = parse_inequality_system(&mut pts.variables, pair);
                 conditions.push(else_condition.clone());
                 let pushed_cond = conditions.last_mut().unwrap();
-                else_condition.append(&mut !pushed_cond.clone());
+                else_condition.append(&mut !new_cond.clone());
                 pushed_cond.append(&mut new_cond);
             },
             Rule::locations => {
