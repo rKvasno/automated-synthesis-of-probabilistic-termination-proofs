@@ -221,6 +221,13 @@ fn parse_nondet<'a>(pts: &mut PTS, parse: Pair<'a, Rule>, start: LocationHandle,
         transitions.push(Default::default());
         parse_locations(pts, locations_parse, transitions.last_mut().unwrap(), end);
     }
+
+    // if theres just one block, the choice is between executing and skipping it
+    if transitions.len() == 1 {
+        transitions.push(Transition{ assignments: Default::default(), target: end })
+
+    }
+
     // grammar doesnt allow empty transitions, start will never be None, its ok to unwrap
     pts.locations.set_outgoing(start, Guards::Nondeterministic(transitions)).unwrap();
 }
