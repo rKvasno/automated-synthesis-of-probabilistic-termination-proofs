@@ -232,16 +232,8 @@ fn parse_if<'a>(pts: &mut PTS, parse: Pair<'a, Rule>, start: LocationHandle, end
     let mut transitions: Vec<Transition> = vec!();
     
     for pair in parse.into_inner() {
-
-        //TODO: fix this ugly match
         match pair.as_rule() {
-            Rule::logic_condition => {
-                let mut new_cond = parse_inequality_system(&mut pts.variables, pair);
-                conditions.push(else_condition.clone());
-                let pushed_cond = conditions.last_mut().unwrap();
-                else_condition.append(&mut !new_cond.clone());
-                pushed_cond.append(&mut new_cond);
-            },
+            Rule::logic_condition => parse_if_condition(pts, pair, &mut conditions, &mut else_condition),
             Rule::locations => {
                 transitions.push(Transition::default());
                 parse_locations(pts, pair, transitions.last_mut().unwrap(), end);
@@ -254,11 +246,20 @@ fn parse_if<'a>(pts: &mut PTS, parse: Pair<'a, Rule>, start: LocationHandle, end
     if conditions.len() < transitions.len() {
         conditions.push(else_condition);
     }
-    //assert_eq!(conditions.len(), transitions.len())
+    // assert_eq!(conditions.len(), transitions.len())
 
     // start cannot ever be None, see parse_locations, guard cannot be empty due to grammar
     pts.locations.set_outgoing(start, Guards::Logic(zip(conditions, transitions).collect())).unwrap();
     
+}
+
+// assumes the parses rule is Rule::logic_condition
+fn parse_if_condition<'a>(pts: &mut PTS, parse: Pair<'a, Rule>, conditions: &mut Vec<InequalitySystem>, negation_acc: &mut InequalitySystem) {
+    let mut new_cond = parse_inequality_system(&mut pts.variables, parse);
+    conditions.push(negation_acc.clone());
+    let pushed_cond = conditions.last_mut().unwrap();
+    negation_acc.append(&mut !new_cond.clone());
+    pushed_cond.append(&mut new_cond);
 }
 
 fn parse_odds<'a>(pts: &mut PTS, parse: Pair<'a, Rule>, start: LocationHandle, end: LocationHandle) {
