@@ -3,7 +3,7 @@ pub mod term;
 use crate::pts::variable_map::{VariableMap, VariableError};
 use constant::{Constant, ZERO};
 use term::Term;
-use std::{ops::{AddAssign, SubAssign, Add, Sub}, iter::zip};
+use std::{ops::{AddAssign, SubAssign, Add, Sub, Neg}, iter::zip};
 
 #[derive(Debug, Default, Clone)]
 pub struct LinearPolynomial {
@@ -99,6 +99,14 @@ impl Sub for LinearPolynomial {
     fn sub(mut self, other: Self) -> Self::Output {
         self -= other;
         self
+    }
+}
+
+impl Neg for LinearPolynomial {
+    type Output = Self;
+
+    fn neg(self) -> Self::Output {
+        LinearPolynomial{ coefficients: self.coefficients.into_iter().map(|x| -x).collect() }
     }
 }
 
@@ -220,6 +228,22 @@ mod tests {
         check_terms(&diff, &map, vec!(Some(one), Some(two), Some(three), Some(four)));
         lhs -= rhs;
         check_terms(&lhs, &map, vec!(Some(one), Some(two), Some(three), Some(four)));
+    }
+
+    #[test]
+    fn neg() {
+        let mut map = setup_test_map();
+        let zero = Constant::new(0.0);
+        let three = Constant::new(3.0);
+        let four = Constant::new(4.0);
+        let five = Constant::new(5.0);
+        let n_two = Constant::new(-2.0);
+        let n_three = Constant::new(-3.0);
+        let n_four = Constant::new(-4.0);
+        let n_five = Constant::new(-5.0);
+        let lhs = setup_test_polynomial(&mut map, zero, n_three, four, n_five);
+        let lhs = -lhs;
+        check_terms(&lhs, &map, vec!(Some(zero), Some(three), Some(n_four), Some(five)));
     }
 
 }

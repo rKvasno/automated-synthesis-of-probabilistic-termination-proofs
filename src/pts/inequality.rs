@@ -1,4 +1,5 @@
 use crate::pts::linear_polynomial::LinearPolynomial; 
+use std::{ops::{Not}, iter::zip};
 
 #[derive(Debug)]
 pub enum ComparisonOperator {
@@ -10,7 +11,7 @@ pub enum ComparisonOperator {
 
 // (a_1 + a_2 + ... + a_n) * x + b < 0
 // default 0 <= 0
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct Inequality {
     strict: bool, // default false
     pol: LinearPolynomial, // default 0
@@ -38,18 +39,28 @@ impl Inequality {
     }
 }
 
-#[derive(Debug, Default)]
+impl Not for Inequality {
+    type Output = Self;
+
+    fn not(mut self) -> Self::Output {
+        self.strict = !self.strict;
+        self.pol = -self.pol;
+        self
+    }
+}
+
+#[derive(Debug, Default, Clone)]
 pub struct InequalitySystem {
     inequalities: Vec<Inequality>,
 }
 
 impl InequalitySystem {
-    pub fn new() -> Self {
-        InequalitySystem { inequalities: vec!() }
-    }
-    
     pub fn push(&mut self, inequality: Inequality) {
         self.inequalities.push(inequality);
+    }
+
+    pub fn append(&mut self, system: &mut InequalitySystem) {
+        self.inequalities.append(&mut system.inequalities);
     }
 
     pub fn len(&self) -> usize {
@@ -65,10 +76,17 @@ impl InequalitySystem {
     }
 }
 
+impl Not for InequalitySystem {
+    type Output = Self;
+    fn not(self) -> Self::Output {
+        InequalitySystem{ inequalities: self.inequalities.into_iter().map(|x| !x).collect() }
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{ComparisonOperator, Inequality};
-    use crate::{misc::{setup_test_map, setup_test_polynomial, check_terms}, pts::linear_polynomial::constant::Constant};
+    use super::{ComparisonOperator, Inequality, InequalitySystem};
+    use crate::{misc::{setup_test_map, setup_test_polynomial, check_terms}, pts::linear_polynomial::{constant::Constant, LinearPolynomial}};
 
     #[test]
     fn inequality() {
@@ -85,5 +103,35 @@ mod tests {
         let cond = Inequality::new(setup_test_polynomial(&map, one, zero, two, two), ComparisonOperator::GE, setup_test_polynomial(&map, five, one, four, two));
         check_terms(&cond.as_linear_polynomial(), &map, vec!(Some(four), Some(one), Some(two), Some(zero)));
         assert!(!cond.is_strict());
+    }
+
+    #[test]
+    fn not(){
+        let map = setup_test_map();
+        let zero = Constant::new(0.0);
+        let one = Constant::new(1.0);
+        let two = Constant::new(2.0);
+        let three = Constant::new(3.0);
+        let four = Constant::new(4.0);
+        let five = Constant::new(5.0);
+        let n_one = Constant::new(-1.0);
+        let n_two = Constant::new(-2.0);
+        let n_three = Constant::new(-3.0);
+        let n_four = Constant::new(-4.0);
+        let n_five = Constant::new(-5.0);
+
+        let mut system = InequalitySystem::default();
+        let cond = Inequality::new(setup_test_polynomial(&map, four, n_five, three, n_two), ComparisonOperator::LE, LinearPolynomial::default());
+        system.push(cond);
+        let cond = Inequality::new(setup_test_polynomial(&map, one, zero, two, n_two), ComparisonOperator::LT, LinearPolynomial::default());
+        system.push(cond);
+
+        system = !system;
+        
+        check_terms(&system.get(0).unwrap().as_linear_polynomial(), &map, vec!(Some(n_four), Some(five), Some(n_three), Some(two)));
+        check_terms(&system.get(1).unwrap().as_linear_polynomial(), &map, vec!(Some(n_one), Some(zero), Some(n_two), Some(two)));
+
+        assert!(&system.get(0).unwrap().is_strict());
+        assert!(!&system.get(1).unwrap().is_strict());
     }
 }

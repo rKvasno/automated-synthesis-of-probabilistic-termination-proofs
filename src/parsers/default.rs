@@ -15,7 +15,6 @@ use pts::location::LocationHandle;
 use pest::Parser;
 use pest::iterators::{Pair, Pairs};
 use pest::error::Error as PestError;
-use std::default::default;
 use std::iter::{zip, once};
 
 macro_rules! invariant_error {
@@ -150,7 +149,7 @@ fn parse_inequality<'a>(map: &mut VariableMap, pairs: &mut Pairs<'a, Rule>) -> I
 // assumes the parses rule is Rule::logic_condition
 fn parse_inequality_system<'a>(map: &mut VariableMap, parse: Pair<'a, Rule>) -> InequalitySystem {
     let mut pairs = parse.into_inner();
-    let mut system = InequalitySystem::new();
+    let mut system = InequalitySystem::default();
     while pairs.peek().is_some() {
         system.push(parse_inequality(map, &mut pairs));
     }
@@ -179,6 +178,7 @@ fn parse_locations<'a, 'b>(pts: &'a mut PTS, parse: Pair<'b, Rule>, start_transi
         pts.locations.set_invariant(local_start, parse_inequality_system(&mut pts.variables, location_iter.next().unwrap()));
 
         let instruction_parse = location_iter.next().unwrap();
+        //TODO: fix this ugly match
         match instruction_parse.as_rule() {
             Rule::if_inst => parse_if(pts, instruction_parse, local_start, local_end),
             Rule::prob_inst => parse_odds(pts, instruction_parse, local_start, local_end),
@@ -212,16 +212,49 @@ fn parse_while<'a>(pts: &mut PTS, parse: Pair<'a, Rule>, start: LocationHandle, 
 
 // assumes the parses rule is Rule::nondet_inst
 fn parse_nondet<'a, 'b>(pts: &'a mut PTS, parse: Pair<'b, Rule>, start: LocationHandle, end: LocationHandle) {
-    let transitions = vec!();
+    let mut transitions = vec!();
     for locations_parse in parse.into_inner() {
         transitions.push(Default::default());
         parse_locations(pts, locations_parse, transitions.last_mut().unwrap(), end);
     }
-    pts.locations.set_outgoing(start, Guards::Nondeterministic(transitions));
+    // grammar doesnt allow empty transitions, start will never be None, its ok to unwrap
+    pts.locations.set_outgoing(start, Guards::Nondeterministic(transitions)).unwrap();
 }
 
+// assumes the parses rule is Rule::if_inst
 fn parse_if<'a>(pts: &mut PTS, parse: Pair<'a, Rule>, start: LocationHandle, end: LocationHandle) {
-    todo!()
+    let mut else_condition = InequalitySystem::default();
+    let mut conditions: Vec<InequalitySystem> = vec!();
+    let mut transitions: Vec<Transition> = vec!();
+    
+    for pair in parse.into_inner() {
+
+        //TODO: fix this ugly match
+        match pair.as_rule() {
+            Rule::logic_condition => {
+                let mut new_cond = parse_inequality_system(&mut pts.variables, pair);
+                conditions.push(else_condition.clone());
+                let pushed_cond = conditions.last_mut().unwrap();
+                else_condition.append(&mut !pushed_cond.clone());
+                pushed_cond.append(&mut new_cond);
+            },
+            Rule::locations => {
+                transitions.push(Transition::default());
+                parse_locations(pts, pair, transitions.last_mut().unwrap(), end);
+            },
+            _ => panic!(invariant_error!()),
+        }
+        
+    }
+    
+    if conditions.len() < transitions.len() {
+        conditions.push(else_condition);
+    }
+    //assert_eq!(conditions.len(), transitions.len())
+
+    // start cannot ever be None, see parse_locations, guard cannot be empty due to grammar
+    pts.locations.set_outgoing(start, Guards::Logic(zip(conditions, transitions).collect())).unwrap();
+    
 }
 
 fn parse_odds<'a>(pts: &mut PTS, parse: Pair<'a, Rule>, start: LocationHandle, end: LocationHandle) {
