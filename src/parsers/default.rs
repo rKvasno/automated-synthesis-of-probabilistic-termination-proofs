@@ -119,7 +119,7 @@ fn parse_linear_polynomial<'a>(map: &mut VariableMap, parse: Pair<'a, Rule>) -> 
 }
 
 // assumes the parses rule is Rule::assign_inst
-fn parse_assign<'a>(map: &mut VariableMap, parse: Pair<'a, Rule>) -> Assignment {
+fn parse_assignment<'a>(map: &mut VariableMap, parse: Pair<'a, Rule>) -> Assignment {
     let mut pairs = parse.into_inner();
     let var: Variable = parse_variable(pairs.next().unwrap());
     map.find_or_add(var.clone());
@@ -157,7 +157,7 @@ fn parse_inequality_system<'a>(map: &mut VariableMap, parse: Pair<'a, Rule>) -> 
 }
 
 // assumes the parses rule is Rule::program
-fn parse_program<'a, 'b>(pts: &'a mut PTS, parse: Pair<'b, Rule>) {
+fn parse_program<'a>(pts: &mut PTS, parse: Pair<'a, Rule>) {
     let mut transition = Transition::default();
     let mut iter = parse.into_inner();
     parse_locations(pts, iter.next().unwrap(), &mut transition, pts.locations.get_terminating_location());
@@ -166,7 +166,7 @@ fn parse_program<'a, 'b>(pts: &'a mut PTS, parse: Pair<'b, Rule>) {
 }
 
 // assumes the parses rule is Rule::locations
-fn parse_locations<'a, 'b>(pts: &'a mut PTS, parse: Pair<'b, Rule>, start_transition: &mut Transition, end: LocationHandle) {
+fn parse_locations<'a>(pts: &mut PTS, parse: Pair<'a, Rule>, start_transition: &mut Transition, end: LocationHandle) {
     let parse_locations = parse.into_inner();
     let mut pts_locations = pts.locations.new_n_locations(parse_locations.len()).peekable();
 
@@ -178,32 +178,36 @@ fn parse_locations<'a, 'b>(pts: &'a mut PTS, parse: Pair<'b, Rule>, start_transi
         pts.locations.set_invariant(local_start, parse_inequality_system(&mut pts.variables, location_iter.next().unwrap()));
 
         let instruction_parse = location_iter.next().unwrap();
-        //TODO: fix this ugly match
         match instruction_parse.as_rule() {
             Rule::if_inst => parse_if(pts, instruction_parse, local_start, local_end),
             Rule::prob_inst => parse_odds(pts, instruction_parse, local_start, local_end),
             Rule::nondet_inst => parse_nondet(pts, instruction_parse, local_start, local_end),
             Rule::while_inst => parse_while(pts, instruction_parse, local_start, local_end),
-            // can unwrap here, since local_start can't be None and parse_assign always returns
-            Rule::assign_inst => pts.locations.set_outgoing(
-                                    local_start,
-                                    Guards::Unguarded(
-                                        Box::new(
-                                            Transition {
-                                                assignments: vec!(
-                                                    parse_assign(
-                                                        &mut pts.variables,
-                                                        instruction_parse
-                                                    )
-                                                ),
-                                                target: local_end 
-                                            }
-                                        )
-                                    )
-                                ).unwrap(),
+            Rule::assign_inst => parse_assign(pts, instruction_parse, local_start, local_end),
             _=> panic!(invariant_error!()),
         }
     }
+}
+
+// assumes the parses rule is Rule::assign_inst
+fn parse_assign<'a>(pts: &mut PTS, parse: Pair<'a, Rule>, start: LocationHandle, end: LocationHandle) {
+    pts.locations.set_outgoing(
+        start,
+        Guards::Unguarded(
+            Box::new(
+                Transition {
+                    assignments: vec!(
+                        parse_assignment(
+                            &mut pts.variables,
+                            parse
+                        )
+                    ),
+                    target: end 
+                }
+            )
+        )
+    // can unwrap here, since local_start can't be None and parse_assignment always returns
+    ).unwrap()
 }
 
 fn parse_while<'a>(pts: &mut PTS, parse: Pair<'a, Rule>, start: LocationHandle, end: LocationHandle) {
@@ -211,7 +215,7 @@ fn parse_while<'a>(pts: &mut PTS, parse: Pair<'a, Rule>, start: LocationHandle, 
 }
 
 // assumes the parses rule is Rule::nondet_inst
-fn parse_nondet<'a, 'b>(pts: &'a mut PTS, parse: Pair<'b, Rule>, start: LocationHandle, end: LocationHandle) {
+fn parse_nondet<'a>(pts: &mut PTS, parse: Pair<'a, Rule>, start: LocationHandle, end: LocationHandle) {
     let mut transitions = vec!();
     for locations_parse in parse.into_inner() {
         transitions.push(Default::default());
@@ -267,7 +271,7 @@ mod tests {
     use super::{DefaultParser, Rule, Operation, Variable, Parser, Term, VariableMap, Constant,
     parse_variable, parse_constant, parse_operation, parse_constant_expr, parse_term, parse_linear_polynomial};
     use std::iter::zip;
-    use crate::{misc::{check_terms, setup_test_map}, parsers::default::{parse_assign, parse_inequality, parse_inequality_system}};
+    use crate::{misc::{check_terms, setup_test_map}, parsers::default::{parse_assignment, parse_inequality, parse_inequality_system}};
 
     #[test]
     fn variable_sanity() {
@@ -338,7 +342,7 @@ mod tests {
     fn assignment_sanity() {
         let mut parse = DefaultParser::parse(Rule::assign_inst, "x = -2a + 4b - 0c - 2").unwrap();
         let mut map = VariableMap::default();
-        let assign = parse_assign(&mut map, parse.next().unwrap());
+        let assign = parse_assignment(&mut map, parse.next().unwrap());
         assert!(parse.next().is_none());
         assert_eq!(assign.0, Variable::new("x"));
         check_terms(&assign.1, &map, vec!(Some(Constant::new(-2.0)), Some(Constant::new(0.0)), Some(Constant::new(-2.0)), Some(Constant::new(4.0)), Some(Constant::new(0.0))));
