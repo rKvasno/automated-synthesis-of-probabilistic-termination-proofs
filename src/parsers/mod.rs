@@ -26,7 +26,7 @@ pub enum Parser {
 pub fn parse<'a>(parser: Parser, input: &str)
                                         -> Result<PTS, ParserError> {
     match parser {
-        Default => default::parse(input)
+        Parser::Default => default::parse(input)
     }
 }
 

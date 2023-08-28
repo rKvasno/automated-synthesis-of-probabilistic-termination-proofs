@@ -34,6 +34,12 @@ pub enum Operation {
 
 type PestResult<'a> = Result<Pairs<'a, Rule>, PestError<Rule>>;
 
+fn odds_to_probabilities(odds: Vec<Constant>) -> Vec<Constant>{
+    let sum: Constant = odds.clone().into_iter().sum();
+    // could probably return the iterator, but that poses some lifetime issues
+    odds.into_iter().map(|x| x/sum).collect()
+}
+
 pub fn parse<'a>(input: &str) -> Result<pts::PTS, ParserError> {
     todo!();
 }
@@ -210,8 +216,43 @@ fn parse_assign<'a>(pts: &mut PTS, parse: Pair<'a, Rule>, start: LocationHandle,
     ).unwrap()
 }
 
+// assumes the parses rule is Rule::*_condition
+fn parse_condition<'a>(pts: &mut PTS, parse: Pair<'a, Rule>, loop_transition: Transition, end: LocationHandle) -> Guards {
+    match parse.clone().as_rule() {
+        Rule::logic_condition => {
+            let loop_condition = parse_inequality_system(&mut pts.variables, parse);
+            Guards::Logic(vec!((loop_condition.clone(), loop_transition), (!loop_condition, Transition{ assignments: Default::default(), target: end})))
+        },
+        Rule::prob_condition => {
+            let mut odds: Vec<Constant> = Default::default();
+            for pair in parse.into_inner() {
+                odds.push(parse_constant(pair));
+            }
+            //assert_eq!(odds.len(), 2);
+            let probabilities = odds_to_probabilities(odds);
+            Guards::Probabilistic(vec!((probabilities[0], loop_transition), (probabilities[1],  Transition{ assignments: Default::default(), target: end})))
+        },
+        Rule::nondet_condition => Guards::Nondeterministic(vec!(Transition{ assignments: Default::default(), target: end}, )),
+        _ => panic!(invariant_error!()),
+    }
+}
+
+// assumes the parses rule is Rule::while_inst
 fn parse_while<'a>(pts: &mut PTS, parse: Pair<'a, Rule>, start: LocationHandle, end: LocationHandle) {
-    todo!()
+    // condition ~ locations
+    // condition = 
+    let mut parse_iter = parse.into_inner();
+    // save the condition parse for later
+    let condition = parse_iter.next().unwrap(); 
+    // parse locations
+    let mut loop_transition: Transition = Default::default();
+    parse_locations(pts, parse_iter.next().unwrap(), &mut loop_transition, start);
+
+    let guards: Guards = parse_condition(pts, condition, loop_transition, end);
+
+    // start cannot be None, see parse_locations, guards cannot be empty, see parse_condition
+    pts.locations.set_outgoing(start, guards).unwrap();
+
 }
 
 // assumes the parses rule is Rule::nondet_inst
@@ -281,8 +322,8 @@ fn parse_odds<'a>(pts: &mut PTS, parse: Pair<'a, Rule>, start: LocationHandle, e
         odds.push(parse_constant_expr(pair.unwrap()));
         pair = parse_iter.next();
     }
-    let sum: Constant = odds.clone().into_iter().sum();
-    let mut prob_iter = odds.into_iter().map(|x| x/sum);
+    let probabilities = odds_to_probabilities(odds); 
+    let mut prob_iter = probabilities.into_iter();
     let mut guards: Vec<(Constant, Transition)> = vec!();
     for locations_parse in parse_iter {
         //assert_eq!(locations_parse.as_rule(), Rule::locations);
@@ -295,7 +336,6 @@ fn parse_odds<'a>(pts: &mut PTS, parse: Pair<'a, Rule>, start: LocationHandle, e
     // start cannot be None, see parse_locations, guards cannot be empty, see grammar
     pts.locations.set_outgoing(start, Guards::Probabilistic(guards)).unwrap();
 }
-
 
 #[cfg(test)]
 mod tests {
