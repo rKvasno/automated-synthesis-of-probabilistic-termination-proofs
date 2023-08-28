@@ -3,6 +3,7 @@ use std::ops::{Neg,
     AddAssign, SubAssign, MulAssign, DivAssign,
     Add, Sub, Mul, Div};
 use std::str::FromStr;
+use std::iter::Sum;
 
 #[derive(Debug, Default, PartialEq, Clone, Copy)]
 pub struct Constant {
@@ -98,3 +99,8 @@ impl Div for Constant {
     }
 }
 
+impl Sum for Constant {
+    fn sum<I: Iterator<Item=Self>>(iter: I) -> Self {
+        iter.fold(ZERO, |a, b| a + b)
+    }
+}

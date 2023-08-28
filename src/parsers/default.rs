@@ -269,8 +269,31 @@ fn parse_if_condition<'a>(pts: &mut PTS, parse: Pair<'a, Rule>, conditions: &mut
     pushed_cond.append(&mut new_cond);
 }
 
+// assumes the parses rule is Rule::odds_inst
 fn parse_odds<'a>(pts: &mut PTS, parse: Pair<'a, Rule>, start: LocationHandle, end: LocationHandle) {
-    todo!()
+    // constant^n ~ block^(n-1)
+    
+    let mut odds: Vec<Constant> = vec!();
+    let mut parse_iter = parse.into_inner();
+
+    let mut pair = parse_iter.next();
+    while pair.clone().is_some_and(|x| x.as_rule() == Rule::constant_expr) {
+        odds.push(parse_constant_expr(pair.unwrap()));
+        pair = parse_iter.next();
+    }
+    let sum: Constant = odds.clone().into_iter().sum();
+    let mut prob_iter = odds.into_iter().map(|x| x/sum);
+    let mut guards: Vec<(Constant, Transition)> = vec!();
+    for locations_parse in parse_iter {
+        //assert_eq!(locations_parse.as_rule(), Rule::locations);
+        guards.push((prob_iter.next().unwrap(), Default::default()));
+
+        //TODO test this properly, cause I am not sure if theres no sneaky moves happening
+        parse_locations(pts, locations_parse, &mut guards.last_mut().unwrap().1, end)
+    }
+    guards.push((prob_iter.next().unwrap(), Transition{ assignments: Default::default(), target: end}));
+    // start cannot be None, see parse_locations, guards cannot be empty, see grammar
+    pts.locations.set_outgoing(start, Guards::Probabilistic(guards)).unwrap();
 }
 
 
