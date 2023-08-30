@@ -3,7 +3,7 @@ use crate::pts::guard::Guards;
 use crate::pts::transition::Transition;
 use crate::{pts, parsers};
 use parsers::grammars::default::{DefaultParser, Rule};
-use parsers::ParserError;
+use parsers::{ParserError, ErrorLocation};
 use pts::variable_map::{Variable, VariableMap};
 use pts::linear_polynomial::LinearPolynomial;
 use pts::linear_polynomial::term::Term;
@@ -14,7 +14,7 @@ use pts::location::LocationHandle;
 
 use pest::Parser;
 use pest::iterators::{Pair, Pairs};
-use pest::error::Error as PestError;
+use pest::error::{Error as PestError, LineColLocation};
 use std::iter::{zip, once};
 
 macro_rules! invariant_error {
@@ -41,7 +41,23 @@ fn odds_to_probabilities(odds: Vec<Constant>) -> Vec<Constant>{
 }
 
 pub fn parse<'a>(input: &str) -> Result<pts::PTS, ParserError> {
-    todo!();
+    match DefaultParser::parse(Rule::program, input) {
+        Err(error) => Err(handle_pest_error(error)),
+        Ok(mut parse) => {
+            let mut pts = Default::default();
+            parse_program(&mut pts, parse.next().unwrap());
+            //assert_eq!(parse.next(), None); // maybe theres EOF
+            Ok(pts)
+        },
+    }
+}
+
+fn handle_pest_error(error: PestError<Rule>) -> ParserError{
+    let location: ErrorLocation = match error.line_col {
+        LineColLocation::Pos(pair) => ErrorLocation::Position(pair),
+        LineColLocation::Span(start, end) => ErrorLocation::Span(start, end),
+    };
+    ParserError { location, message: error.variant.message().to_string() }   
 }
 
 // assumes the parses rule is Rule::variable
