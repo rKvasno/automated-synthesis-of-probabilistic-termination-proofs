@@ -1,5 +1,6 @@
-mod pts;
+#![deny(warnings)]
+pub mod pts;
 
-mod parsers;
+pub mod parsers;
 mod linear_generators;
 pub mod misc;

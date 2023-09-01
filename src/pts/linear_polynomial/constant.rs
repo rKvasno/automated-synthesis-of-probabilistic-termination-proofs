@@ -1,7 +1,7 @@
 use std::num::ParseFloatError;
 use std::ops::{Neg, 
     AddAssign, SubAssign, MulAssign, DivAssign,
-    Add, Sub, Mul, Div, ControlFlow};
+    Add, Sub, Mul, Div};
 use std::str::FromStr;
 use std::iter::Sum;
 use std::convert::From;

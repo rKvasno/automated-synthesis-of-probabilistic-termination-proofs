@@ -1,5 +1,5 @@
 use crate::pts::linear_polynomial::LinearPolynomial; 
-use std::{ops::{Not}, iter::zip};
+use std::ops::Not;
 use std::slice::Iter;
 
 #[derive(Debug, PartialEq, Eq)]

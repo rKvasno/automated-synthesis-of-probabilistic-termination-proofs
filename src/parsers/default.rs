@@ -32,8 +32,6 @@ pub enum Operation {
     Power
 }
 
-type PestResult<'a> = Result<Pairs<'a, Rule>, PestError<Rule>>;
-
 fn odds_to_probabilities(odds: Vec<Constant>) -> Vec<Constant>{
     let sum: Constant = odds.clone().into_iter().sum();
     // could probably return the iterator, but that poses some lifetime issues
@@ -111,7 +109,7 @@ fn parse_constant_expr<'a>(parse: Pair<'a, Rule>) -> Constant {
 
 // assumes the parses rule is Rule::term
 fn parse_term<'a>(parse: Pair<'a, Rule>) -> Term {
-    let mut pairs = parse.into_inner();
+    let pairs = parse.into_inner();
     let mut variable: Option<Variable> = None;
     let mut coefficient = Constant(1.0);
     for pair in pairs {
@@ -127,7 +125,7 @@ fn parse_term<'a>(parse: Pair<'a, Rule>) -> Term {
 // assumes the parses rule is Rule::linear_polynomial
 fn parse_linear_polynomial<'a>(map: &mut VariableMap, parse: Pair<'a, Rule>) -> LinearPolynomial {
     let mut op = Operation::Addition;
-    let mut pairs = parse.into_inner();
+    let pairs = parse.into_inner();
     let mut pol = LinearPolynomial::default();
     for pair in pairs {
         match pair.as_rule() {
@@ -360,7 +358,7 @@ fn parse_odds<'a>(pts: &mut PTS, parse: Pair<'a, Rule>, start: LocationHandle, e
 #[cfg(test)]
 mod tests {
     use super::{DefaultParser, Rule, Operation, Variable, Parser, Term, VariableMap, Constant,
-    parse_variable, parse_constant, parse_operation, parse_constant_expr, parse_term, parse_linear_polynomial, parse_locations, parse_program, parse};
+    parse_variable, parse_constant, parse_operation, parse_constant_expr, parse_term, parse_linear_polynomial, parse};
     use std::iter::zip;
     use crate::{pts::{linear_polynomial::LinearPolynomial, inequality::{Inequality, InequalitySystem}, transition::{Assignment, Transition}, PTS, location::Locations, guard::Guards}, misc::{setup_test_map, read_test_input}, parsers::default::{parse_assignment, parse_inequality, parse_inequality_system}};
 

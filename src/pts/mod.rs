@@ -5,9 +5,8 @@ pub mod inequality;
 pub mod variable_map;
 pub mod linear_polynomial;
 
-use location::{Locations, LocationHandle};
+use location::Locations;
 use variable_map::VariableMap;
-use inequality::InequalitySystem;
 
 #[cfg_attr(test, derive(PartialEq))]
 #[derive(Debug, Default)]

@@ -1,4 +1,4 @@
-use crate::pts::{linear_polynomial::{self, term::Term}, variable_map, PTS, inequality::InequalitySystem, guard::Guards};
+use crate::pts::{linear_polynomial::{self, term::Term}, variable_map};
 use linear_polynomial::LinearPolynomial;
 use linear_polynomial::constant::Constant;
 use variable_map::{VariableMap, Variable};
@@ -6,7 +6,6 @@ use variable_map::{VariableMap, Variable};
 use pest::{Parser, RuleType};
 use std::fs::read_to_string;
 use std::env::var;
-use std::iter::zip;
 
 
 pub fn setup_test_map() -> VariableMap {
