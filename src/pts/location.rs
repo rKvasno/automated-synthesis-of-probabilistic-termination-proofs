@@ -2,13 +2,15 @@ use crate::pts;
 use pts::guard::{Guards, GuardsError};
 use pts::inequality::InequalitySystem;
 
-use std::cell::RefCell;
-use std::iter::Map;
+use std::iter::{Map, Chain, Once};
 use std::ops::Range;
+use std::iter::once;
 
 // use of handles across different instances of Locations is undefined
 pub type LocationHandle = Option<usize>;
-pub type LocationIter = Map<Range<usize>, fn(usize) -> LocationHandle>;
+pub type NonterminatingLocationIter = Map<Range<usize>, IndexToHandleFn>;
+pub type LocationIter = Chain<Map<Range<usize>, IndexToHandleFn>, Once<LocationHandle>>;
+type IndexToHandleFn = fn(usize) -> LocationHandle;
 
 #[cfg_attr(test, derive(PartialEq))]
 #[derive(Debug, Default)]
@@ -28,6 +30,10 @@ pub struct Locations {
 
 
 impl<'a> Locations {
+    pub fn len(&self) -> usize {
+        self.data.len()
+    }
+
     pub fn new_location(&mut self) -> LocationHandle {
         self.data.push(Location::default());
         Some(self.data.len()-1)
@@ -41,9 +47,9 @@ impl<'a> Locations {
         None
     }
 
-    pub fn new_n_locations(&mut self, n: usize) -> LocationIter {
+    pub fn new_n_locations(&mut self, n: usize) -> NonterminatingLocationIter {
         self.data.resize_with(self.data.len() + n, Default::default);
-        Range{ start: self.data.len(), end: self.data.len() + n }.map(|x| Some(x))
+        Range{ start: self.data.len() - n, end: self.data.len() }.map((|x| Some(x)) as IndexToHandleFn)
     }
 
     pub fn set_outgoing(&mut self, location: LocationHandle, guards: Guards) -> Result<(), GuardsError> {
@@ -65,6 +71,25 @@ impl<'a> Locations {
         }
         else {
             self.data[location.unwrap()].invariant = invariant;
+        }
+    }
+
+    pub fn iter(&self) -> LocationIter {
+        Range{ start: 0, end: self.data.len() }.map((|x| Some(x)) as IndexToHandleFn).chain(once::<Option<usize>>(None))
+    }
+
+    pub fn get_invariant(&self, handle: LocationHandle) -> Option<&InequalitySystem> {
+        match handle {
+            Some(n) => self.data.get(n).map(|x| &x.invariant),
+            None => Some(&self.terminating_invariant),
+        }
+        
+    }
+
+    pub fn get_outgoing(&self, handle: LocationHandle) -> Option<&Guards> {
+        match handle {
+            Some(n) => self.data.get(n).map(|x| &x.outgoing),
+            None => None,
         }
     }
 }

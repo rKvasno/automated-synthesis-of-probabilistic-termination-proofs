@@ -10,7 +10,6 @@ mod tests {
     use super::LinearPolynomialTestParser;
     use super::Rule;
     use pest::{ parses_to, fails_with, consumes_to};
-    use crate::parsers::grammars::misc::print_rule_parsing;
 
     #[test]
     fn single_constant() {

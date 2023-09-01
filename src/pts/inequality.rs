@@ -1,5 +1,6 @@
 use crate::pts::linear_polynomial::LinearPolynomial; 
 use std::{ops::{Not}, iter::zip};
+use std::slice::Iter;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum ComparisonOperator {
@@ -8,6 +9,8 @@ pub enum ComparisonOperator {
     GT,
     GE,
 }
+
+pub type InequalityIter<'a> = Iter<'a, Inequality>;
 
 // (a_1 + a_2 + ... + a_n) * x + b < 0
 // default 0 <= 0
@@ -82,6 +85,10 @@ impl InequalitySystem {
 
     pub fn get_mut(&mut self, index: usize) -> Option<&mut Inequality> {
         self.inequalities.get_mut(index)
+    }
+
+    pub fn iter<'a> (&'a self) -> InequalityIter<'a> {
+        self.inequalities.iter()
     }
 }
 

@@ -1,23 +1,23 @@
 program = { SOI ~ locations ~ invariants ~ EOI }
 location = { invariants ~ instruction }
 
-invariants = { ("#" ~ logic_condition ~ NEWLINE)+ }
+invariants = { ("#" ~ conjunction ~ NEWLINE)+ }
 
 locations = { NEWLINE* ~ location ~ (NEWLINE+ ~ location)* ~ NEWLINE* | 
-              NEWLINE* ~ location ~ NEWLINE*             }
+            NEWLINE* ~ location ~ NEWLINE*             }
 
 block = _{ NEWLINE* ~ "{" ~ locations ~ "}" }
 
 instruction = _{ if_inst     |
-                 prob_inst   | 
-                 nondet_inst |
-                 while_inst  |
-                 assign_inst }
+               prob_inst   | 
+               nondet_inst |
+               while_inst  |
+               assign_inst }
 
 if_inst = { "if " ~ if }
 if = _{ logic_condition ~ block ~ ( NEWLINE? ~ "else" ~ NEWLINE? ~ else)? }
 else =  _{ "if " ~ if |
-           block      }
+         block      }
 
 prob_inst = { "odds " ~ odds }
 odds = _{ constant ~ ":" ~ ( odds | constant ) ~ block }
@@ -27,12 +27,13 @@ while_inst = { "while " ~ condition ~ block }
 assign_inst = { variable ~ "=" ~ linear_polynomial}
 
 condition = _{ logic_condition   |
-               prob_condition    |
-               nondet_condition  }
-logic_condition = { inequality ~ ( "and" ~ inequality )* }
+             prob_condition    |
+             nondet_condition  }
+logic_condition = { conjunction }
 prob_condition = { constant ~ ":" ~ constant }
 nondet_condition = { "nondet" }
 
+conjunction = _{ inequality ~ ( "and" ~ inequality )* }
 inequality = _{ linear_polynomial ~ comparison_op ~ linear_polynomial }
 comparison_op = @{ "<=" | ">=" | "<" | ">" }
 

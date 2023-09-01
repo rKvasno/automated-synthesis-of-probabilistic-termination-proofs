@@ -134,7 +134,8 @@ fn parse_linear_polynomial<'a>(map: &mut VariableMap, parse: Pair<'a, Rule>) -> 
             Rule::additive_op => op = parse_operation(pair),
             Rule::term if op == Operation::Addition => pol.add_term(map, parse_term(pair)),
             Rule::term if op == Operation::Subtraction => pol.add_term(map, -parse_term(pair)),
-            _ => panic!(invariant_error!()),
+            //_ => panic!(invariant_error!()),
+            rule => panic!("{:?}", rule),
         }
     }
     pol
@@ -168,7 +169,7 @@ fn parse_inequality<'a>(map: &mut VariableMap, pairs: &mut Pairs<'a, Rule>) -> I
     Inequality::new(lhs, op, rhs)
 }
 
-// assumes the parses rule is Rule::logic_condition
+// assumes the parses rule is Rule::
 fn parse_inequality_system<'a>(map: &mut VariableMap, parse: Pair<'a, Rule>) -> InequalitySystem {
     let mut pairs = parse.into_inner();
     let mut system = InequalitySystem::default();
@@ -180,6 +181,7 @@ fn parse_inequality_system<'a>(map: &mut VariableMap, parse: Pair<'a, Rule>) -> 
 
 // assumes the parses rule is Rule::program
 fn parse_program<'a>(pts: &mut PTS, parse: Pair<'a, Rule>) {
+    assert_eq!(parse.clone().as_rule(), Rule::program);
     let mut transition = Transition::default();
     let mut iter = parse.into_inner();
     parse_locations(pts, iter.next().unwrap(), &mut transition, pts.locations.get_terminating_location());
@@ -189,6 +191,7 @@ fn parse_program<'a>(pts: &mut PTS, parse: Pair<'a, Rule>) {
 
 // assumes the parses rule is Rule::locations
 fn parse_locations<'a>(pts: &mut PTS, parse: Pair<'a, Rule>, start_transition: &mut Transition, end: LocationHandle) {
+    assert_eq!(parse.clone().as_rule(), Rule::locations);
     let parse_locations = parse.into_inner();
     let mut pts_locations = pts.locations.new_n_locations(parse_locations.len()).peekable();
 
@@ -197,7 +200,8 @@ fn parse_locations<'a>(pts: &mut PTS, parse: Pair<'a, Rule>, start_transition: &
 
     for ((local_start, local_end), pair) in zip(zip(pts_locations.clone(), pts_locations.skip(1).chain(once(end))), parse_locations) {
         let mut location_iter = pair.into_inner();
-        pts.locations.set_invariant(local_start, parse_inequality_system(&mut pts.variables, location_iter.next().unwrap()));
+        let invariant_parse = location_iter.next().unwrap();
+        pts.locations.set_invariant(local_start, parse_inequality_system(&mut pts.variables, invariant_parse));
 
         let instruction_parse = location_iter.next().unwrap();
         match instruction_parse.as_rule() {
@@ -356,9 +360,9 @@ fn parse_odds<'a>(pts: &mut PTS, parse: Pair<'a, Rule>, start: LocationHandle, e
 #[cfg(test)]
 mod tests {
     use super::{DefaultParser, Rule, Operation, Variable, Parser, Term, VariableMap, Constant,
-    parse_variable, parse_constant, parse_operation, parse_constant_expr, parse_term, parse_linear_polynomial};
+    parse_variable, parse_constant, parse_operation, parse_constant_expr, parse_term, parse_linear_polynomial, parse_locations, parse_program, parse};
     use std::iter::zip;
-    use crate::{pts::{linear_polynomial::LinearPolynomial, inequality::Inequality, transition::Assignment}, misc::{setup_test_map}, parsers::default::{parse_assignment, parse_inequality, parse_inequality_system}};
+    use crate::{pts::{linear_polynomial::LinearPolynomial, inequality::{Inequality, InequalitySystem}, transition::{Assignment, Transition}, PTS, location::Locations, guard::Guards}, misc::{setup_test_map, read_test_input}, parsers::default::{parse_assignment, parse_inequality, parse_inequality_system}};
 
     #[test]
     fn variable_sanity() {
@@ -457,5 +461,47 @@ mod tests {
         assert_eq!(*cond, Inequality::mock(false, LinearPolynomial::mock(vec!(Constant(0.0), Constant(0.0), Constant(0.0), Constant(0.0)))));
         assert!(system.get(2).is_none());
     }
+
+    #[test]
+    fn parse_program_sanity() {
+        let input = read_test_input("trivial_program");
+        let parsed = parse(input.as_str()).unwrap();
+
+        let mut locations = Locations::default();
+        let handle = locations.new_location();
+        locations.initial = handle;
+
+        // line #
+        // 1
+        locations.set_invariant(handle, InequalitySystem::mock(vec!(Inequality::mock(true, LinearPolynomial::mock(vec!(Constant(-1.0)))))));
+        // 2
+        locations.set_outgoing(handle, 
+                Guards::Unguarded(
+                    Box::new(
+                        Transition {
+                            assignments: vec!(
+                                Assignment(
+                                    Variable::new("a"),
+                                    LinearPolynomial::mock(
+                                        vec!(
+                                            Constant(1.0),
+                                            Constant(0.0)
+                                        )
+                                    )
+                                )
+                            ),
+                            target: locations.get_terminating_location()
+                        }
+                    )
+                )
+        ).unwrap();
+        // 3
+        locations.set_invariant(locations.get_terminating_location(), InequalitySystem::mock(vec!(Inequality::mock(true, LinearPolynomial::mock(vec!(Constant(1.0), Constant(0.0)))))));
+
+        let variables = VariableMap::mock(vec!(Variable::new("a")));
+        
+        assert_eq!(parsed, PTS { locations, variables });
+    }
+
 }
 

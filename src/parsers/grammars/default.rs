@@ -11,11 +11,11 @@ mod tests {
     use super::Rule;
     use pest::{ parses_to, consumes_to};
     use pest::Parser;
-    use crate::parsers::grammars::misc::read_test_input;
+    use crate::misc::read_test_input;
 
     #[test]
-    fn simple_program() {
-        let input = read_test_input("simple_program");
+    fn trivial_program() {
+        let input = read_test_input("trivial_program");
 
         parses_to! {
             parser: DefaultParser,
@@ -26,20 +26,18 @@ mod tests {
                     locations(0, 14, [
                         location(0, 13, [
                             invariants(0, 8, [
-                                logic_condition(2, 7, [
-                                    linear_polynomial(2, 3, [
-                                        term(2, 3, [
-                                            constant_expr(2, 3, [
-                                                constant(2, 3)
-                                            ])
+                                linear_polynomial(2, 3, [
+                                    term(2, 3, [
+                                        constant_expr(2, 3, [
+                                            constant(2, 3)
                                         ])
-                                    ]),
-                                    comparison_op(4, 5),
-                                    linear_polynomial(6, 7, [
-                                        term(6, 7, [
-                                            constant_expr(6, 7, [
-                                                constant(6, 7)
-                                            ])
+                                    ])
+                                ]),
+                                comparison_op(4, 5),
+                                linear_polynomial(6, 7, [
+                                    term(6, 7, [
+                                        constant_expr(6, 7, [
+                                            constant(6, 7)
                                         ])
                                     ])
                                 ])
@@ -57,20 +55,18 @@ mod tests {
                         ]),
                     ]),
                     invariants(14, 22, [
-                        logic_condition(16, 21, [
-                            linear_polynomial(16, 17, [
-                                term(16, 17, [
-                                    constant_expr(16, 17, [
-                                        constant(16, 17)
-                                    ])
+                        linear_polynomial(16, 17, [
+                            term(16, 17, [
+                                constant_expr(16, 17, [
+                                    constant(16, 17)
                                 ])
-                            ]),
-                            comparison_op(18, 19),
-                            linear_polynomial(20, 21, [
-                                term(20, 21, [
-                                    constant_expr(20, 21, [
-                                        constant(20, 21)
-                                    ])
+                            ])
+                        ]),
+                        comparison_op(18, 19),
+                        linear_polynomial(20, 21, [
+                            term(20, 21, [
+                                constant_expr(20, 21, [
+                                    constant(20, 21)
                                 ])
                             ])
                         ])
@@ -97,17 +93,15 @@ mod tests {
                     locations(12, 31, [
                         location(15, 30, [
                             invariants(15, 25, [
-                                logic_condition(17, 22, [
-                                    linear_polynomial(17, 18, [
-                                        term(17, 18, [
-                                            variable(17, 18)
-                                        ])
-                                    ]),
-                                    comparison_op(19, 20),
-                                    linear_polynomial(21, 22, [
-                                        term(21, 22, [
-                                            variable(21, 22)
-                                        ])
+                                linear_polynomial(17, 18, [
+                                    term(17, 18, [
+                                        variable(17, 18)
+                                    ])
+                                ]),
+                                comparison_op(19, 20),
+                                linear_polynomial(21, 22, [
+                                    term(21, 22, [
+                                        variable(21, 22)
                                     ])
                                 ])
                             ]),
@@ -124,17 +118,15 @@ mod tests {
                     locations(34, 54, [
                         location(37, 53, [
                             invariants(37, 48, [
-                                logic_condition(39, 45, [
-                                    linear_polynomial(39, 40, [
-                                        term(39, 40, [
-                                            variable(39, 40)
-                                        ])
-                                    ]),
-                                    comparison_op(41, 43),
-                                    linear_polynomial(44, 45, [
-                                        term(44, 45, [
-                                            variable(44, 45)
-                                        ])
+                                linear_polynomial(39, 40, [
+                                    term(39, 40, [
+                                        variable(39, 40)
+                                    ])
+                                ]),
+                                comparison_op(41, 43),
+                                linear_polynomial(44, 45, [
+                                    term(44, 45, [
+                                        variable(44, 45)
                                     ])
                                 ])
                             ]),
@@ -179,17 +171,15 @@ mod tests {
                     locations(11, 30, [
                         location(14, 29, [
                             invariants(14, 24, [
-                                logic_condition(16, 21, [
-                                    linear_polynomial(16, 17, [
-                                        term(16, 17, [
-                                            variable(16, 17)
-                                        ])
-                                    ]),
-                                    comparison_op(18, 19),
-                                    linear_polynomial(20, 21, [
-                                        term(20, 21, [
-                                            variable(20, 21)
-                                        ])
+                                linear_polynomial(16, 17, [
+                                    term(16, 17, [
+                                        variable(16, 17)
+                                    ])
+                                ]),
+                                comparison_op(18, 19),
+                                linear_polynomial(20, 21, [
+                                    term(20, 21, [
+                                        variable(20, 21)
                                     ])
                                 ])
                             ]), 
@@ -219,17 +209,15 @@ mod tests {
                     locations(48, 67, [
                         location(51, 66, [
                             invariants(51, 61, [
-                                logic_condition(53, 58, [
-                                    linear_polynomial(53, 54, [
-                                        term(53, 54, [
-                                            variable(53, 54)
-                                        ])
-                                    ]),
-                                    comparison_op(55, 56),
-                                    linear_polynomial(57, 58, [
-                                        term(57, 58, [
-                                            variable(57, 58)
-                                        ])
+                                linear_polynomial(53, 54, [
+                                    term(53, 54, [
+                                        variable(53, 54)
+                                    ])
+                                ]),
+                                comparison_op(55, 56),
+                                linear_polynomial(57, 58, [
+                                    term(57, 58, [
+                                        variable(57, 58)
                                     ])
                                 ])
                             ]),
@@ -246,17 +234,15 @@ mod tests {
                     locations(75, 94, [
                         location(78, 93, [
                             invariants(78, 88, [
-                                logic_condition(80, 85, [
-                                    linear_polynomial(80, 81, [
-                                        term(80, 81, [
-                                            variable(80, 81)
-                                        ])
-                                    ]),
-                                    comparison_op(82, 83),
-                                    linear_polynomial(84, 85, [
-                                        term(84, 85, [
-                                            variable(84, 85)
-                                        ])
+                                linear_polynomial(80, 81, [
+                                    term(80, 81, [
+                                        variable(80, 81)
+                                    ])
+                                ]),
+                                comparison_op(82, 83),
+                                linear_polynomial(84, 85, [
+                                    term(84, 85, [
+                                        variable(84, 85)
                                     ])
                                 ])
                             ]),
@@ -287,17 +273,15 @@ mod tests {
                     locations(8, 27, [
                         location(11, 26, [
                             invariants(11, 21, [
-                                logic_condition(13, 18, [
-                                    linear_polynomial(13, 14, [
-                                        term(13, 14, [
-                                            variable(13, 14)
-                                        ])
-                                    ]),
-                                    comparison_op(15, 16),
-                                    linear_polynomial(17, 18, [
-                                        term(17, 18, [
-                                            variable(17, 18)
-                                        ])
+                                linear_polynomial(13, 14, [
+                                    term(13, 14, [
+                                        variable(13, 14)
+                                    ])
+                                ]),
+                                comparison_op(15, 16),
+                                linear_polynomial(17, 18, [
+                                    term(17, 18, [
+                                        variable(17, 18)
                                     ])
                                 ])
                             ]),
@@ -314,17 +298,15 @@ mod tests {
                     locations(33, 52, [
                         location(36, 51, [
                             invariants(36, 46, [
-                                logic_condition(38, 43, [
-                                    linear_polynomial(38, 39, [
-                                        term(38, 39, [
-                                            variable(38, 39)
-                                        ])
-                                    ]),
-                                    comparison_op(40, 41),
-                                    linear_polynomial(42, 43, [
-                                        term(42, 43, [
-                                            variable(42, 43)
-                                        ])
+                                linear_polynomial(38, 39, [
+                                    term(38, 39, [
+                                        variable(38, 39)
+                                    ])
+                                ]),
+                                comparison_op(40, 41),
+                                linear_polynomial(42, 43, [
+                                    term(42, 43, [
+                                        variable(42, 43)
                                     ])
                                 ])
                             ]),
@@ -341,17 +323,15 @@ mod tests {
                     locations(58, 77, [
                         location(61, 76, [
                             invariants(61, 71, [
-                                logic_condition(63, 68, [
-                                    linear_polynomial(63, 64, [
-                                        term(63, 64, [
-                                            variable(63, 64)
-                                        ])
-                                    ]),
-                                    comparison_op(65, 66),
-                                    linear_polynomial(67, 68, [
-                                        term(67, 68, [
-                                            variable(67, 68)
-                                        ])
+                                linear_polynomial(63, 64, [
+                                    term(63, 64, [
+                                        variable(63, 64)
+                                    ])
+                                ]),
+                                comparison_op(65, 66),
+                                linear_polynomial(67, 68, [
+                                    term(67, 68, [
+                                        variable(67, 68)
                                     ])
                                 ])
                             ]),
@@ -407,17 +387,15 @@ mod tests {
                     locations(23, 46, [
                         location(28, 45, [
                             invariants(28, 40, [
-                                logic_condition(30, 35, [
-                                    linear_polynomial(30, 31, [
-                                        term(30, 31, [
-                                            variable(30, 31)
-                                        ])
-                                    ]),
-                                    comparison_op(32, 33),
-                                    linear_polynomial(34, 35, [
-                                        term(34, 35, [
-                                            variable(34, 35)
-                                        ])
+                                linear_polynomial(30, 31, [
+                                    term(30, 31, [
+                                        variable(30, 31)
+                                    ])
+                                ]),
+                                comparison_op(32, 33),
+                                linear_polynomial(34, 35, [
+                                    term(34, 35, [
+                                        variable(34, 35)
                                     ])
                                 ])
                             ]),
@@ -453,17 +431,15 @@ mod tests {
                     locations(13, 36, [
                         location(18, 35, [
                             invariants(18, 30, [
-                                logic_condition(20, 25, [
-                                    linear_polynomial(20, 21, [
-                                        term(20, 21, [
-                                            variable(20, 21)
-                                        ])
-                                    ]),
-                                    comparison_op(22, 23),
-                                    linear_polynomial(24, 25, [
-                                        term(24, 25, [
-                                            variable(24, 25)
-                                        ])
+                                linear_polynomial(20, 21, [
+                                    term(20, 21, [
+                                        variable(20, 21)
+                                    ])
+                                ]),
+                                comparison_op(22, 23),
+                                linear_polynomial(24, 25, [
+                                    term(24, 25, [
+                                        variable(24, 25)
                                     ])
                                 ])
                             ]),
@@ -496,17 +472,15 @@ mod tests {
                     locations(14, 37, [
                         location(19, 36, [
                             invariants(19, 31, [
-                                logic_condition(21, 26, [
-                                    linear_polynomial(21, 22, [
-                                        term(21, 22, [
-                                            variable(21, 22)
-                                        ])
-                                    ]),
-                                    comparison_op(23, 24),
-                                    linear_polynomial(25, 26, [
-                                        term(25, 26, [
-                                            variable(25, 26)
-                                        ])
+                                linear_polynomial(21, 22, [
+                                    term(21, 22, [
+                                        variable(21, 22)
+                                    ])
+                                ]),
+                                comparison_op(23, 24),
+                                linear_polynomial(25, 26, [
+                                    term(25, 26, [
+                                        variable(25, 26)
                                     ])
                                 ])
                             ]),
@@ -536,43 +510,37 @@ mod tests {
             tokens: [
                 location(0, 29, [
                     invariants(0, 24, [
-                        logic_condition(2, 7, [
-                            linear_polynomial(2, 3, [
-                                term(2, 3, [
-                                    variable(2, 3)
-                                ])
-                            ]),
-                            comparison_op(4, 5),
-                            linear_polynomial(6, 7, [
-                                term(6, 7, [
-                                    variable(6, 7)
-                                ])
+                        linear_polynomial(2, 3, [
+                            term(2, 3, [
+                                variable(2, 3)
                             ])
                         ]),
-                        logic_condition(10, 15, [
-                            linear_polynomial(10, 11, [
-                                term(10, 11, [
-                                    variable(10, 11)
-                                ])
-                            ]),
-                            comparison_op(12, 13),
-                            linear_polynomial(14, 15, [
-                                term(14, 15, [
-                                    variable(14, 15)
-                                ])
+                        comparison_op(4, 5),
+                        linear_polynomial(6, 7, [
+                            term(6, 7, [
+                                variable(6, 7)
                             ])
                         ]),
-                        logic_condition(18, 23, [
-                            linear_polynomial(18, 19, [
-                                term(18, 19, [
-                                    variable(18, 19)
-                                ])
-                            ]),
-                            comparison_op(20, 21),
-                            linear_polynomial(22, 23, [
-                                term(22, 23, [
-                                    variable(22, 23)
-                                ])
+                        linear_polynomial(10, 11, [
+                            term(10, 11, [
+                                variable(10, 11)
+                            ])
+                        ]),
+                        comparison_op(12, 13),
+                        linear_polynomial(14, 15, [
+                            term(14, 15, [
+                                variable(14, 15)
+                            ])
+                        ]),
+                        linear_polynomial(18, 19, [
+                            term(18, 19, [
+                                variable(18, 19)
+                            ])
+                        ]),
+                        comparison_op(20, 21),
+                        linear_polynomial(22, 23, [
+                            term(22, 23, [
+                                variable(22, 23)
                             ])
                         ])
                     ]),
