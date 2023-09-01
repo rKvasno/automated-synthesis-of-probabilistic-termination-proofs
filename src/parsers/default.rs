@@ -44,7 +44,7 @@ pub fn parse<'a>(input: &str) -> Result<pts::PTS, ParserError> {
         Ok(mut parse) => {
             let mut pts = Default::default();
             parse_program(&mut pts, parse.next().unwrap());
-            //assert_eq!(parse.next(), None); // maybe theres EOF
+            // assert_eq!(parse.next(), None);
             Ok(pts)
         },
     }
