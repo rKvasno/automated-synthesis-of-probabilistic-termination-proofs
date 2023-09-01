@@ -60,11 +60,13 @@ fn handle_pest_error(error: PestError<Rule>) -> ParserError{
 
 // assumes the parses rule is Rule::variable
 fn parse_variable<'a>(parse: Pair<'a, Rule>) -> Variable {
+    assert_eq!(parse.clone().as_rule(), Rule::variable);
     Variable::new(parse.as_str())
 }
 
 // assumes the parses rule is Rule::constant
 fn parse_constant<'a>(parse: Pair<'a, Rule>) -> Constant {
+    assert_eq!(parse.clone().as_rule(), Rule::constant);
     // all parses have to follow f64 grammar, no need to handle errors
     parse.as_str().parse::<Constant>().expect(invariant_error!())
 }
@@ -83,6 +85,7 @@ fn parse_operation<'a>(parse: Pair<'a, Rule>) -> Operation {
 
 // assumes the parses rule is Rule::constant_expr
 fn parse_constant_expr<'a>(parse: Pair<'a, Rule>) -> Constant {
+    assert_eq!(parse.clone().as_rule(), Rule::constant_expr);
     let mut iter = parse.into_inner().into_iter();
     let first = iter.next().unwrap();
     let mut acc = match first.as_rule() {
@@ -109,6 +112,7 @@ fn parse_constant_expr<'a>(parse: Pair<'a, Rule>) -> Constant {
 
 // assumes the parses rule is Rule::term
 fn parse_term<'a>(parse: Pair<'a, Rule>) -> Term {
+    assert_eq!(parse.clone().as_rule(), Rule::term);
     let pairs = parse.into_inner();
     let mut variable: Option<Variable> = None;
     let mut coefficient = Constant(1.0);
@@ -124,6 +128,7 @@ fn parse_term<'a>(parse: Pair<'a, Rule>) -> Term {
 
 // assumes the parses rule is Rule::linear_polynomial
 fn parse_linear_polynomial<'a>(map: &mut VariableMap, parse: Pair<'a, Rule>) -> LinearPolynomial {
+    assert_eq!(parse.clone().as_rule(), Rule::linear_polynomial);
     let mut op = Operation::Addition;
     let pairs = parse.into_inner();
     let mut pol = LinearPolynomial::default();
@@ -141,6 +146,7 @@ fn parse_linear_polynomial<'a>(map: &mut VariableMap, parse: Pair<'a, Rule>) -> 
 
 // assumes the parses rule is Rule::assign_inst
 fn parse_assignment<'a>(map: &mut VariableMap, parse: Pair<'a, Rule>) -> Assignment {
+    assert_eq!(parse.clone().as_rule(), Rule::assign_inst);
     let mut pairs = parse.into_inner();
     let var: Variable = parse_variable(pairs.next().unwrap());
     map.find_or_add(var.clone());
@@ -159,16 +165,18 @@ fn parse_comparison_op<'a> (parse: Pair<'a, Rule>) -> ComparisonOperator {
     }
 }
 
-// assumes pairs is the iterator of a parse with rule Rule::logic_condition
+// assumes pairs is the iterator of a parse with rule Rule::invariants or Rule::logic_condition
 fn parse_inequality<'a>(map: &mut VariableMap, pairs: &mut Pairs<'a, Rule>) -> Inequality {
+    // assert is checked before calling
     let lhs: LinearPolynomial = parse_linear_polynomial(map, pairs.next().unwrap());
     let op = parse_comparison_op(pairs.next().unwrap());
     let rhs: LinearPolynomial = parse_linear_polynomial(map, pairs.next().unwrap());
     Inequality::new(lhs, op, rhs)
 }
 
-// assumes the parses rule is Rule::
+// assumes the parses rule is Rule::invariants or Rule::logic_condition
 fn parse_inequality_system<'a>(map: &mut VariableMap, parse: Pair<'a, Rule>) -> InequalitySystem {
+    assert!(parse.clone().as_rule() == Rule::invariants || parse.clone().as_rule() == Rule::logic_condition);
     let mut pairs = parse.into_inner();
     let mut system = InequalitySystem::default();
     while pairs.peek().is_some() {
@@ -215,6 +223,7 @@ fn parse_locations<'a>(pts: &mut PTS, parse: Pair<'a, Rule>, start_transition: &
 
 // assumes the parses rule is Rule::assign_inst
 fn parse_assign<'a>(pts: &mut PTS, parse: Pair<'a, Rule>, start: LocationHandle, end: LocationHandle) {
+    assert_eq!(parse.clone().as_rule(), Rule::assign_inst);
     pts.locations.set_outgoing(
         start,
         Guards::Unguarded(
@@ -246,7 +255,7 @@ fn parse_condition<'a>(pts: &mut PTS, parse: Pair<'a, Rule>, loop_transition: Tr
             for pair in parse.into_inner() {
                 odds.push(parse_constant(pair));
             }
-            //assert_eq!(odds.len(), 2);
+            // assert_eq!(odds.len(), 2);
             let probabilities = odds_to_probabilities(odds);
             Guards::Probabilistic(vec!((probabilities[0], loop_transition), (probabilities[1],  Transition{ assignments: Default::default(), target: end})))
         },
@@ -257,8 +266,8 @@ fn parse_condition<'a>(pts: &mut PTS, parse: Pair<'a, Rule>, loop_transition: Tr
 
 // assumes the parses rule is Rule::while_inst
 fn parse_while<'a>(pts: &mut PTS, parse: Pair<'a, Rule>, start: LocationHandle, end: LocationHandle) {
+    assert_eq!(parse.clone().as_rule(), Rule::while_inst);
     // condition ~ locations
-    // condition = 
     let mut parse_iter = parse.into_inner();
     // save the condition parse for later
     let condition = parse_iter.next().unwrap(); 
@@ -275,6 +284,7 @@ fn parse_while<'a>(pts: &mut PTS, parse: Pair<'a, Rule>, start: LocationHandle, 
 
 // assumes the parses rule is Rule::nondet_inst
 fn parse_nondet<'a>(pts: &mut PTS, parse: Pair<'a, Rule>, start: LocationHandle, end: LocationHandle) {
+    assert_eq!(parse.clone().as_rule(), Rule::nondet_inst);
     let mut transitions = vec!();
     for locations_parse in parse.into_inner() {
         transitions.push(Default::default());
@@ -284,7 +294,6 @@ fn parse_nondet<'a>(pts: &mut PTS, parse: Pair<'a, Rule>, start: LocationHandle,
     // if theres just one block, the choice is between executing and skipping it
     if transitions.len() == 1 {
         transitions.push(Transition{ assignments: Default::default(), target: end })
-
     }
 
     // grammar doesnt allow empty transitions, start will never be None, its ok to unwrap
@@ -293,6 +302,7 @@ fn parse_nondet<'a>(pts: &mut PTS, parse: Pair<'a, Rule>, start: LocationHandle,
 
 // assumes the parses rule is Rule::if_inst
 fn parse_if<'a>(pts: &mut PTS, parse: Pair<'a, Rule>, start: LocationHandle, end: LocationHandle) {
+    assert_eq!(parse.clone().as_rule(), Rule::if_inst);
     let mut else_condition = InequalitySystem::default();
     let mut conditions: Vec<InequalitySystem> = vec!();
     let mut transitions: Vec<Transition> = vec!();
@@ -306,7 +316,6 @@ fn parse_if<'a>(pts: &mut PTS, parse: Pair<'a, Rule>, start: LocationHandle, end
             },
             _ => panic!(invariant_error!()),
         }
-        
     }
     
     if conditions.len() < transitions.len() {
@@ -321,6 +330,7 @@ fn parse_if<'a>(pts: &mut PTS, parse: Pair<'a, Rule>, start: LocationHandle, end
 
 // assumes the parses rule is Rule::logic_condition
 fn parse_if_condition<'a>(pts: &mut PTS, parse: Pair<'a, Rule>, conditions: &mut Vec<InequalitySystem>, negation_acc: &mut InequalitySystem) {
+    assert_eq!(parse.clone().as_rule(), Rule::logic_condition);
     let mut new_cond = parse_inequality_system(&mut pts.variables, parse);
     conditions.push(negation_acc.clone());
     let pushed_cond = conditions.last_mut().unwrap();
@@ -328,8 +338,9 @@ fn parse_if_condition<'a>(pts: &mut PTS, parse: Pair<'a, Rule>, conditions: &mut
     pushed_cond.append(&mut new_cond);
 }
 
-// assumes the parses rule is Rule::odds_inst
+// assumes the parses rule is Rule::prob_inst
 fn parse_odds<'a>(pts: &mut PTS, parse: Pair<'a, Rule>, start: LocationHandle, end: LocationHandle) {
+    assert_eq!(parse.clone().as_rule(), Rule::prob_inst);
     // constant^n ~ block^(n-1)
     
     let mut odds: Vec<Constant> = vec!();
