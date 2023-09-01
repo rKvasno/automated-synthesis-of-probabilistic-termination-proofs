@@ -12,26 +12,15 @@ pub fn setup_test_map() -> VariableMap {
 }
 
 pub fn setup_test_polynomial(map: &VariableMap, constant: Constant, a: Constant, b: Constant, c: Constant) -> LinearPolynomial {
-        let mut pol = LinearPolynomial::new();
+        let mut pol = LinearPolynomial::default();
         let mut var = Option::<&Variable>::cloned(map.get_variable(0));
-        pol.try_add_term(&map, Term::new(var, constant)).unwrap();
+        pol.try_add_term(&map, Term{ variable: var, coefficient: constant }).unwrap();
         var = Option::<&Variable>::cloned(map.get_variable(1));
-        pol.try_add_term(&map, Term::new(var, a)).unwrap();
+        pol.try_add_term(&map, Term{ variable: var, coefficient: a }).unwrap();
         var = Option::<&Variable>::cloned(map.get_variable(2));
-        pol.try_add_term(&map, Term::new(var, b)).unwrap();
+        pol.try_add_term(&map, Term{ variable: var, coefficient: b }).unwrap();
         var = Option::<&Variable>::cloned(map.get_variable(3));
-        pol.try_add_term(&map, Term::new(var, c)).unwrap();
-        check_terms(&pol, &map, vec!(Some(constant), Some(a), Some(b), Some(c)));
+        pol.try_add_term(&map, Term{ variable: var, coefficient: c }).unwrap();
         pol
-}
-
-pub fn check_terms(pol: &LinearPolynomial, map: &VariableMap, vec: Vec<Option<Constant>>) {
-    assert_eq!(map.len() +1, vec.len());
-    assert!(map.len() <= pol.len());
-    for (index, element) in vec.iter().enumerate() {
-        if element.is_some() {
-            assert_eq!(pol.get_coefficient(index).unwrap(), element.unwrap());
-        }
-    }
 }
 

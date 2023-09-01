@@ -9,6 +9,7 @@ use linear_polynomial::constant::Constant;
 pub type Probability = Constant;
 
 // 32 bytes
+#[cfg_attr(test, derive(PartialEq))]
 #[derive(Debug)]
 pub enum Guards {
     Logic(Vec<(InequalitySystem, Transition)>),

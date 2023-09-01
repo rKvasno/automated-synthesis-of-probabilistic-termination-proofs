@@ -1,7 +1,7 @@
 use crate::pts::linear_polynomial::LinearPolynomial; 
 use std::{ops::{Not}, iter::zip};
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum ComparisonOperator {
     LT,
     LE,
@@ -11,6 +11,7 @@ pub enum ComparisonOperator {
 
 // (a_1 + a_2 + ... + a_n) * x + b < 0
 // default 0 <= 0
+#[cfg_attr(test, derive(PartialEq))]
 #[derive(Debug, Default, Clone)]
 pub struct Inequality {
     strict: bool, // default false
@@ -39,6 +40,13 @@ impl Inequality {
     }
 }
 
+#[cfg(test)]
+impl Inequality {
+    pub fn mock(strict: bool, pol: LinearPolynomial) -> Self {
+        Inequality { strict, pol }
+    }
+}
+
 impl Not for Inequality {
     type Output = Self;
 
@@ -49,6 +57,7 @@ impl Not for Inequality {
     }
 }
 
+#[cfg_attr(test, derive(PartialEq))]
 #[derive(Debug, Default, Clone)]
 pub struct InequalitySystem {
     inequalities: Vec<Inequality>,
@@ -76,6 +85,13 @@ impl InequalitySystem {
     }
 }
 
+#[cfg(test)]
+impl InequalitySystem {
+    pub fn mock(inequalities: Vec<Inequality>) -> Self {
+        InequalitySystem { inequalities }
+    }
+}
+
 impl Not for InequalitySystem {
     type Output = Self;
     fn not(self) -> Self::Output {
@@ -86,7 +102,7 @@ impl Not for InequalitySystem {
 #[cfg(test)]
 mod tests {
     use super::{ComparisonOperator, Inequality, InequalitySystem};
-    use crate::{misc::{setup_test_map, setup_test_polynomial, check_terms}, pts::linear_polynomial::{constant::Constant, LinearPolynomial}};
+    use crate::{misc::{setup_test_map, setup_test_polynomial}, pts::linear_polynomial::{constant::Constant, LinearPolynomial}};
 
     #[test]
     fn inequality() {
@@ -98,10 +114,10 @@ mod tests {
         let four = Constant::new(4.0);
         let five = Constant::new(5.0);
         let cond = Inequality::new(setup_test_polynomial(&map, four, five, three, two), ComparisonOperator::LT, setup_test_polynomial(&map, one, five, four, two));
-        check_terms(&cond.as_linear_polynomial(), &map, vec!(Some(three), Some(zero), Some(-one), Some(zero)));
+        assert_eq!(cond.as_linear_polynomial(), &LinearPolynomial::mock(vec!(three, zero, -one, zero)));
         assert!(cond.is_strict());
         let cond = Inequality::new(setup_test_polynomial(&map, one, zero, two, two), ComparisonOperator::GE, setup_test_polynomial(&map, five, one, four, two));
-        check_terms(&cond.as_linear_polynomial(), &map, vec!(Some(four), Some(one), Some(two), Some(zero)));
+        assert_eq!(cond.as_linear_polynomial(), &LinearPolynomial::mock(vec!(four, one, two, zero)));
         assert!(!cond.is_strict());
     }
 
@@ -128,8 +144,8 @@ mod tests {
 
         system = !system;
         
-        check_terms(&system.get(0).unwrap().as_linear_polynomial(), &map, vec!(Some(n_four), Some(five), Some(n_three), Some(two)));
-        check_terms(&system.get(1).unwrap().as_linear_polynomial(), &map, vec!(Some(n_one), Some(zero), Some(n_two), Some(two)));
+        assert_eq!(system.get(0).unwrap().as_linear_polynomial(), &LinearPolynomial::mock(vec!(n_four, five, n_three, two)));
+        assert_eq!(system.get(1).unwrap().as_linear_polynomial(), &LinearPolynomial::mock(vec!(n_one, zero, n_two, two)));
 
         assert!(&system.get(0).unwrap().is_strict());
         assert!(!&system.get(1).unwrap().is_strict());

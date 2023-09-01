@@ -11,17 +11,11 @@ pub struct Term {
     pub coefficient: Constant
 }
 
-impl Term {
-    pub fn new(variable: Option<Variable>, coefficient: Constant) -> Self {
-        Term{variable, coefficient}
-    }
-}
-
 impl Neg for Term {
     type Output = Self;
 
     fn neg(self) -> Self::Output {
-        Self::new(self.variable, -self.coefficient)
+        Self{ variable: self.variable, coefficient: -self.coefficient }
     }
 }
 

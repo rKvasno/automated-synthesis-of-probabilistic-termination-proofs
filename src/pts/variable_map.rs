@@ -23,6 +23,7 @@ impl fmt::Display for Variable {
 
 // linear search in Vec is faster than logarithmic for small number of elements,
 // mostly due to caching
+#[cfg_attr(test, derive(PartialEq))]
 #[derive(Debug, Default)]
 pub struct VariableMap {
     variables: Vec<Variable>
@@ -60,6 +61,13 @@ impl VariableMap {
     // Find variable and return its index, if not found, return None 
     pub fn get_index(&self, var: &Variable) -> Option<usize> {
         self.variables.iter().enumerate().find(|(_, element)| element == &var).map(|(index, _)| index + 1)
+    }
+}
+
+#[cfg(test)]
+impl VariableMap {
+    pub fn mock(variables: Vec<Variable>) -> Self {
+        VariableMap { variables }
     }
 }
 

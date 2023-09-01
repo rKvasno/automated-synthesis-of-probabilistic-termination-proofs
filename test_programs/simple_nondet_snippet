@@ -1,0 +1,13 @@
+nondet {
+  # a > a
+  a = a
+}
+or {
+  # a > a
+  a = a
+}
+or {
+  # a > a
+  a = a
+}
+

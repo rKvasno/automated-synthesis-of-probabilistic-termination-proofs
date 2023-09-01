@@ -1,0 +1,7 @@
+# a > 0
+b = 1
+# b >= 1 and a > 0
+c = a + b
+# b >= 1 and a > 0 and c > 1
+b = c + 2a
+# b > 1 and a > 0 and c > 1

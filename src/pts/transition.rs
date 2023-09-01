@@ -4,16 +4,12 @@ use variable_map::Variable;
 use linear_polynomial::LinearPolynomial;
 
 
+#[cfg_attr(test, derive(PartialEq))]
 #[derive(Debug)]
 #[repr(align(32))] // 32 bytes
 pub struct Assignment(pub Variable, pub LinearPolynomial);
 
-impl Assignment {
-    pub fn new(var: Variable, pol: LinearPolynomial) -> Self {
-        Assignment( var, pol )
-    }
-}
-
+#[cfg_attr(test, derive(PartialEq))]
 #[derive(Debug, Default)]
 #[repr(align(32))] // 32 bytes
 pub struct Transition { 

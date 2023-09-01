@@ -9,6 +9,7 @@ use location::{Locations, LocationHandle};
 use variable_map::VariableMap;
 use inequality::InequalitySystem;
 
+#[cfg_attr(test, derive(PartialEq))]
 #[derive(Debug, Default)]
 #[repr(align(32))] // 32 bytes
 pub struct PTS {

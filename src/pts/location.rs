@@ -10,6 +10,7 @@ use std::ops::Range;
 pub type LocationHandle = Option<usize>;
 pub type LocationIter = Map<Range<usize>, fn(usize) -> LocationHandle>;
 
+#[cfg_attr(test, derive(PartialEq))]
 #[derive(Debug, Default)]
 #[repr(align(64))] // 64 bytes
 struct Location {
@@ -17,6 +18,7 @@ struct Location {
     outgoing: Guards,
 }
 
+#[cfg_attr(test, derive(PartialEq))]
 #[derive(Debug, Default)]
 pub struct Locations {
     data: Vec<Location>,
@@ -65,6 +67,5 @@ impl<'a> Locations {
             self.data[location.unwrap()].invariant = invariant;
         }
     }
-
 }
 
