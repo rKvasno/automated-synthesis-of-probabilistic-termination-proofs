@@ -7,7 +7,7 @@ use parsers::{ParserError, ErrorLocation};
 use pts::variable_map::{Variable, VariableMap};
 use pts::linear_polynomial::LinearPolynomial;
 use pts::linear_polynomial::term::Term;
-use pts::linear_polynomial::constant::{ONE, Constant};
+use pts::linear_polynomial::constant::Constant;
 use pts::transition::Assignment;
 use pts::inequality::{Inequality, ComparisonOperator, InequalitySystem};
 use pts::location::LocationHandle;
@@ -113,7 +113,7 @@ fn parse_constant_expr<'a>(parse: Pair<'a, Rule>) -> Constant {
 fn parse_term<'a>(parse: Pair<'a, Rule>) -> Term {
     let mut pairs = parse.into_inner();
     let mut variable: Option<Variable> = None;
-    let mut coefficient = ONE;
+    let mut coefficient = Constant(1.0);
     for pair in pairs {
         match pair.as_rule() {
             Rule::variable => variable = Some(parse_variable(pair)),
@@ -374,7 +374,7 @@ mod tests {
         let mut parse = DefaultParser::parse(Rule::constant, "123").unwrap();
         let constant = parse_constant(parse.next().unwrap());
         assert!(parse.next().is_none());
-        assert_eq!(constant, Constant::new(123.0));
+        assert_eq!(constant, Constant(123.0));
     }
 
     #[test]
@@ -395,23 +395,23 @@ mod tests {
     #[test]
     fn constant_expr_sanity() {
         let mut parse = DefaultParser::parse(Rule::constant_expr, "((4^2 + 5) - (2 * 2 / 2))").unwrap();
-        assert_eq!(parse_constant_expr(parse.next().unwrap()), Constant::new(19.0));
+        assert_eq!(parse_constant_expr(parse.next().unwrap()), Constant(19.0));
         assert!(parse.next().is_none());
     }
 
     #[test]
     fn term_sanity() {
         let mut parse = DefaultParser::parse(Rule::term, "5a").unwrap();
-        assert_eq!(parse_term(parse.next().unwrap()), Term{ variable: Some(Variable::new("a")), coefficient: Constant::new(5.0)});
+        assert_eq!(parse_term(parse.next().unwrap()), Term{ variable: Some(Variable::new("a")), coefficient: Constant(5.0)});
         assert!(parse.next().is_none());
         parse = DefaultParser::parse(Rule::term, "a * 5").unwrap();
-        assert_eq!(parse_term(parse.next().unwrap()), Term{ variable: Some(Variable::new("a")), coefficient: Constant::new(5.0)});
+        assert_eq!(parse_term(parse.next().unwrap()), Term{ variable: Some(Variable::new("a")), coefficient: Constant(5.0)});
         assert!(parse.next().is_none());
         parse = DefaultParser::parse(Rule::term, "a").unwrap();
-        assert_eq!(parse_term(parse.next().unwrap()), Term{ variable: Some(Variable::new("a")), coefficient: Constant::new(1.0)});
+        assert_eq!(parse_term(parse.next().unwrap()), Term{ variable: Some(Variable::new("a")), coefficient: Constant(1.0)});
         assert!(parse.next().is_none());
         parse = DefaultParser::parse(Rule::term, "5").unwrap();
-        assert_eq!(parse_term(parse.next().unwrap()), Term{ variable: None, coefficient: Constant::new(5.0)});
+        assert_eq!(parse_term(parse.next().unwrap()), Term{ variable: None, coefficient: Constant(5.0)});
         assert!(parse.next().is_none());
         
     }
@@ -422,7 +422,7 @@ mod tests {
         let mut map = VariableMap::default();
         let pol = parse_linear_polynomial(&mut map, parse.next().unwrap());
         assert!(parse.next().is_none());
-        assert_eq!(&pol, &LinearPolynomial::mock(vec!(Constant::new(5.0), Constant::new(-1.0), Constant::new(-0.5))));
+        assert_eq!(&pol, &LinearPolynomial::mock(vec!(Constant(5.0), Constant(-1.0), Constant(-0.5))));
     }
 
     #[test]
@@ -431,7 +431,7 @@ mod tests {
         let mut map = VariableMap::default();
         let assign = parse_assignment(&mut map, parse.next().unwrap());
         assert!(parse.next().is_none());
-        assert_eq!(assign, Assignment(Variable::new("x"), LinearPolynomial::mock(vec!(Constant::new(-2.0), Constant::new(0.0), Constant::new(-2.0), Constant::new(4.0), Constant::new(0.0)))));
+        assert_eq!(assign, Assignment(Variable::new("x"), LinearPolynomial::mock(vec!(Constant(-2.0), Constant(0.0), Constant(-2.0), Constant(4.0), Constant(0.0)))));
     }
 
     #[test]
@@ -442,7 +442,7 @@ mod tests {
         assert!(parse.next().is_none());
         let cond = parse_inequality(&mut map, &mut pairs);
         assert!(pairs.next().is_none());
-        assert_eq!(cond, Inequality::mock(true, LinearPolynomial::mock(vec!(Constant::new(-4.0), Constant::new(3.0), Constant::new(1.0)))));
+        assert_eq!(cond, Inequality::mock(true, LinearPolynomial::mock(vec!(Constant(-4.0), Constant(3.0), Constant(1.0)))));
     }
 
     #[test]
@@ -452,9 +452,9 @@ mod tests {
         let system = parse_inequality_system(&mut map, parse.next().unwrap());
         assert!(parse.next().is_none());
         let cond = system.get(0).unwrap();
-        assert_eq!(*cond, Inequality::mock(true, LinearPolynomial::mock(vec!(Constant::new(-4.0), Constant::new(1.0), Constant::new(-2.0), Constant::new(0.0)))));
+        assert_eq!(*cond, Inequality::mock(true, LinearPolynomial::mock(vec!(Constant(-4.0), Constant(1.0), Constant(-2.0), Constant(0.0)))));
         let cond = system.get(1).unwrap();
-        assert_eq!(*cond, Inequality::mock(false, LinearPolynomial::mock(vec!(Constant::new(0.0), Constant::new(0.0), Constant::new(0.0), Constant::new(0.0)))));
+        assert_eq!(*cond, Inequality::mock(false, LinearPolynomial::mock(vec!(Constant(0.0), Constant(0.0), Constant(0.0), Constant(0.0)))));
         assert!(system.get(2).is_none());
     }
 }
