@@ -4,12 +4,11 @@ use pest_derive::Parser;
 #[grammar = "parsers/grammars/linear_polynomial.pest"]
 pub struct LinearPolynomialTestParser;
 
-    
 #[cfg(test)]
 mod tests {
     use super::LinearPolynomialTestParser;
     use super::Rule;
-    use pest::{ parses_to, fails_with, consumes_to};
+    use pest::{consumes_to, fails_with, parses_to};
 
     #[test]
     fn single_constant() {
@@ -282,7 +281,6 @@ mod tests {
         negatives: vec![],
         pos: 0
         };
-
     }
 
     #[test]
@@ -295,7 +293,7 @@ mod tests {
             negatives: vec![],
             pos: 0
         };
-        
+
         fails_with! {
             parser: LinearPolynomialTestParser,
             input: "(-1)",
@@ -334,4 +332,3 @@ mod tests {
         };
     }
 }
-

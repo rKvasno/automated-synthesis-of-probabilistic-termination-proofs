@@ -2,12 +2,14 @@ use std::fmt;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Variable {
-    name: Box<str>
+    name: Box<str>,
 }
 
 impl Variable {
     pub fn new(name: &str) -> Self {
-        Variable{ name: name.to_string().into_boxed_str() }
+        Variable {
+            name: name.to_string().into_boxed_str(),
+        }
     }
 
     pub fn as_str(&self) -> &str {
@@ -26,7 +28,7 @@ impl fmt::Display for Variable {
 #[cfg_attr(test, derive(PartialEq))]
 #[derive(Debug, Default)]
 pub struct VariableMap {
-    variables: Vec<Variable>
+    variables: Vec<Variable>,
 }
 
 impl VariableMap {
@@ -38,8 +40,7 @@ impl VariableMap {
     pub fn get_variable(&self, index: usize) -> Option<&Variable> {
         if index == 0 {
             None
-        }
-        else {
+        } else {
             self.variables.get(index - 1)
         }
     }
@@ -51,16 +52,18 @@ impl VariableMap {
             self.variables.push(Variable::new(var.as_str()));
             // -1 because its after push, +1 because the polynomial indexing is shifted
             self.variables.len() - 1 + 1
-        }
-        else {
+        } else {
             index.unwrap()
         }
     }
 
-
-    // Find variable and return its index, if not found, return None 
+    // Find variable and return its index, if not found, return None
     pub fn get_index(&self, var: &Variable) -> Option<usize> {
-        self.variables.iter().enumerate().find(|(_, element)| element == &var).map(|(index, _)| index + 1)
+        self.variables
+            .iter()
+            .enumerate()
+            .find(|(_, element)| element == &var)
+            .map(|(index, _)| index + 1)
     }
 }
 
@@ -88,7 +91,7 @@ impl fmt::Display for VariableError {
 
 #[cfg(test)]
 mod tests {
-    use super::{VariableMap, Variable};
+    use super::{Variable, VariableMap};
 
     #[test]
     fn out_of_bounds() {
@@ -120,4 +123,3 @@ mod tests {
         assert_eq!(map.get_variable(3), Some(&c));
     }
 }
-

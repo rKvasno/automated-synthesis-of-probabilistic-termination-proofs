@@ -1,9 +1,9 @@
 pub mod guard;
+pub mod inequality;
+pub mod linear_polynomial;
 pub mod location;
 pub mod transition;
-pub mod inequality;
 pub mod variable_map;
-pub mod linear_polynomial;
 
 use location::Locations;
 use variable_map::VariableMap;
@@ -16,19 +16,18 @@ pub struct PTS {
     pub variables: VariableMap,
 }
 
-
 // #[cfg(test)]
 // mod tests {
 //     use std::mem;
 //     use super::PTS;
-//     
+//
 //     #[test]
 //     fn align_pts() {
 //         if mem::size_of::<usize>() == 8{
 //             assert_eq!(mem::align_of::<PTS>(), 32);
 //         }
 //     }
-//     
+//
 //     #[test]
 //     fn size_pts() {
 //         if mem::size_of::<usize>() == 8{
@@ -36,4 +35,3 @@ pub struct PTS {
 //         }
 //     }
 // }
-

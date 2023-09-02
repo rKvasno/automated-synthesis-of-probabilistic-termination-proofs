@@ -1,6 +1,6 @@
-use crate::pts::{variable_map, linear_polynomial};
-use variable_map::Variable;
+use crate::pts::{linear_polynomial, variable_map};
 use linear_polynomial::constant::Constant;
+use variable_map::Variable;
 
 use std::ops::Neg;
 
@@ -8,14 +8,17 @@ use std::ops::Neg;
 #[derive(Debug, Default, PartialEq)]
 pub struct Term {
     pub variable: Option<Variable>,
-    pub coefficient: Constant
+    pub coefficient: Constant,
 }
 
 impl Neg for Term {
     type Output = Self;
 
     fn neg(self) -> Self::Output {
-        Self{ variable: self.variable, coefficient: -self.coefficient }
+        Self {
+            variable: self.variable,
+            coefficient: -self.coefficient,
+        }
     }
 }
 
@@ -27,4 +30,3 @@ impl Neg for &mut Term {
         self
     }
 }
-

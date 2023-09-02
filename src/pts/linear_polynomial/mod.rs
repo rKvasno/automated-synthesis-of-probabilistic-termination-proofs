@@ -1,16 +1,18 @@
 pub mod constant;
 pub mod term;
-use crate::pts::variable_map::{VariableMap, VariableError};
+use crate::pts::variable_map::{VariableError, VariableMap};
 
 use constant::Constant;
+use std::{
+    iter::zip,
+    ops::{Add, AddAssign, Neg, Sub, SubAssign},
+};
 use term::Term;
-use std::{ops::{AddAssign, SubAssign, Add, Sub, Neg}, iter::zip};
-
 
 #[cfg_attr(test, derive(PartialEq))]
 #[derive(Debug, Clone)]
 pub struct LinearPolynomial {
-    coefficients: Vec<Constant>
+    coefficients: Vec<Constant>,
 }
 
 impl LinearPolynomial {
@@ -31,35 +33,28 @@ impl LinearPolynomial {
         }
     }
 
-    pub fn try_add_term(&mut self, 
-                    map: &VariableMap,
-                    term: Term) -> Result<(), VariableError> {
+    pub fn try_add_term(&mut self, map: &VariableMap, term: Term) -> Result<(), VariableError> {
         self.resize(map);
         if term.variable.is_none() {
             self.coefficients[0] += term.coefficient;
             Ok(())
-        }
-        else{
+        } else {
             let index = map.get_index(term.variable.as_ref().unwrap());
             // if variable is not in the map, its not a program variable
             if index.is_none() {
-                Err(VariableError::new(term.variable.as_ref().unwrap()))   
-            }
-            else {
+                Err(VariableError::new(term.variable.as_ref().unwrap()))
+            } else {
                 self.coefficients[index.unwrap()] += term.coefficient;
                 Ok(())
             }
         }
     }
 
-    pub fn add_term(&mut self, 
-                    map: &mut VariableMap,
-                    term: Term) {
+    pub fn add_term(&mut self, map: &mut VariableMap, term: Term) {
         if term.variable.is_none() {
             self.coefficients[0] += term.coefficient;
             self.resize(map);
-        }
-        else{
+        } else {
             let index = map.find_or_add(term.variable.unwrap());
             self.resize(map);
             self.coefficients[index] += term.coefficient;
@@ -74,13 +69,15 @@ impl LinearPolynomial {
 #[cfg(test)]
 impl LinearPolynomial {
     pub fn mock(coefficients: Vec<Constant>) -> Self {
-        LinearPolynomial{ coefficients }
+        LinearPolynomial { coefficients }
     }
 }
 
 impl Default for LinearPolynomial {
     fn default() -> Self {
-        LinearPolynomial { coefficients: vec!(Constant(0.0)) }
+        LinearPolynomial {
+            coefficients: vec![Constant(0.0)],
+        }
     }
 }
 
@@ -124,13 +121,15 @@ impl Neg for LinearPolynomial {
     type Output = Self;
 
     fn neg(self) -> Self::Output {
-        LinearPolynomial{ coefficients: self.coefficients.into_iter().map(|x| -x).collect() }
+        LinearPolynomial {
+            coefficients: self.coefficients.into_iter().map(|x| -x).collect(),
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{LinearPolynomial, Term, VariableError, Constant};
+    use super::{Constant, LinearPolynomial, Term, VariableError};
     use crate::misc::{setup_test_map, setup_test_polynomial};
     use crate::pts::variable_map::Variable;
 
@@ -140,30 +139,85 @@ mod tests {
         assert_eq!(pol.len(), 1);
         let mut map = setup_test_map();
         let var = Option::<&Variable>::cloned(map.get_variable(1));
-        pol.add_term(&mut map, Term{ variable: var, coefficient: Constant(0.0)});
+        pol.add_term(
+            &mut map,
+            Term {
+                variable: var,
+                coefficient: Constant(0.0),
+            },
+        );
         assert_eq!(pol.len(), map.len() + 1);
-        assert_eq!(&pol, &LinearPolynomial{ coefficients: vec!(Constant(0.0), Constant(0.0), Constant(0.0), Constant(0.0)) });
+        assert_eq!(
+            &pol,
+            &LinearPolynomial {
+                coefficients: vec!(Constant(0.0), Constant(0.0), Constant(0.0), Constant(0.0))
+            }
+        );
     }
-    
+
     #[test]
     fn add_variable() {
         let mut pol = LinearPolynomial::default();
         let mut map = setup_test_map();
         let b = Variable::new("b");
-        pol.add_term(&mut map, Term{ variable: Some(b.clone()), coefficient: Constant(1.0)});
-        assert_eq!(&pol, &LinearPolynomial{ coefficients: vec!(Constant(0.0), Constant(0.0), Constant(1.0), Constant(0.0))}); 
-        pol.add_term(&mut map, Term{ variable: Some(b), coefficient: Constant(1.0)});
-        assert_eq!(&pol, &LinearPolynomial{ coefficients: vec!(Constant(0.0), Constant(0.0), Constant(2.0), Constant(0.0)) });
+        pol.add_term(
+            &mut map,
+            Term {
+                variable: Some(b.clone()),
+                coefficient: Constant(1.0),
+            },
+        );
+        assert_eq!(
+            &pol,
+            &LinearPolynomial {
+                coefficients: vec!(Constant(0.0), Constant(0.0), Constant(1.0), Constant(0.0))
+            }
+        );
+        pol.add_term(
+            &mut map,
+            Term {
+                variable: Some(b),
+                coefficient: Constant(1.0),
+            },
+        );
+        assert_eq!(
+            &pol,
+            &LinearPolynomial {
+                coefficients: vec!(Constant(0.0), Constant(0.0), Constant(2.0), Constant(0.0))
+            }
+        );
     }
 
     #[test]
     fn add_constant() {
         let mut pol = LinearPolynomial::default();
         let mut map = setup_test_map();
-        pol.add_term(&mut map, Term{ variable: None, coefficient: Constant(1.0)});
-        assert_eq!(&pol, &LinearPolynomial{ coefficients: vec!(Constant(1.0), Constant(0.0), Constant(0.0), Constant(0.0)) });
-        pol.add_term(&mut map, Term{ variable: None, coefficient: Constant(1.0)});
-        assert_eq!(&pol, &LinearPolynomial{ coefficients: vec!(Constant(2.0), Constant(0.0), Constant(0.0), Constant(0.0)) });
+        pol.add_term(
+            &mut map,
+            Term {
+                variable: None,
+                coefficient: Constant(1.0),
+            },
+        );
+        assert_eq!(
+            &pol,
+            &LinearPolynomial {
+                coefficients: vec!(Constant(1.0), Constant(0.0), Constant(0.0), Constant(0.0))
+            }
+        );
+        pol.add_term(
+            &mut map,
+            Term {
+                variable: None,
+                coefficient: Constant(1.0),
+            },
+        );
+        assert_eq!(
+            &pol,
+            &LinearPolynomial {
+                coefficients: vec!(Constant(2.0), Constant(0.0), Constant(0.0), Constant(0.0))
+            }
+        );
     }
 
     #[test]
@@ -171,8 +225,25 @@ mod tests {
         let mut pol = LinearPolynomial::default();
         let mut map = setup_test_map();
         let e = Variable::new("e");
-        pol.add_term(&mut map, Term{ variable: Some(e), coefficient: Constant(1.0)});
-        assert_eq!(&pol, &LinearPolynomial{ coefficients: vec!(Constant(0.0), Constant(0.0), Constant(0.0), Constant(0.0), Constant(1.0)) });
+        pol.add_term(
+            &mut map,
+            Term {
+                variable: Some(e),
+                coefficient: Constant(1.0),
+            },
+        );
+        assert_eq!(
+            &pol,
+            &LinearPolynomial {
+                coefficients: vec!(
+                    Constant(0.0),
+                    Constant(0.0),
+                    Constant(0.0),
+                    Constant(0.0),
+                    Constant(1.0)
+                )
+            }
+        );
     }
 
     #[test]
@@ -180,30 +251,92 @@ mod tests {
         let mut pol = LinearPolynomial::default();
         assert_eq!(pol.len(), 1);
         let map = setup_test_map();
-        assert_eq!(pol.try_add_term(&map, Term{ variable: Option::<&Variable>::cloned(map.get_variable(1)), coefficient: Constant(0.0)}), Ok(()));
+        assert_eq!(
+            pol.try_add_term(
+                &map,
+                Term {
+                    variable: Option::<&Variable>::cloned(map.get_variable(1)),
+                    coefficient: Constant(0.0)
+                }
+            ),
+            Ok(())
+        );
         assert_eq!(pol.len(), map.len() + 1);
-        assert_eq!(&pol, &LinearPolynomial{ coefficients: vec!(Constant(0.0), Constant(0.0), Constant(0.0), Constant(0.0)) });
+        assert_eq!(
+            &pol,
+            &LinearPolynomial {
+                coefficients: vec!(Constant(0.0), Constant(0.0), Constant(0.0), Constant(0.0))
+            }
+        );
     }
-    
+
     #[test]
     fn try_add_variable() {
         let mut pol = LinearPolynomial::default();
         let map = setup_test_map();
         let b = Variable::new("b");
-        pol.try_add_term(&map, Term{ variable: Some(b.clone()), coefficient: Constant(1.0)}).unwrap();
-        assert_eq!(&pol, &LinearPolynomial{ coefficients: vec!(Constant(0.0), Constant(0.0), Constant(1.0), Constant(0.0)) });
-        pol.try_add_term(&map, Term{ variable: Some(b), coefficient: Constant(1.0)}).unwrap();
-        assert_eq!(&pol, &LinearPolynomial{ coefficients: vec!(Constant(0.0), Constant(0.0), Constant(2.0), Constant(0.0)) });
+        pol.try_add_term(
+            &map,
+            Term {
+                variable: Some(b.clone()),
+                coefficient: Constant(1.0),
+            },
+        )
+        .unwrap();
+        assert_eq!(
+            &pol,
+            &LinearPolynomial {
+                coefficients: vec!(Constant(0.0), Constant(0.0), Constant(1.0), Constant(0.0))
+            }
+        );
+        pol.try_add_term(
+            &map,
+            Term {
+                variable: Some(b),
+                coefficient: Constant(1.0),
+            },
+        )
+        .unwrap();
+        assert_eq!(
+            &pol,
+            &LinearPolynomial {
+                coefficients: vec!(Constant(0.0), Constant(0.0), Constant(2.0), Constant(0.0))
+            }
+        );
     }
 
     #[test]
     fn try_add_constant() {
         let mut pol = LinearPolynomial::default();
         let map = setup_test_map();
-        pol.try_add_term(&map, Term{ variable: None, coefficient: Constant(1.0)}).unwrap();
-        assert_eq!(&pol, &LinearPolynomial{ coefficients: vec!(Constant(1.0), Constant(0.0), Constant(0.0), Constant(0.0))});
-        pol.try_add_term(&map, Term{ variable: None, coefficient: Constant(1.0)}).unwrap();
-        assert_eq!(&pol, &LinearPolynomial{ coefficients: vec!(Constant(2.0), Constant(0.0), Constant(0.0), Constant(0.0)) });
+        pol.try_add_term(
+            &map,
+            Term {
+                variable: None,
+                coefficient: Constant(1.0),
+            },
+        )
+        .unwrap();
+        assert_eq!(
+            &pol,
+            &LinearPolynomial {
+                coefficients: vec!(Constant(1.0), Constant(0.0), Constant(0.0), Constant(0.0))
+            }
+        );
+        pol.try_add_term(
+            &map,
+            Term {
+                variable: None,
+                coefficient: Constant(1.0),
+            },
+        )
+        .unwrap();
+        assert_eq!(
+            &pol,
+            &LinearPolynomial {
+                coefficients: vec!(Constant(2.0), Constant(0.0), Constant(0.0), Constant(0.0))
+            }
+        );
     }
 
     #[test]
@@ -211,39 +344,106 @@ mod tests {
         let mut pol = LinearPolynomial::default();
         let map = setup_test_map();
         let e = Variable::new("e");
-        assert_eq!(pol.try_add_term(&map, Term{ variable: Some(e.clone()), coefficient: Constant(1.0)}), Err(VariableError::new(&e)));
-        assert_eq!(&pol, &LinearPolynomial{ coefficients: vec!(Constant(0.0), Constant(0.0), Constant(0.0), Constant(0.0)) });
+        assert_eq!(
+            pol.try_add_term(
+                &map,
+                Term {
+                    variable: Some(e.clone()),
+                    coefficient: Constant(1.0)
+                }
+            ),
+            Err(VariableError::new(&e))
+        );
+        assert_eq!(
+            &pol,
+            &LinearPolynomial {
+                coefficients: vec!(Constant(0.0), Constant(0.0), Constant(0.0), Constant(0.0))
+            }
+        );
     }
 
     #[test]
     fn arithmetic_add() {
         let mut map = setup_test_map();
-        let mut lhs = setup_test_polynomial(&mut map, Constant(1.0), Constant(2.0), Constant(3.0), Constant(4.0));
-        let rhs = setup_test_polynomial(&mut map, Constant(4.0), Constant(3.0), Constant(2.0), Constant(1.0));
+        let mut lhs = setup_test_polynomial(
+            &mut map,
+            Constant(1.0),
+            Constant(2.0),
+            Constant(3.0),
+            Constant(4.0),
+        );
+        let rhs = setup_test_polynomial(
+            &mut map,
+            Constant(4.0),
+            Constant(3.0),
+            Constant(2.0),
+            Constant(1.0),
+        );
         let sum = lhs.clone() + rhs.clone();
-        assert_eq!(&sum, &LinearPolynomial{ coefficients: vec!(Constant(5.0), Constant(5.0), Constant(5.0), Constant(5.0)) });
+        assert_eq!(
+            &sum,
+            &LinearPolynomial {
+                coefficients: vec!(Constant(5.0), Constant(5.0), Constant(5.0), Constant(5.0))
+            }
+        );
         lhs += rhs;
-        assert_eq!(&lhs, &LinearPolynomial{ coefficients: vec!(Constant(5.0), Constant(5.0), Constant(5.0), Constant(5.0)) });
+        assert_eq!(
+            &lhs,
+            &LinearPolynomial {
+                coefficients: vec!(Constant(5.0), Constant(5.0), Constant(5.0), Constant(5.0))
+            }
+        );
     }
-    
+
     #[test]
     fn arithmetic_sub() {
         let mut map = setup_test_map();
-        let mut lhs = setup_test_polynomial(&mut map, Constant(2.0), Constant(3.0), Constant(4.0), Constant(5.0));
-        let rhs = setup_test_polynomial(&mut map, Constant(1.0), Constant(1.0), Constant(1.0), Constant(1.0));
+        let mut lhs = setup_test_polynomial(
+            &mut map,
+            Constant(2.0),
+            Constant(3.0),
+            Constant(4.0),
+            Constant(5.0),
+        );
+        let rhs = setup_test_polynomial(
+            &mut map,
+            Constant(1.0),
+            Constant(1.0),
+            Constant(1.0),
+            Constant(1.0),
+        );
         let diff = lhs.clone() - rhs.clone();
-        assert_eq!(&diff, &LinearPolynomial{ coefficients: vec!(Constant(1.0), Constant(2.0), Constant(3.0), Constant(4.0)) });
+        assert_eq!(
+            &diff,
+            &LinearPolynomial {
+                coefficients: vec!(Constant(1.0), Constant(2.0), Constant(3.0), Constant(4.0))
+            }
+        );
         lhs -= rhs;
-        assert_eq!(&lhs, &LinearPolynomial{ coefficients: vec!(Constant(1.0), Constant(2.0), Constant(3.0), Constant(4.0)) });
+        assert_eq!(
+            &lhs,
+            &LinearPolynomial {
+                coefficients: vec!(Constant(1.0), Constant(2.0), Constant(3.0), Constant(4.0))
+            }
+        );
     }
 
     #[test]
     fn neg() {
         let mut map = setup_test_map();
-        let lhs = setup_test_polynomial(&mut map, Constant(0.0), Constant(-3.0), Constant(4.0), Constant(-5.0));
+        let lhs = setup_test_polynomial(
+            &mut map,
+            Constant(0.0),
+            Constant(-3.0),
+            Constant(4.0),
+            Constant(-5.0),
+        );
         let lhs = -lhs;
-        assert_eq!(&lhs, &LinearPolynomial{ coefficients: vec!(Constant(0.0), Constant(3.0), Constant(-4.0), Constant(5.0)) });
+        assert_eq!(
+            &lhs,
+            &LinearPolynomial {
+                coefficients: vec!(Constant(0.0), Constant(3.0), Constant(-4.0), Constant(5.0))
+            }
+        );
     }
-
 }
-

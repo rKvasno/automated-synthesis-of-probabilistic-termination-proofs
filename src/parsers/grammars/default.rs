@@ -9,9 +9,9 @@ pub struct DefaultParser;
 mod tests {
     use super::DefaultParser;
     use super::Rule;
-    use pest::{ parses_to, consumes_to};
-    use pest::Parser;
     use crate::misc::read_test_input;
+    use pest::Parser;
+    use pest::{consumes_to, parses_to};
 
     #[test]
     fn trivial_program() {
@@ -148,7 +148,7 @@ mod tests {
     #[test]
     fn simple_if() {
         let input = read_test_input("simple_if_snippet");
-        
+
         parses_to! {
             parser: DefaultParser,
             input: input.as_str(),
@@ -160,7 +160,7 @@ mod tests {
                             term(3, 4, [
                                 variable(3, 4)
                             ])
-                        ]), 
+                        ]),
                         comparison_op(5, 7),
                         linear_polynomial(8, 9, [
                             term(8, 9, [
@@ -182,9 +182,9 @@ mod tests {
                                         variable(20, 21)
                                     ])
                                 ])
-                            ]), 
+                            ]),
                             assign_inst(24, 29, [
-                                variable(24, 25), 
+                                variable(24, 25),
                                 linear_polynomial(28, 29, [
                                     term(28, 29, [
                                         variable(28, 29)
@@ -192,13 +192,13 @@ mod tests {
                                 ])
                             ])
                         ])
-                    ]), 
+                    ]),
                     logic_condition(40, 47, [
                         linear_polynomial(40, 41, [
                             term(40, 41, [
                                 variable(40, 41)
                             ])
-                        ]), 
+                        ]),
                         comparison_op(42, 44),
                         linear_polynomial(45, 46, [
                             term(45, 46, [
@@ -294,7 +294,7 @@ mod tests {
                                 ])
                             ])
                         ])
-                    ]), 
+                    ]),
                     locations(33, 52, [
                         location(36, 51, [
                             invariants(36, 46, [
@@ -453,7 +453,7 @@ mod tests {
                             ])
                         ])
                     ])
-                ])      
+                ])
             ]
         };
     }
@@ -562,6 +562,4 @@ mod tests {
         let input = read_test_input("complex_program");
         assert!(DefaultParser::parse(Rule::program, &input).is_ok());
     }
-    
 }
-

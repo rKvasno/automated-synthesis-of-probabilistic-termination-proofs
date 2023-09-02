@@ -1,10 +1,8 @@
-use std::num::ParseFloatError;
-use std::ops::{Neg, 
-    AddAssign, SubAssign, MulAssign, DivAssign,
-    Add, Sub, Mul, Div};
-use std::str::FromStr;
-use std::iter::Sum;
 use std::convert::From;
+use std::iter::Sum;
+use std::num::ParseFloatError;
+use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign};
+use std::str::FromStr;
 
 #[derive(Debug, Default, PartialEq, Clone, Copy)]
 pub struct Constant(pub f64);
@@ -98,8 +96,7 @@ impl Div for Constant {
 }
 
 impl Sum for Constant {
-    fn sum<I: Iterator<Item=Self>>(iter: I) -> Self {
+    fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
         iter.fold(Constant(0.0), |a, b| a + b)
     }
 }
-
