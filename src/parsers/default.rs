@@ -665,7 +665,7 @@ mod tests {
     }
 
     #[test]
-    fn parse_program_sanity() {
+    fn parse_program_trivial() {
         let input = read_test_input("trivial_program");
         let parsed = parse(input.as_str()).unwrap();
 
@@ -705,6 +705,179 @@ mod tests {
         );
 
         let variables = VariableMap::mock(vec![Variable::new("a")]);
+
+        assert_eq!(
+            parsed,
+            PTS {
+                locations,
+                variables
+            }
+        );
+    }
+
+    #[test]
+    fn parse_program_simple() {
+        let input = read_test_input("simple_program");
+        let parsed = parse(input.as_str()).unwrap();
+
+        let mut locations = Locations::default();
+        let mut locations_iter = locations.new_n_locations(3);
+
+        let handle = locations_iter.next().unwrap();
+        locations.initial = handle;
+
+        // line #
+        // 1
+        locations.set_invariant(
+            handle,
+            InequalitySystem::mock(vec![Inequality::mock(
+                true,
+                LinearPolynomial::mock(vec![Constant(0.0), Constant(-1.0)]),
+            )]),
+        );
+        // 2
+        let next_location = locations_iter.next().unwrap();
+        locations
+            .set_outgoing(
+                handle,
+                Guards::Unguarded(Box::new(Transition {
+                    assignments: vec![Assignment(
+                        Variable::new("b"),
+                        LinearPolynomial::mock(vec![Constant(1.0), Constant(0.0), Constant(0.0)]),
+                    )],
+                    target: next_location,
+                })),
+            )
+            .unwrap();
+        // 3
+        let handle = next_location;
+        locations.set_invariant(
+            handle,
+            InequalitySystem::mock(vec![
+                Inequality::mock(
+                    false,
+                    LinearPolynomial::mock(vec![Constant(1.0), Constant(0.0), Constant(-1.0)]),
+                ),
+                Inequality::mock(
+                    true,
+                    LinearPolynomial::mock(vec![Constant(0.0), Constant(-1.0), Constant(0.0)]),
+                ),
+            ]),
+        );
+
+        // 4
+        let next_location = locations_iter.next().unwrap();
+        locations
+            .set_outgoing(
+                handle,
+                Guards::Unguarded(Box::new(Transition {
+                    assignments: vec![Assignment(
+                        Variable::new("c"),
+                        LinearPolynomial::mock(vec![
+                            Constant(0.0),
+                            Constant(1.0),
+                            Constant(1.0),
+                            Constant(0.0),
+                        ]),
+                    )],
+                    target: next_location,
+                })),
+            )
+            .unwrap();
+
+        // 5
+        let handle = next_location;
+        locations.set_invariant(
+            handle,
+            InequalitySystem::mock(vec![
+                Inequality::mock(
+                    false,
+                    LinearPolynomial::mock(vec![
+                        Constant(1.0),
+                        Constant(0.0),
+                        Constant(-1.0),
+                        Constant(0.0),
+                    ]),
+                ),
+                Inequality::mock(
+                    true,
+                    LinearPolynomial::mock(vec![
+                        Constant(0.0),
+                        Constant(-1.0),
+                        Constant(0.0),
+                        Constant(0.0),
+                    ]),
+                ),
+                Inequality::mock(
+                    true,
+                    LinearPolynomial::mock(vec![
+                        Constant(1.0),
+                        Constant(0.0),
+                        Constant(0.0),
+                        Constant(-1.0),
+                    ]),
+                ),
+            ]),
+        );
+        // 6
+        let next_location = locations.get_terminating_location();
+        locations
+            .set_outgoing(
+                handle,
+                Guards::Unguarded(Box::new(Transition {
+                    assignments: vec![Assignment(
+                        Variable::new("b"),
+                        LinearPolynomial::mock(vec![
+                            Constant(0.0),
+                            Constant(2.0),
+                            Constant(0.0),
+                            Constant(1.0),
+                        ]),
+                    )],
+                    target: next_location,
+                })),
+            )
+            .unwrap();
+        // 7
+        let handle = next_location;
+        locations.set_invariant(
+            handle,
+            InequalitySystem::mock(vec![
+                Inequality::mock(
+                    true,
+                    LinearPolynomial::mock(vec![
+                        Constant(1.0),
+                        Constant(0.0),
+                        Constant(-1.0),
+                        Constant(0.0),
+                    ]),
+                ),
+                Inequality::mock(
+                    true,
+                    LinearPolynomial::mock(vec![
+                        Constant(0.0),
+                        Constant(-1.0),
+                        Constant(0.0),
+                        Constant(0.0),
+                    ]),
+                ),
+                Inequality::mock(
+                    true,
+                    LinearPolynomial::mock(vec![
+                        Constant(1.0),
+                        Constant(0.0),
+                        Constant(0.0),
+                        Constant(-1.0),
+                    ]),
+                ),
+            ]),
+        );
+
+        let variables = VariableMap::mock(vec![
+            Variable::new("a"),
+            Variable::new("b"),
+            Variable::new("c"),
+        ]);
 
         assert_eq!(
             parsed,
