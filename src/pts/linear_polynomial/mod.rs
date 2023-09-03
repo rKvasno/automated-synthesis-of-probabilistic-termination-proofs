@@ -16,25 +16,29 @@ pub struct LinearPolynomial {
 }
 
 impl LinearPolynomial {
-    pub fn test() -> Self {
-        Default::default()
-    }
-}
-
-impl LinearPolynomial {
     pub fn len(&self) -> usize {
         self.coefficients.len()
     }
 
-    fn resize(&mut self, map: &VariableMap) {
+    fn resize_to_map(&mut self, map: &VariableMap) {
         if self.len() < map.len() + 1 {
             // +1 for constant term
             self.coefficients.resize(map.len() + 1, Constant(0.0));
         }
     }
 
+    fn resize_to_polynomial(&mut self, other: &mut Self) {
+        if self.len() < other.len() {
+            self.coefficients.resize(other.len(), Constant(0.0));
+        } else if self.len() > other.len() {
+            other
+                .coefficients
+                .resize(self.coefficients.len(), Constant(0.0));
+        }
+    }
+
     pub fn try_add_term(&mut self, map: &VariableMap, term: Term) -> Result<(), VariableError> {
-        self.resize(map);
+        self.resize_to_map(map);
         if term.variable.is_none() {
             self.coefficients[0] += term.coefficient;
             Ok(())
@@ -53,10 +57,10 @@ impl LinearPolynomial {
     pub fn add_term(&mut self, map: &mut VariableMap, term: Term) {
         if term.variable.is_none() {
             self.coefficients[0] += term.coefficient;
-            self.resize(map);
+            self.resize_to_map(map);
         } else {
             let index = map.find_or_add(term.variable.unwrap());
-            self.resize(map);
+            self.resize_to_map(map);
             self.coefficients[index] += term.coefficient;
         }
     }
@@ -82,7 +86,8 @@ impl Default for LinearPolynomial {
 }
 
 impl AddAssign for LinearPolynomial {
-    fn add_assign(&mut self, other: Self) {
+    fn add_assign(&mut self, mut other: Self) {
+        self.resize_to_polynomial(&mut other);
         let iter = zip(self.coefficients.iter_mut(), other.coefficients.into_iter());
         for (lhs, rhs) in iter {
             *lhs += rhs;
@@ -100,7 +105,8 @@ impl Add for LinearPolynomial {
 }
 
 impl SubAssign for LinearPolynomial {
-    fn sub_assign(&mut self, other: Self) {
+    fn sub_assign(&mut self, mut other: Self) {
+        self.resize_to_polynomial(&mut other);
         let iter = zip(self.coefficients.iter_mut(), other.coefficients.into_iter());
         for (lhs, rhs) in iter {
             *lhs -= rhs;

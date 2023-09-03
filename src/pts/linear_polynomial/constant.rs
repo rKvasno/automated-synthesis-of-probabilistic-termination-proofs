@@ -7,6 +7,11 @@ use std::str::FromStr;
 #[derive(Debug, Default, PartialEq, Clone, Copy)]
 pub struct Constant(pub f64);
 
+// TODO make sure -0.0 doesnt cause issues
+// this -0.0 == 0.0,
+// and this !(-0.0 < 0.0) are both true
+// and while Debug prints -
+// Display doesnt
 impl Constant {
     pub fn pow(self, exponent: Self) -> Self {
         Constant(self.0.powf(exponent.0))
