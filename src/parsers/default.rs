@@ -1526,4 +1526,268 @@ mod tests {
             }
         );
     }
+
+    #[test]
+    fn parse_simple_nondet_program() {
+        let input = read_test_input("simple_nondet_program");
+        let parsed = parse(input.as_str()).unwrap();
+
+        let mut locations = Locations::default();
+        let mut locations_iter = locations.new_n_locations(5);
+
+        let start = locations_iter.next().unwrap();
+        locations.initial = start;
+
+        // line #
+        // 1
+        locations.set_invariant(
+            start,
+            InequalitySystem::mock(vec![Inequality::mock(
+                true,
+                LinearPolynomial::mock(vec![Constant(0.0)]),
+            )]),
+        );
+        let junction = locations_iter.next().unwrap();
+        let br_1 = locations_iter.next().unwrap();
+        let br_2 = locations_iter.next().unwrap();
+        let br_3 = locations_iter.next().unwrap();
+        locations
+            .set_outgoing(
+                start,
+                Guards::Nondeterministic(vec![
+                    // 2
+                    Transition {
+                        assignments: vec![],
+                        target: br_1,
+                    },
+                    //6
+                    Transition {
+                        assignments: vec![],
+                        target: br_2,
+                    },
+                    //10
+                    Transition {
+                        assignments: vec![],
+                        target: br_3,
+                    },
+                ]),
+            )
+            .unwrap();
+
+        // 3
+        locations.set_invariant(
+            br_1,
+            InequalitySystem::mock(vec![Inequality::mock(
+                true,
+                LinearPolynomial::mock(vec![Constant(0.0), Constant(0.0)]),
+            )]),
+        );
+
+        // 4
+        locations
+            .set_outgoing(
+                br_1,
+                Guards::Unguarded(Box::new(Transition {
+                    assignments: vec![Assignment(
+                        Variable::new("a"),
+                        LinearPolynomial::mock(vec![Constant(0.0), Constant(1.0)]),
+                    )],
+                    target: junction,
+                })),
+            )
+            .unwrap();
+
+        // 7
+        locations.set_invariant(
+            br_2,
+            InequalitySystem::mock(vec![Inequality::mock(
+                true,
+                LinearPolynomial::mock(vec![Constant(0.0), Constant(0.0)]),
+            )]),
+        );
+
+        // 8
+        locations
+            .set_outgoing(
+                br_2,
+                Guards::Unguarded(Box::new(Transition {
+                    assignments: vec![Assignment(
+                        Variable::new("a"),
+                        LinearPolynomial::mock(vec![Constant(0.0), Constant(1.0)]),
+                    )],
+                    target: junction,
+                })),
+            )
+            .unwrap();
+
+        // 11
+        locations.set_invariant(
+            br_3,
+            InequalitySystem::mock(vec![Inequality::mock(
+                true,
+                LinearPolynomial::mock(vec![Constant(0.0), Constant(0.0)]),
+            )]),
+        );
+
+        // 12
+        locations
+            .set_outgoing(
+                br_3,
+                Guards::Unguarded(Box::new(Transition {
+                    assignments: vec![Assignment(
+                        Variable::new("a"),
+                        LinearPolynomial::mock(vec![Constant(0.0), Constant(1.0)]),
+                    )],
+                    target: junction,
+                })),
+            )
+            .unwrap();
+
+        // 14
+        locations.set_invariant(
+            junction,
+            InequalitySystem::mock(vec![Inequality::mock(
+                true,
+                LinearPolynomial::mock(vec![Constant(0.0), Constant(0.0)]),
+            )]),
+        );
+
+        // 15
+        locations
+            .set_outgoing(
+                junction,
+                Guards::Unguarded(Box::new(Transition {
+                    assignments: vec![Assignment(
+                        Variable::new("a"),
+                        LinearPolynomial::mock(vec![Constant(0.0), Constant(1.0)]),
+                    )],
+                    target: locations.get_terminating_location(),
+                })),
+            )
+            .unwrap();
+
+        // 16
+        locations.set_invariant(
+            locations.get_terminating_location(),
+            InequalitySystem::mock(vec![Inequality::mock(
+                true,
+                LinearPolynomial::mock(vec![Constant(0.0), Constant(0.0)]),
+            )]),
+        );
+
+        let variables = VariableMap::mock(vec![Variable::new("a")]);
+
+        assert_eq!(
+            parsed,
+            PTS {
+                locations,
+                variables
+            }
+        );
+    }
+
+    #[test]
+    fn parse_trivial_nondet_program() {
+        let input = read_test_input("trivial_nondet_program");
+        let parsed = parse(input.as_str()).unwrap();
+
+        let mut locations = Locations::default();
+        let mut locations_iter = locations.new_n_locations(3);
+
+        let start = locations_iter.next().unwrap();
+        locations.initial = start;
+
+        // line #
+        // 1
+        locations.set_invariant(
+            start,
+            InequalitySystem::mock(vec![Inequality::mock(
+                true,
+                LinearPolynomial::mock(vec![Constant(0.0)]),
+            )]),
+        );
+        let junction = locations_iter.next().unwrap();
+        let br_1 = locations_iter.next().unwrap();
+        locations
+            .set_outgoing(
+                start,
+                Guards::Nondeterministic(vec![
+                    // 2
+                    Transition {
+                        assignments: vec![],
+                        target: br_1,
+                    },
+                    //5
+                    Transition {
+                        assignments: vec![],
+                        target: junction,
+                    },
+                ]),
+            )
+            .unwrap();
+
+        // 3
+        locations.set_invariant(
+            br_1,
+            InequalitySystem::mock(vec![Inequality::mock(
+                true,
+                LinearPolynomial::mock(vec![Constant(0.0), Constant(0.0)]),
+            )]),
+        );
+
+        // 4
+        locations
+            .set_outgoing(
+                br_1,
+                Guards::Unguarded(Box::new(Transition {
+                    assignments: vec![Assignment(
+                        Variable::new("a"),
+                        LinearPolynomial::mock(vec![Constant(0.0), Constant(1.0)]),
+                    )],
+                    target: junction,
+                })),
+            )
+            .unwrap();
+        // 6
+        locations.set_invariant(
+            junction,
+            InequalitySystem::mock(vec![Inequality::mock(
+                true,
+                LinearPolynomial::mock(vec![Constant(0.0), Constant(0.0)]),
+            )]),
+        );
+
+        // 7
+        locations
+            .set_outgoing(
+                junction,
+                Guards::Unguarded(Box::new(Transition {
+                    assignments: vec![Assignment(
+                        Variable::new("a"),
+                        LinearPolynomial::mock(vec![Constant(0.0), Constant(1.0)]),
+                    )],
+                    target: locations.get_terminating_location(),
+                })),
+            )
+            .unwrap();
+
+        // 8
+        locations.set_invariant(
+            locations.get_terminating_location(),
+            InequalitySystem::mock(vec![Inequality::mock(
+                true,
+                LinearPolynomial::mock(vec![Constant(0.0), Constant(0.0)]),
+            )]),
+        );
+
+        let variables = VariableMap::mock(vec![Variable::new("a")]);
+
+        assert_eq!(
+            parsed,
+            PTS {
+                locations,
+                variables
+            }
+        );
+    }
 }

@@ -1,0 +1,16 @@
+# 0 < 0
+nondet {
+  # a > a
+  a = a
+}
+or {
+  # a > a
+  a = a
+}
+or {
+  # a > a
+  a = a
+}
+# a > a
+a = a
+# 0 < 0
