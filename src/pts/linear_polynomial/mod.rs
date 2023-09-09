@@ -144,7 +144,7 @@ mod tests {
         let mut pol = LinearPolynomial::default();
         assert_eq!(pol.len(), 1);
         let mut map = setup_test_map();
-        let var = Option::<&Variable>::cloned(map.get_variable(1));
+        let var = Option::<&Variable>::cloned(map.get_variable(1).unwrap());
         pol.add_term(
             &mut map,
             Term {
@@ -261,7 +261,7 @@ mod tests {
             pol.try_add_term(
                 &map,
                 Term {
-                    variable: Option::<&Variable>::cloned(map.get_variable(1)),
+                    variable: Option::<&Variable>::cloned(map.get_variable(1).unwrap()),
                     coefficient: Constant(0.0)
                 }
             ),

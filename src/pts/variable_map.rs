@@ -37,11 +37,11 @@ impl VariableMap {
     }
 
     // Return the variable with specified index in a polynomial
-    pub fn get_variable(&self, index: usize) -> Option<&Variable> {
+    pub fn get_variable(&self, index: usize) -> Option<Option<&Variable>> {
         if index == 0 {
-            None
+            Some(None)
         } else {
-            self.variables.get(index - 1)
+            self.variables.get(index - 1).map(Some)
         }
     }
 
@@ -98,11 +98,11 @@ mod tests {
         let mut map = VariableMap::default();
         let a = Variable::new("a");
         assert_eq!(map.get_index(&a), None);
-        assert_eq!(map.get_variable(0), None);
+        assert_eq!(map.get_variable(0), Some(None));
         assert_eq!(map.get_variable(1), None);
         map.find_or_add(Variable::new("b"));
         assert_eq!(map.get_index(&a), None);
-        assert_eq!(map.get_variable(0), None);
+        assert_eq!(map.get_variable(0), Some(None));
         assert_eq!(map.get_variable(2), None);
     }
 
@@ -111,15 +111,15 @@ mod tests {
         let mut map = VariableMap::default();
         let a = Variable::new("a");
         assert_eq!(map.find_or_add(a.clone()), 1);
-        assert_eq!(map.get_variable(1), Some(&a));
+        assert_eq!(map.get_variable(1), Some(Some(&a)));
         assert_eq!(map.find_or_add(a.clone()), 1);
-        assert_eq!(map.get_variable(1), Some(&a));
+        assert_eq!(map.get_variable(1), Some(Some(&a)));
         let b = Variable::new("b");
         assert_eq!(map.find_or_add(b.clone()), 2);
         let c = Variable::new("c");
         assert_eq!(map.find_or_add(c.clone()), 3);
-        assert_eq!(map.get_variable(1), Some(&a));
-        assert_eq!(map.get_variable(2), Some(&b));
-        assert_eq!(map.get_variable(3), Some(&c));
+        assert_eq!(map.get_variable(1), Some(Some(&a)));
+        assert_eq!(map.get_variable(2), Some(Some(&b)));
+        assert_eq!(map.get_variable(3), Some(Some(&c)));
     }
 }

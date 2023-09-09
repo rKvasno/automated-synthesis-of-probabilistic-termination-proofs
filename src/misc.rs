@@ -26,7 +26,7 @@ pub fn setup_test_polynomial(
     c: Constant,
 ) -> LinearPolynomial {
     let mut pol = LinearPolynomial::default();
-    let mut var = Option::<&Variable>::cloned(map.get_variable(0));
+    let mut var = Option::<&Variable>::cloned(map.get_variable(0).unwrap());
     pol.try_add_term(
         &map,
         Term {
@@ -35,7 +35,7 @@ pub fn setup_test_polynomial(
         },
     )
     .unwrap();
-    var = Option::<&Variable>::cloned(map.get_variable(1));
+    var = Option::<&Variable>::cloned(map.get_variable(1).unwrap());
     pol.try_add_term(
         &map,
         Term {
@@ -44,7 +44,7 @@ pub fn setup_test_polynomial(
         },
     )
     .unwrap();
-    var = Option::<&Variable>::cloned(map.get_variable(2));
+    var = Option::<&Variable>::cloned(map.get_variable(2).unwrap());
     pol.try_add_term(
         &map,
         Term {
@@ -53,7 +53,7 @@ pub fn setup_test_polynomial(
         },
     )
     .unwrap();
-    var = Option::<&Variable>::cloned(map.get_variable(3));
+    var = Option::<&Variable>::cloned(map.get_variable(3).unwrap());
     pol.try_add_term(
         &map,
         Term {
