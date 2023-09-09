@@ -2,7 +2,7 @@ use crate::pts::{linear_polynomial, variable_map};
 use linear_polynomial::constant::Constant;
 use variable_map::Variable;
 
-use std::ops::Neg;
+use std::{fmt, ops::Neg};
 
 // default: constant term 0
 #[derive(Debug, Default, PartialEq)]
@@ -28,5 +28,16 @@ impl Neg for &mut Term {
     fn neg(self) -> Self::Output {
         self.coefficient = -self.coefficient;
         self
+    }
+}
+
+impl fmt::Display for Term {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
+        write!(
+            f,
+            "{}{}",
+            self.variable.map(|x| x.as_str()).unwrap_or(""),
+            self.coefficient
+        )
     }
 }
