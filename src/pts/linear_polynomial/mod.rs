@@ -15,7 +15,7 @@ pub struct LinearPolynomial {
     coefficients: Vec<Constant>,
 }
 
-impl LinearPolynomial {
+impl<'a> LinearPolynomial {
     pub fn len(&self) -> usize {
         self.coefficients.len()
     }
@@ -67,6 +67,28 @@ impl LinearPolynomial {
 
     pub fn get_coefficient(&self, index: usize) -> Option<Constant> {
         self.coefficients.get(index).map(|x| x.clone())
+    }
+
+    pub fn iter(&'a self, variable_map: &'a VariableMap) -> TermIterator<'a> {
+        TermIterator(self, variable_map, 0)
+    }
+}
+
+pub struct TermIterator<'a>(&'a LinearPolynomial, &'a VariableMap, usize);
+
+impl<'a> Iterator for TermIterator<'a> {
+    type Item = Term;
+    fn next(&mut self) -> Option<Self::Item> {
+        let variable = self.1.get_variable(self.2);
+        let coefficient = self.0.get_coefficient(self.2);
+        self.2 += 1;
+        match (variable, coefficient) {
+            (Some(v), Some(c)) => Some(Term {
+                variable: v.map(|x| x.clone()),
+                coefficient: c,
+            }),
+            _ => None,
+        }
     }
 }
 
