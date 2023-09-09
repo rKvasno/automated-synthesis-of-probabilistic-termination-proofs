@@ -1,10 +1,11 @@
 use std::convert::From;
+use std::fmt;
 use std::iter::Sum;
 use std::num::ParseFloatError;
 use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign};
 use std::str::FromStr;
 
-#[derive(Debug, Default, PartialEq, Clone, Copy)]
+#[derive(Debug, Default, PartialEq, PartialOrd, Clone, Copy)]
 pub struct Constant(pub f64);
 
 // TODO make sure -0.0 doesnt cause issues
@@ -15,6 +16,14 @@ pub struct Constant(pub f64);
 impl Constant {
     pub fn pow(self, exponent: Self) -> Self {
         Constant(self.0.powf(exponent.0))
+    }
+
+    pub fn abs(self) -> Self {
+        Constant(self.0.abs())
+    }
+
+    pub fn is_zero(&self) -> bool {
+        self.0 == 0.0
     }
 }
 
