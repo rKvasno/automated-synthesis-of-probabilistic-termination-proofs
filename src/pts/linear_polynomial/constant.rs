@@ -114,3 +114,9 @@ impl Sum for Constant {
         iter.fold(Constant(0.0), |a, b| a + b)
     }
 }
+
+impl fmt::Display for Constant {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
+        write!(f, "{}", self.0)
+    }
+}
