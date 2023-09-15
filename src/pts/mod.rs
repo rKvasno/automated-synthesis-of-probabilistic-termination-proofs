@@ -16,6 +16,9 @@ pub struct PTS {
     pub variables: VariableMap,
 }
 
+trait DisplayLabel {
+    fn label(&self, variable_map: &VariableMap) -> String;
+}
 // #[cfg(test)]
 // mod tests {
 //     use std::mem;

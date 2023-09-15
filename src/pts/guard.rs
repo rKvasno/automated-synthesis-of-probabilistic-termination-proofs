@@ -5,8 +5,6 @@ use inequality::InequalitySystem;
 use linear_polynomial::constant::Constant;
 use transition::Transition;
 
-use super::variable_map::VariableMap;
-
 pub type Probability = Constant;
 
 // 32 bytes
