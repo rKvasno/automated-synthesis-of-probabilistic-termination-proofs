@@ -532,6 +532,35 @@ mod tests {
     }
 
     #[test]
+    fn separate_constant_term() {
+        let mut map = setup_test_map();
+        let mut lhs = setup_test_polynomial(
+            &mut map,
+            Constant(9.0),
+            Constant(-3.0),
+            Constant(4.0),
+            Constant(-5.0),
+        );
+        let rhs = lhs.separate_constant_term();
+        assert_eq!(
+            lhs,
+            setup_test_polynomial(
+                &mut map,
+                Constant(0.0),
+                Constant(-3.0),
+                Constant(4.0),
+                Constant(-5.0),
+            )
+        );
+        assert_eq!(
+            rhs,
+            LinearPolynomial {
+                coefficients: vec![Constant(9.0)]
+            }
+        );
+    }
+
+    #[test]
     fn label() {
         let pol = LinearPolynomial {
             coefficients: vec![Constant(0.0)],
@@ -570,34 +599,5 @@ mod tests {
             Variable::new("c"),
         ]);
         assert_eq!(pol.label(&map), "-5");
-    }
-
-    #[test]
-    fn separate_constant_term() {
-        let mut map = setup_test_map();
-        let mut lhs = setup_test_polynomial(
-            &mut map,
-            Constant(9.0),
-            Constant(-3.0),
-            Constant(4.0),
-            Constant(-5.0),
-        );
-        let rhs = lhs.separate_constant_term();
-        assert_eq!(
-            lhs,
-            setup_test_polynomial(
-                &mut map,
-                Constant(0.0),
-                Constant(-3.0),
-                Constant(4.0),
-                Constant(-5.0),
-            )
-        );
-        assert_eq!(
-            rhs,
-            LinearPolynomial {
-                coefficients: vec![Constant(9.0)]
-            }
-        );
     }
 }
