@@ -133,10 +133,20 @@ impl InequalitySystem {
     }
 }
 
-#[cfg(test)]
-impl InequalitySystem {
-    pub fn mock(inequalities: Vec<Inequality>) -> Self {
-        InequalitySystem { inequalities }
+impl DisplayLabel for InequalitySystem {
+    fn label(&self, variable_map: &VariableMap) -> String {
+        //ineq (\n ineq)*
+        let mut label = String::default();
+        let mut iter = self.inequalities.iter().map(|x| x.label(variable_map));
+        match iter.next() {
+            Some(line) => label.push_str(line.as_str()),
+            _ => (),
+        }
+        for line in iter {
+            label.push_str("\n");
+            label.push_str(line.as_str());
+        }
+        label
     }
 }
 
@@ -146,6 +156,13 @@ impl Not for InequalitySystem {
         InequalitySystem {
             inequalities: self.inequalities.into_iter().map(|x| !x).collect(),
         }
+    }
+}
+
+#[cfg(test)]
+impl InequalitySystem {
+    pub fn mock(inequalities: Vec<Inequality>) -> Self {
+        InequalitySystem { inequalities }
     }
 }
 
@@ -345,5 +362,56 @@ mod tests {
             Variable::new("c"),
         ]);
         assert_eq!(ineq.label(&map), "a <= 0");
+    }
+
+    #[test]
+    fn label_inequality_system() {
+        let system = InequalitySystem {
+            inequalities: vec![
+                Inequality {
+                    strict: false,
+                    pol: LinearPolynomial::mock(vec![Constant(0.0)]),
+                },
+                Inequality {
+                    strict: false,
+                    pol: LinearPolynomial::mock(vec![Constant(0.0)]),
+                },
+            ],
+        };
+        let map = VariableMap::mock(vec![]);
+        assert_eq!(system.label(&map), "0 <= 0\n0 <= 0");
+
+        let system = InequalitySystem {
+            inequalities: vec![
+                Inequality {
+                    strict: false,
+                    pol: LinearPolynomial::mock(vec![Constant(0.0), Constant(1.0)]),
+                },
+                Inequality {
+                    strict: false,
+                    pol: LinearPolynomial::mock(vec![Constant(0.0), Constant(-1.0)]),
+                },
+            ],
+        };
+        let map = VariableMap::mock(vec![Variable::new("a"), Variable::new("b")]);
+        assert_eq!(system.label(&map), "a <= 0\na >= 0");
+
+        let system = InequalitySystem {
+            inequalities: vec![Inequality {
+                strict: true,
+                pol: LinearPolynomial::mock(vec![
+                    Constant(0.0),
+                    Constant(-1.0),
+                    Constant(0.0),
+                    Constant(0.0),
+                ]),
+            }],
+        };
+        let map = VariableMap::mock(vec![
+            Variable::new("test1"),
+            Variable::new("test2"),
+            Variable::new("test3"),
+        ]);
+        assert_eq!(system.label(&map), "test1 > 0");
     }
 }
