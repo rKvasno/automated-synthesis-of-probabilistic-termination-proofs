@@ -71,6 +71,23 @@ impl<'a> LinearPolynomial {
         self.coefficients.get(index).map(|x| x.clone())
     }
 
+    pub fn separate_constant_term(&mut self) -> LinearPolynomial {
+        let mut new_pol = LinearPolynomial {
+            coefficients: vec![Constant(0.0)],
+        };
+
+        unsafe {
+            // we assume all polynomials to have atleast the constant term
+            assert!(self.coefficients.len() > 0);
+            assert!(new_pol.coefficients.len() > 0);
+            std::mem::swap(
+                self.coefficients.get_unchecked_mut(0),
+                new_pol.coefficients.get_unchecked_mut(0),
+            );
+        }
+        new_pol
+    }
+
     pub fn iter(&'a self, variable_map: &'a VariableMap) -> TermIterator<'a> {
         TermIterator(self, variable_map, 0)
     }
@@ -553,5 +570,34 @@ mod tests {
             Variable::new("c"),
         ]);
         assert_eq!(pol.label(&map), "-5");
+    }
+
+    #[test]
+    fn separate_constant_term() {
+        let mut map = setup_test_map();
+        let mut lhs = setup_test_polynomial(
+            &mut map,
+            Constant(9.0),
+            Constant(-3.0),
+            Constant(4.0),
+            Constant(-5.0),
+        );
+        let rhs = lhs.separate_constant_term();
+        assert_eq!(
+            lhs,
+            setup_test_polynomial(
+                &mut map,
+                Constant(0.0),
+                Constant(-3.0),
+                Constant(4.0),
+                Constant(-5.0),
+            )
+        );
+        assert_eq!(
+            rhs,
+            LinearPolynomial {
+                coefficients: vec![Constant(9.0)]
+            }
+        );
     }
 }
