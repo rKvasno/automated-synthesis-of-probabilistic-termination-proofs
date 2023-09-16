@@ -1,0 +1,9 @@
+digraph PTS {
+    Location_0[label="a > 0"][style="bold"];
+    Location_1[label="b >= 1\na > 0"][style="solid"];
+    Location_2[label="b >= 1\na > 0\nc > 1"][style="solid"];
+    Location_terminating[label="b > 1\na > 0\nc > 1"][style="solid"][shape="doublecircle"];
+    Location_0 -> Location_1[label="\nb = 1"];
+    Location_1 -> Location_2[label="\nc = a + b"];
+    Location_2 -> Location_terminating[label="\nb = 2a + c"];
+}

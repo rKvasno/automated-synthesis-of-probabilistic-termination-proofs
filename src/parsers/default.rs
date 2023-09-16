@@ -486,7 +486,7 @@ mod tests {
         Variable, VariableMap,
     };
     use crate::{
-        misc::{read_test_input, setup_test_map},
+        misc::{read_test_string, setup_test_map},
         parsers::default::{parse_assignment, parse_inequality, parse_inequality_system},
         pts::{
             guard::Guards,
@@ -645,8 +645,11 @@ mod tests {
     #[test]
     fn inequality_system_sanity() {
         let mut map = setup_test_map();
-        let mut parse =
-            DefaultParser::parse(Rule::logic_condition, "- 2b - 4 < - a and 0 >= 0").unwrap();
+        let mut parse = DefaultParser::parse(
+            Rule::logic_condition,
+            "- 2b - 4 < - a and 0 >= 0 and a >= 0",
+        )
+        .unwrap();
         let system = parse_inequality_system(&mut map, parse.next().unwrap());
         assert!(parse.next().is_none());
         let cond = system.get(0).unwrap();
@@ -675,12 +678,25 @@ mod tests {
                 ))
             )
         );
-        assert!(system.get(2).is_none());
+        let cond = system.get(2).unwrap();
+        assert_eq!(
+            *cond,
+            Inequality::mock(
+                false,
+                LinearPolynomial::mock(vec!(
+                    Constant(0.0),
+                    Constant(-1.0),
+                    Constant(0.0),
+                    Constant(0.0)
+                ))
+            )
+        );
+        assert!(system.get(3).is_none());
     }
 
     #[test]
     fn parse_program_trivial() {
-        let input = read_test_input("trivial_program");
+        let input = read_test_string("code/default/trivial_program");
         let parsed = parse(input.as_str()).unwrap();
 
         let mut locations = Locations::default();
@@ -731,7 +747,7 @@ mod tests {
 
     #[test]
     fn parse_program_simple() {
-        let input = read_test_input("simple_program");
+        let input = read_test_string("code/default/simple_program");
         let parsed = parse(input.as_str()).unwrap();
 
         let mut locations = Locations::default();
@@ -904,7 +920,7 @@ mod tests {
 
     #[test]
     fn parse_simple_if_program() {
-        let input = read_test_input("simple_if_program");
+        let input = read_test_string("code/default/simple_if_program");
         let parsed = parse(input.as_str()).unwrap();
 
         let mut locations = Locations::default();
@@ -1154,7 +1170,7 @@ mod tests {
 
     #[test]
     fn parse_trivial_if_program() {
-        let input = read_test_input("trivial_if_program");
+        let input = read_test_string("code/default/trivial_if_program");
         let parsed = parse(input.as_str()).unwrap();
 
         let mut locations = Locations::default();
@@ -1280,7 +1296,7 @@ mod tests {
 
     #[test]
     fn parse_simple_odds_program() {
-        let input = read_test_input("simple_odds_program");
+        let input = read_test_string("code/default/simple_odds_program");
         let parsed = parse(input.as_str()).unwrap();
 
         let mut locations = Locations::default();
@@ -1424,7 +1440,7 @@ mod tests {
 
     #[test]
     fn parse_trivial_odds_program() {
-        let input = read_test_input("trivial_odds_program");
+        let input = read_test_string("code/default/trivial_odds_program");
         let parsed = parse(input.as_str()).unwrap();
 
         let mut locations = Locations::default();
@@ -1536,7 +1552,7 @@ mod tests {
 
     #[test]
     fn parse_simple_nondet_program() {
-        let input = read_test_input("simple_nondet_program");
+        let input = read_test_string("code/default/simple_nondet_program");
         let parsed = parse(input.as_str()).unwrap();
 
         let mut locations = Locations::default();
@@ -1695,7 +1711,7 @@ mod tests {
 
     #[test]
     fn parse_trivial_nondet_program() {
-        let input = read_test_input("trivial_nondet_program");
+        let input = read_test_string("code/default/trivial_nondet_program");
         let parsed = parse(input.as_str()).unwrap();
 
         let mut locations = Locations::default();
@@ -1800,7 +1816,7 @@ mod tests {
 
     #[test]
     fn parse_logic_while_program() {
-        let input = read_test_input("while_logic_program");
+        let input = read_test_string("code/default/while_logic_program");
         let parsed = parse(input.as_str()).unwrap();
 
         let mut locations = Locations::default();
@@ -1929,7 +1945,7 @@ mod tests {
 
     #[test]
     fn parse_prob_while_program() {
-        let input = read_test_input("while_prob_program");
+        let input = read_test_string("code/default/while_prob_program");
         let parsed = parse(input.as_str()).unwrap();
 
         let mut locations = Locations::default();
@@ -2040,7 +2056,7 @@ mod tests {
 
     #[test]
     fn parse_nondet_while_program() {
-        let input = read_test_input("while_nondet_program");
+        let input = read_test_string("code/default/while_nondet_program");
         let parsed = parse(input.as_str()).unwrap();
 
         let mut locations = Locations::default();

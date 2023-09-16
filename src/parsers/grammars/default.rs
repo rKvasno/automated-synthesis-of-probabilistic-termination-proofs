@@ -9,13 +9,13 @@ pub struct DefaultParser;
 mod tests {
     use super::DefaultParser;
     use super::Rule;
-    use crate::misc::read_test_input;
+    use crate::misc::read_test_string;
     use pest::Parser;
     use pest::{consumes_to, parses_to};
 
     #[test]
     fn trivial_program() {
-        let input = read_test_input("trivial_program");
+        let input = read_test_string("code/default/trivial_program");
 
         parses_to! {
             parser: DefaultParser,
@@ -79,7 +79,7 @@ mod tests {
 
     #[test]
     fn simple_odds() {
-        let input = read_test_input("simple_odds_snippet");
+        let input = read_test_string("code/default/simple_odds_snippet");
 
         parses_to! {
             parser: DefaultParser,
@@ -147,7 +147,7 @@ mod tests {
 
     #[test]
     fn simple_if() {
-        let input = read_test_input("simple_if_snippet");
+        let input = read_test_string("code/default/simple_if_snippet");
 
         parses_to! {
             parser: DefaultParser,
@@ -263,7 +263,7 @@ mod tests {
 
     #[test]
     fn simple_nondet() {
-        let input = read_test_input("simple_nondet_snippet");
+        let input = read_test_string("code/default/simple_nondet_snippet");
         parses_to! {
             parser: DefaultParser,
             input: input.as_str(),
@@ -352,7 +352,7 @@ mod tests {
 
     #[test]
     fn simple_logic_while() {
-        let input = read_test_input("simple_logic_while_snippet");
+        let input = read_test_string("code/default/simple_logic_while_snippet");
 
         parses_to! {
             parser: DefaultParser,
@@ -416,7 +416,7 @@ mod tests {
 
     #[test]
     fn simple_prob_while() {
-        let input = read_test_input("simple_prob_while_snippet");
+        let input = read_test_string("code/default/simple_prob_while_snippet");
 
         parses_to! {
             parser: DefaultParser,
@@ -460,7 +460,7 @@ mod tests {
 
     #[test]
     fn simple_nondet_while() {
-        let input = read_test_input("simple_nondet_while_snippet");
+        let input = read_test_string("code/default/simple_nondet_while_snippet");
 
         parses_to! {
             parser: DefaultParser,
@@ -501,7 +501,7 @@ mod tests {
 
     #[test]
     fn invariants() {
-        let input = read_test_input("invariants_snippet");
+        let input = read_test_string("code/default/invariants_snippet");
 
         parses_to! {
             parser: DefaultParser,
@@ -559,7 +559,7 @@ mod tests {
 
     #[test]
     fn complex_program() {
-        let input = read_test_input("complex_program");
+        let input = read_test_string("code/default/complex_program");
         assert!(DefaultParser::parse(Rule::program, &input).is_ok());
     }
 }

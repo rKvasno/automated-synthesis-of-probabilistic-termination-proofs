@@ -8,7 +8,6 @@ use variable_map::{Variable, VariableMap};
 
 use pest::{Parser, RuleType};
 use std::env::var;
-use std::fs::read_to_string;
 
 pub fn setup_test_map() -> VariableMap {
     let mut map = VariableMap::default();
@@ -77,7 +76,7 @@ pub fn _print_rule_parsing<R: RuleType, P: Parser<R>>(rule: R, input: &str) {
     panic!("{}", parsed);
 }
 
-pub fn read_test_input(input_file: &str) -> String {
-    let dir = var("CARGO_MANIFEST_DIR").unwrap() + "/test_programs/" + input_file;
-    read_to_string(dir.clone()).unwrap_or_else(|_| panic!("Can't find {}", dir))
+pub fn read_test_string(input_file: &str) -> String {
+    let dir = var("CARGO_MANIFEST_DIR").unwrap() + "/test_data/" + input_file;
+    std::fs::read_to_string(dir.clone()).unwrap_or_else(|_| panic!("Can't find {}", dir))
 }

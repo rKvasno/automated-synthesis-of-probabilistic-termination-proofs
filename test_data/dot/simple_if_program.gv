@@ -1,0 +1,15 @@
+digraph PTS {
+    Location_0[label="0 < 0"][style="bold"];
+    Location_1[label="0 < 0"][style="solid"];
+    Location_2[label="0 < 0"][style="solid"];
+    Location_3[label="0 < 0"][style="solid"];
+    Location_4[label="0 < 0"][style="solid"];
+    Location_terminating[label="0 < 0"][style="solid"][shape="doublecircle"];
+    Location_0 -> Location_2[label="a - b >= 0"];
+    Location_0 -> Location_3[label="a - b < 0\nb - c <= 0"];
+    Location_0 -> Location_4[label="a - b < 0\nb - c > 0"];
+    Location_1 -> Location_terminating[label="\na = a"];
+    Location_2 -> Location_1[label="\na = a"];
+    Location_3 -> Location_1[label="\na = a"];
+    Location_4 -> Location_1[label="\na = a"];
+}

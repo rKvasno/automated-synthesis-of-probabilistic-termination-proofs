@@ -1,0 +1,3 @@
+digraph PTS {
+    Location_terminating[label=""][style="bold"][shape="doublecircle"];
+}

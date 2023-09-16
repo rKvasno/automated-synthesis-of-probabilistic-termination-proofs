@@ -1,0 +1,5 @@
+digraph PTS {
+    Location_0[label="0 < 1"][style="bold"];
+    Location_terminating[label="0 < -1"][style="solid"][shape="doublecircle"];
+    Location_0 -> Location_terminating[label="\na = 1"];
+}
