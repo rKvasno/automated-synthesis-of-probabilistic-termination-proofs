@@ -9,6 +9,8 @@ use std::{
 };
 use term::Term;
 
+use super::DisplayLabel;
+
 #[cfg_attr(test, derive(PartialEq))]
 #[derive(Debug, Clone)]
 pub struct LinearPolynomial {
@@ -92,10 +94,38 @@ impl<'a> Iterator for TermIterator<'a> {
     }
 }
 
-#[cfg(test)]
-impl LinearPolynomial {
-    pub fn mock(coefficients: Vec<Constant>) -> Self {
-        LinearPolynomial { coefficients }
+impl DisplayLabel for LinearPolynomial {
+    fn label(&self, variable_map: &VariableMap) -> String {
+        let mut label = String::default();
+        let mut iter = self
+            .iter(variable_map)
+            .skip(1) // skip constant term
+            .chain(self.iter(variable_map).take(1))
+            .filter(|x| x.coefficient != Constant(0.0));
+
+        let first_term = iter.next();
+        if first_term.is_some() {
+            label.push_str(first_term.unwrap().to_string().as_str());
+        }
+
+        for term in iter {
+            // is_negative_sign returns true on -0.0, so I dont use it
+            // xor, cause double negative is positive
+            if term.coefficient < Constant(0.0) {
+                label.push_str(" - ");
+                label.push_str((-term).to_string().as_str());
+            } else {
+                label.push_str(" + ");
+                label.push_str(term.to_string().as_str());
+            }
+        }
+
+        // theres no non-zero coefficients
+        if label.is_empty() {
+            label.push_str("0");
+        }
+
+        label
     }
 }
 
@@ -156,10 +186,19 @@ impl Neg for LinearPolynomial {
 }
 
 #[cfg(test)]
+impl LinearPolynomial {
+    pub fn mock(coefficients: Vec<Constant>) -> Self {
+        assert!(coefficients.len() > 0);
+        LinearPolynomial { coefficients }
+    }
+}
+
+#[cfg(test)]
 mod tests {
     use super::{Constant, LinearPolynomial, Term, VariableError};
     use crate::misc::{setup_test_map, setup_test_polynomial};
-    use crate::pts::variable_map::Variable;
+    use crate::pts::variable_map::{Variable, VariableMap};
+    use crate::pts::DisplayLabel;
 
     #[test]
     fn add_resizing() {
@@ -473,5 +512,46 @@ mod tests {
                 coefficients: vec!(Constant(0.0), Constant(3.0), Constant(-4.0), Constant(5.0))
             }
         );
+    }
+
+    #[test]
+    fn label() {
+        let pol = LinearPolynomial {
+            coefficients: vec![Constant(0.0)],
+        };
+        let map = VariableMap::mock(vec![]);
+        assert_eq!(pol.label(&map), "0");
+
+        let pol = LinearPolynomial {
+            coefficients: vec![Constant(-5.0)],
+        };
+        let map = VariableMap::mock(vec![]);
+        assert_eq!(pol.label(&map), "-5");
+
+        let pol = LinearPolynomial {
+            coefficients: vec![Constant(0.0), Constant(1.0)],
+        };
+        let map = VariableMap::mock(vec![Variable::new("test")]);
+        assert_eq!(pol.label(&map), "test");
+
+        let pol = LinearPolynomial {
+            coefficients: vec![Constant(-5.0), Constant(-1.0), Constant(0.0), Constant(2.0)],
+        };
+        let map = VariableMap::mock(vec![
+            Variable::new("a"),
+            Variable::new("b"),
+            Variable::new("c"),
+        ]);
+        assert_eq!(pol.label(&map), "-a + 2c - 5");
+
+        let pol = LinearPolynomial {
+            coefficients: vec![Constant(-5.0), Constant(0.0), Constant(0.0), Constant(0.0)],
+        };
+        let map = VariableMap::mock(vec![
+            Variable::new("a"),
+            Variable::new("b"),
+            Variable::new("c"),
+        ]);
+        assert_eq!(pol.label(&map), "-5");
     }
 }
