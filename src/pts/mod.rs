@@ -1,7 +1,8 @@
 pub mod guard;
-pub mod inequality;
 pub mod linear_polynomial;
 pub mod location;
+pub mod relation;
+pub mod system;
 pub mod transition;
 pub mod variable_map;
 
@@ -120,8 +121,9 @@ mod tests {
         misc::read_test_string,
         pts::{
             guard::Guards,
-            inequality::{Inequality, InequalitySystem},
             linear_polynomial::{constant::Constant, LinearPolynomial},
+            relation::{Relation, RelationType},
+            system::System,
             transition::{Assignment, Transition},
             variable_map::Variable,
         },
@@ -151,8 +153,8 @@ mod tests {
         // 1
         locations.set_invariant(
             handle,
-            InequalitySystem::mock(vec![Inequality::mock(
-                true,
+            System::mock(vec![Relation::mock(
+                RelationType::StrictInequality,
                 LinearPolynomial::mock(vec![Constant(-1.0)]),
             )]),
         );
@@ -172,8 +174,8 @@ mod tests {
         // 3
         locations.set_invariant(
             locations.get_terminating_location(),
-            InequalitySystem::mock(vec![Inequality::mock(
-                true,
+            System::mock(vec![Relation::mock(
+                RelationType::StrictInequality,
                 LinearPolynomial::mock(vec![Constant(1.0), Constant(0.0)]),
             )]),
         );
@@ -203,8 +205,8 @@ mod tests {
         // 1
         locations.set_invariant(
             handle,
-            InequalitySystem::mock(vec![Inequality::mock(
-                true,
+            System::mock(vec![Relation::mock(
+                RelationType::StrictInequality,
                 LinearPolynomial::mock(vec![Constant(0.0), Constant(-1.0)]),
             )]),
         );
@@ -226,13 +228,13 @@ mod tests {
         let handle = next_location;
         locations.set_invariant(
             handle,
-            InequalitySystem::mock(vec![
-                Inequality::mock(
-                    false,
+            System::mock(vec![
+                Relation::mock(
+                    RelationType::NonstrictInequality,
                     LinearPolynomial::mock(vec![Constant(1.0), Constant(0.0), Constant(-1.0)]),
                 ),
-                Inequality::mock(
-                    true,
+                Relation::mock(
+                    RelationType::StrictInequality,
                     LinearPolynomial::mock(vec![Constant(0.0), Constant(-1.0), Constant(0.0)]),
                 ),
             ]),
@@ -262,9 +264,9 @@ mod tests {
         let handle = next_location;
         locations.set_invariant(
             handle,
-            InequalitySystem::mock(vec![
-                Inequality::mock(
-                    false,
+            System::mock(vec![
+                Relation::mock(
+                    RelationType::NonstrictInequality,
                     LinearPolynomial::mock(vec![
                         Constant(1.0),
                         Constant(0.0),
@@ -272,8 +274,8 @@ mod tests {
                         Constant(0.0),
                     ]),
                 ),
-                Inequality::mock(
-                    true,
+                Relation::mock(
+                    RelationType::StrictInequality,
                     LinearPolynomial::mock(vec![
                         Constant(0.0),
                         Constant(-1.0),
@@ -281,8 +283,8 @@ mod tests {
                         Constant(0.0),
                     ]),
                 ),
-                Inequality::mock(
-                    true,
+                Relation::mock(
+                    RelationType::StrictInequality,
                     LinearPolynomial::mock(vec![
                         Constant(1.0),
                         Constant(0.0),
@@ -315,9 +317,9 @@ mod tests {
         let handle = next_location;
         locations.set_invariant(
             handle,
-            InequalitySystem::mock(vec![
-                Inequality::mock(
-                    true,
+            System::mock(vec![
+                Relation::mock(
+                    RelationType::StrictInequality,
                     LinearPolynomial::mock(vec![
                         Constant(1.0),
                         Constant(0.0),
@@ -325,8 +327,8 @@ mod tests {
                         Constant(0.0),
                     ]),
                 ),
-                Inequality::mock(
-                    true,
+                Relation::mock(
+                    RelationType::StrictInequality,
                     LinearPolynomial::mock(vec![
                         Constant(0.0),
                         Constant(-1.0),
@@ -334,8 +336,8 @@ mod tests {
                         Constant(0.0),
                     ]),
                 ),
-                Inequality::mock(
-                    true,
+                Relation::mock(
+                    RelationType::StrictInequality,
                     LinearPolynomial::mock(vec![
                         Constant(1.0),
                         Constant(0.0),
@@ -376,8 +378,8 @@ mod tests {
         // 1
         locations.set_invariant(
             start,
-            InequalitySystem::mock(vec![Inequality::mock(
-                true,
+            System::mock(vec![Relation::mock(
+                RelationType::StrictInequality,
                 LinearPolynomial::mock(vec![Constant(0.0)]),
             )]),
         );
@@ -391,8 +393,8 @@ mod tests {
                 Guards::Logic(vec![
                     (
                         // 2
-                        InequalitySystem::mock(vec![Inequality::mock(
-                            false,
+                        System::mock(vec![Relation::mock(
+                            RelationType::NonstrictInequality,
                             LinearPolynomial::mock(vec![
                                 Constant(0.0),
                                 Constant(-1.0),
@@ -406,17 +408,17 @@ mod tests {
                     ),
                     (
                         // 6
-                        InequalitySystem::mock(vec![
-                            Inequality::mock(
-                                true,
+                        System::mock(vec![
+                            Relation::mock(
+                                RelationType::StrictInequality,
                                 LinearPolynomial::mock(vec![
                                     Constant(0.0),
                                     Constant(1.0),
                                     Constant(-1.0),
                                 ]),
                             ),
-                            Inequality::mock(
-                                false,
+                            Relation::mock(
+                                RelationType::NonstrictInequality,
                                 LinearPolynomial::mock(vec![
                                     Constant(0.0),
                                     Constant(0.0),
@@ -432,17 +434,17 @@ mod tests {
                     ),
                     (
                         // 10
-                        InequalitySystem::mock(vec![
-                            Inequality::mock(
-                                true,
+                        System::mock(vec![
+                            Relation::mock(
+                                RelationType::StrictInequality,
                                 LinearPolynomial::mock(vec![
                                     Constant(0.0),
                                     Constant(1.0),
                                     Constant(-1.0),
                                 ]),
                             ),
-                            Inequality::mock(
-                                true,
+                            Relation::mock(
+                                RelationType::StrictInequality,
                                 LinearPolynomial::mock(vec![
                                     Constant(0.0),
                                     Constant(0.0),
@@ -463,8 +465,8 @@ mod tests {
         // 3
         locations.set_invariant(
             br_1,
-            InequalitySystem::mock(vec![Inequality::mock(
-                true,
+            System::mock(vec![Relation::mock(
+                RelationType::StrictInequality,
                 LinearPolynomial::mock(vec![Constant(0.0), Constant(0.0), Constant(0.0)]),
             )]),
         );
@@ -486,8 +488,8 @@ mod tests {
         // 7
         locations.set_invariant(
             br_2,
-            InequalitySystem::mock(vec![Inequality::mock(
-                true,
+            System::mock(vec![Relation::mock(
+                RelationType::StrictInequality,
                 LinearPolynomial::mock(vec![
                     Constant(0.0),
                     Constant(0.0),
@@ -519,8 +521,8 @@ mod tests {
         // 11
         locations.set_invariant(
             br_3,
-            InequalitySystem::mock(vec![Inequality::mock(
-                true,
+            System::mock(vec![Relation::mock(
+                RelationType::StrictInequality,
                 LinearPolynomial::mock(vec![
                     Constant(0.0),
                     Constant(0.0),
@@ -552,8 +554,8 @@ mod tests {
         // 14
         locations.set_invariant(
             junction,
-            InequalitySystem::mock(vec![Inequality::mock(
-                true,
+            System::mock(vec![Relation::mock(
+                RelationType::StrictInequality,
                 LinearPolynomial::mock(vec![
                     Constant(0.0),
                     Constant(0.0),
@@ -585,8 +587,8 @@ mod tests {
         // 16
         locations.set_invariant(
             locations.get_terminating_location(),
-            InequalitySystem::mock(vec![Inequality::mock(
-                true,
+            System::mock(vec![Relation::mock(
+                RelationType::StrictInequality,
                 LinearPolynomial::mock(vec![
                     Constant(0.0),
                     Constant(0.0),
@@ -626,8 +628,8 @@ mod tests {
         // 1
         locations.set_invariant(
             start,
-            InequalitySystem::mock(vec![Inequality::mock(
-                true,
+            System::mock(vec![Relation::mock(
+                RelationType::StrictInequality,
                 LinearPolynomial::mock(vec![Constant(0.0)]),
             )]),
         );
@@ -639,8 +641,8 @@ mod tests {
                 Guards::Logic(vec![
                     (
                         // 2
-                        InequalitySystem::mock(vec![Inequality::mock(
-                            false,
+                        System::mock(vec![Relation::mock(
+                            RelationType::NonstrictInequality,
                             LinearPolynomial::mock(vec![
                                 Constant(0.0),
                                 Constant(-1.0),
@@ -654,8 +656,8 @@ mod tests {
                     ),
                     (
                         // 5
-                        InequalitySystem::mock(vec![Inequality::mock(
-                            true,
+                        System::mock(vec![Relation::mock(
+                            RelationType::StrictInequality,
                             LinearPolynomial::mock(vec![
                                 Constant(0.0),
                                 Constant(1.0),
@@ -674,8 +676,8 @@ mod tests {
         // 3
         locations.set_invariant(
             br_1,
-            InequalitySystem::mock(vec![Inequality::mock(
-                true,
+            System::mock(vec![Relation::mock(
+                RelationType::StrictInequality,
                 LinearPolynomial::mock(vec![Constant(0.0), Constant(0.0), Constant(0.0)]),
             )]),
         );
@@ -697,8 +699,8 @@ mod tests {
         // 6
         locations.set_invariant(
             junction,
-            InequalitySystem::mock(vec![Inequality::mock(
-                true,
+            System::mock(vec![Relation::mock(
+                RelationType::StrictInequality,
                 LinearPolynomial::mock(vec![Constant(0.0), Constant(0.0), Constant(0.0)]),
             )]),
         );
@@ -720,8 +722,8 @@ mod tests {
         // 8
         locations.set_invariant(
             locations.get_terminating_location(),
-            InequalitySystem::mock(vec![Inequality::mock(
-                true,
+            System::mock(vec![Relation::mock(
+                RelationType::StrictInequality,
                 LinearPolynomial::mock(vec![Constant(0.0), Constant(0.0), Constant(0.0)]),
             )]),
         );
@@ -752,8 +754,8 @@ mod tests {
         // 1
         locations.set_invariant(
             start,
-            InequalitySystem::mock(vec![Inequality::mock(
-                true,
+            System::mock(vec![Relation::mock(
+                RelationType::StrictInequality,
                 LinearPolynomial::mock(vec![Constant(0.0)]),
             )]),
         );
@@ -795,8 +797,8 @@ mod tests {
         // 3
         locations.set_invariant(
             br_1,
-            InequalitySystem::mock(vec![Inequality::mock(
-                true,
+            System::mock(vec![Relation::mock(
+                RelationType::StrictInequality,
                 LinearPolynomial::mock(vec![Constant(0.0), Constant(0.0)]),
             )]),
         );
@@ -818,8 +820,8 @@ mod tests {
         // 7
         locations.set_invariant(
             br_2,
-            InequalitySystem::mock(vec![Inequality::mock(
-                false,
+            System::mock(vec![Relation::mock(
+                RelationType::NonstrictInequality,
                 LinearPolynomial::mock(vec![Constant(0.0), Constant(1.0), Constant(-1.0)]),
             )]),
         );
@@ -841,8 +843,8 @@ mod tests {
         // 10
         locations.set_invariant(
             junction,
-            InequalitySystem::mock(vec![Inequality::mock(
-                true,
+            System::mock(vec![Relation::mock(
+                RelationType::StrictInequality,
                 LinearPolynomial::mock(vec![Constant(0.0), Constant(0.0), Constant(0.0)]),
             )]),
         );
@@ -864,8 +866,8 @@ mod tests {
         // 12
         locations.set_invariant(
             locations.get_terminating_location(),
-            InequalitySystem::mock(vec![Inequality::mock(
-                true,
+            System::mock(vec![Relation::mock(
+                RelationType::StrictInequality,
                 LinearPolynomial::mock(vec![Constant(0.0), Constant(0.0), Constant(0.0)]),
             )]),
         );
@@ -896,8 +898,8 @@ mod tests {
         // 1
         locations.set_invariant(
             start,
-            InequalitySystem::mock(vec![Inequality::mock(
-                true,
+            System::mock(vec![Relation::mock(
+                RelationType::StrictInequality,
                 LinearPolynomial::mock(vec![Constant(0.0)]),
             )]),
         );
@@ -930,8 +932,8 @@ mod tests {
         // 3
         locations.set_invariant(
             br_1,
-            InequalitySystem::mock(vec![Inequality::mock(
-                true,
+            System::mock(vec![Relation::mock(
+                RelationType::StrictInequality,
                 LinearPolynomial::mock(vec![Constant(0.0), Constant(0.0)]),
             )]),
         );
@@ -953,8 +955,8 @@ mod tests {
         // 6
         locations.set_invariant(
             junction,
-            InequalitySystem::mock(vec![Inequality::mock(
-                true,
+            System::mock(vec![Relation::mock(
+                RelationType::StrictInequality,
                 LinearPolynomial::mock(vec![Constant(0.0), Constant(0.0)]),
             )]),
         );
@@ -976,8 +978,8 @@ mod tests {
         // 8
         locations.set_invariant(
             locations.get_terminating_location(),
-            InequalitySystem::mock(vec![Inequality::mock(
-                true,
+            System::mock(vec![Relation::mock(
+                RelationType::StrictInequality,
                 LinearPolynomial::mock(vec![Constant(0.0), Constant(0.0)]),
             )]),
         );
@@ -1008,8 +1010,8 @@ mod tests {
         // 1
         locations.set_invariant(
             start,
-            InequalitySystem::mock(vec![Inequality::mock(
-                true,
+            System::mock(vec![Relation::mock(
+                RelationType::StrictInequality,
                 LinearPolynomial::mock(vec![Constant(0.0)]),
             )]),
         );
@@ -1043,8 +1045,8 @@ mod tests {
         // 3
         locations.set_invariant(
             br_1,
-            InequalitySystem::mock(vec![Inequality::mock(
-                true,
+            System::mock(vec![Relation::mock(
+                RelationType::StrictInequality,
                 LinearPolynomial::mock(vec![Constant(0.0), Constant(0.0)]),
             )]),
         );
@@ -1066,8 +1068,8 @@ mod tests {
         // 7
         locations.set_invariant(
             br_2,
-            InequalitySystem::mock(vec![Inequality::mock(
-                true,
+            System::mock(vec![Relation::mock(
+                RelationType::StrictInequality,
                 LinearPolynomial::mock(vec![Constant(0.0), Constant(0.0)]),
             )]),
         );
@@ -1089,8 +1091,8 @@ mod tests {
         // 11
         locations.set_invariant(
             br_3,
-            InequalitySystem::mock(vec![Inequality::mock(
-                true,
+            System::mock(vec![Relation::mock(
+                RelationType::StrictInequality,
                 LinearPolynomial::mock(vec![Constant(0.0), Constant(0.0)]),
             )]),
         );
@@ -1112,8 +1114,8 @@ mod tests {
         // 14
         locations.set_invariant(
             junction,
-            InequalitySystem::mock(vec![Inequality::mock(
-                true,
+            System::mock(vec![Relation::mock(
+                RelationType::StrictInequality,
                 LinearPolynomial::mock(vec![Constant(0.0), Constant(0.0)]),
             )]),
         );
@@ -1135,8 +1137,8 @@ mod tests {
         // 16
         locations.set_invariant(
             locations.get_terminating_location(),
-            InequalitySystem::mock(vec![Inequality::mock(
-                true,
+            System::mock(vec![Relation::mock(
+                RelationType::StrictInequality,
                 LinearPolynomial::mock(vec![Constant(0.0), Constant(0.0)]),
             )]),
         );
@@ -1167,8 +1169,8 @@ mod tests {
         // 1
         locations.set_invariant(
             start,
-            InequalitySystem::mock(vec![Inequality::mock(
-                true,
+            System::mock(vec![Relation::mock(
+                RelationType::StrictInequality,
                 LinearPolynomial::mock(vec![Constant(0.0)]),
             )]),
         );
@@ -1195,8 +1197,8 @@ mod tests {
         // 3
         locations.set_invariant(
             br_1,
-            InequalitySystem::mock(vec![Inequality::mock(
-                true,
+            System::mock(vec![Relation::mock(
+                RelationType::StrictInequality,
                 LinearPolynomial::mock(vec![Constant(0.0), Constant(0.0)]),
             )]),
         );
@@ -1217,8 +1219,8 @@ mod tests {
         // 6
         locations.set_invariant(
             junction,
-            InequalitySystem::mock(vec![Inequality::mock(
-                true,
+            System::mock(vec![Relation::mock(
+                RelationType::StrictInequality,
                 LinearPolynomial::mock(vec![Constant(0.0), Constant(0.0)]),
             )]),
         );
@@ -1240,8 +1242,8 @@ mod tests {
         // 8
         locations.set_invariant(
             locations.get_terminating_location(),
-            InequalitySystem::mock(vec![Inequality::mock(
-                true,
+            System::mock(vec![Relation::mock(
+                RelationType::StrictInequality,
                 LinearPolynomial::mock(vec![Constant(0.0), Constant(0.0)]),
             )]),
         );
@@ -1272,8 +1274,8 @@ mod tests {
         // 1
         locations.set_invariant(
             start,
-            InequalitySystem::mock(vec![Inequality::mock(
-                true,
+            System::mock(vec![Relation::mock(
+                RelationType::StrictInequality,
                 LinearPolynomial::mock(vec![Constant(0.0)]),
             )]),
         );
@@ -1285,13 +1287,13 @@ mod tests {
                 Guards::Logic(vec![
                     // 2
                     (
-                        InequalitySystem::mock(vec![
-                            Inequality::mock(
-                                true,
+                        System::mock(vec![
+                            Relation::mock(
+                                RelationType::StrictInequality,
                                 LinearPolynomial::mock(vec![Constant(0.0), Constant(0.0)]),
                             ),
-                            Inequality::mock(
-                                true,
+                            Relation::mock(
+                                RelationType::StrictInequality,
                                 LinearPolynomial::mock(vec![Constant(0.0), Constant(0.0)]),
                             ),
                         ]),
@@ -1302,13 +1304,13 @@ mod tests {
                     ),
                     //5
                     (
-                        InequalitySystem::mock(vec![
-                            Inequality::mock(
-                                false,
+                        System::mock(vec![
+                            Relation::mock(
+                                RelationType::NonstrictInequality,
                                 LinearPolynomial::mock(vec![Constant(0.0), Constant(0.0)]),
                             ),
-                            Inequality::mock(
-                                false,
+                            Relation::mock(
+                                RelationType::NonstrictInequality,
                                 LinearPolynomial::mock(vec![Constant(0.0), Constant(0.0)]),
                             ),
                         ]),
@@ -1324,8 +1326,8 @@ mod tests {
         // 3
         locations.set_invariant(
             br_1,
-            InequalitySystem::mock(vec![Inequality::mock(
-                true,
+            System::mock(vec![Relation::mock(
+                RelationType::StrictInequality,
                 LinearPolynomial::mock(vec![Constant(0.0), Constant(0.0)]),
             )]),
         );
@@ -1346,8 +1348,8 @@ mod tests {
         // 6
         locations.set_invariant(
             junction,
-            InequalitySystem::mock(vec![Inequality::mock(
-                true,
+            System::mock(vec![Relation::mock(
+                RelationType::StrictInequality,
                 LinearPolynomial::mock(vec![Constant(0.0), Constant(0.0), Constant(0.0)]),
             )]),
         );
@@ -1369,8 +1371,8 @@ mod tests {
         // 8
         locations.set_invariant(
             locations.get_terminating_location(),
-            InequalitySystem::mock(vec![Inequality::mock(
-                true,
+            System::mock(vec![Relation::mock(
+                RelationType::StrictInequality,
                 LinearPolynomial::mock(vec![Constant(0.0), Constant(0.0), Constant(0.0)]),
             )]),
         );
@@ -1401,8 +1403,8 @@ mod tests {
         // 1
         locations.set_invariant(
             start,
-            InequalitySystem::mock(vec![Inequality::mock(
-                true,
+            System::mock(vec![Relation::mock(
+                RelationType::StrictInequality,
                 LinearPolynomial::mock(vec![Constant(0.0)]),
             )]),
         );
@@ -1435,8 +1437,8 @@ mod tests {
         // 3
         locations.set_invariant(
             br_1,
-            InequalitySystem::mock(vec![Inequality::mock(
-                true,
+            System::mock(vec![Relation::mock(
+                RelationType::StrictInequality,
                 LinearPolynomial::mock(vec![Constant(0.0), Constant(0.0)]),
             )]),
         );
@@ -1457,8 +1459,8 @@ mod tests {
         // 6
         locations.set_invariant(
             junction,
-            InequalitySystem::mock(vec![Inequality::mock(
-                true,
+            System::mock(vec![Relation::mock(
+                RelationType::StrictInequality,
                 LinearPolynomial::mock(vec![Constant(0.0), Constant(0.0), Constant(0.0)]),
             )]),
         );
@@ -1480,8 +1482,8 @@ mod tests {
         // 8
         locations.set_invariant(
             locations.get_terminating_location(),
-            InequalitySystem::mock(vec![Inequality::mock(
-                true,
+            System::mock(vec![Relation::mock(
+                RelationType::StrictInequality,
                 LinearPolynomial::mock(vec![Constant(0.0), Constant(0.0), Constant(0.0)]),
             )]),
         );
@@ -1512,8 +1514,8 @@ mod tests {
         // 1
         locations.set_invariant(
             start,
-            InequalitySystem::mock(vec![Inequality::mock(
-                true,
+            System::mock(vec![Relation::mock(
+                RelationType::StrictInequality,
                 LinearPolynomial::mock(vec![Constant(0.0)]),
             )]),
         );
@@ -1540,8 +1542,8 @@ mod tests {
         // 3
         locations.set_invariant(
             br_1,
-            InequalitySystem::mock(vec![Inequality::mock(
-                true,
+            System::mock(vec![Relation::mock(
+                RelationType::StrictInequality,
                 LinearPolynomial::mock(vec![Constant(0.0), Constant(0.0)]),
             )]),
         );
@@ -1562,8 +1564,8 @@ mod tests {
         // 6
         locations.set_invariant(
             junction,
-            InequalitySystem::mock(vec![Inequality::mock(
-                true,
+            System::mock(vec![Relation::mock(
+                RelationType::StrictInequality,
                 LinearPolynomial::mock(vec![Constant(0.0), Constant(0.0), Constant(0.0)]),
             )]),
         );
@@ -1585,8 +1587,8 @@ mod tests {
         // 8
         locations.set_invariant(
             locations.get_terminating_location(),
-            InequalitySystem::mock(vec![Inequality::mock(
-                true,
+            System::mock(vec![Relation::mock(
+                RelationType::StrictInequality,
                 LinearPolynomial::mock(vec![Constant(0.0), Constant(0.0), Constant(0.0)]),
             )]),
         );

@@ -1,6 +1,6 @@
 use crate::pts;
 use pts::guard::{Guards, GuardsError};
-use pts::inequality::InequalitySystem;
+use pts::system::System;
 
 use std::iter::once;
 use std::iter::{Chain, Map, Once};
@@ -16,7 +16,7 @@ type IndexToHandleFn = fn(usize) -> LocationHandle;
 #[derive(Debug, Default)]
 #[repr(align(64))] // 64 bytes
 struct Location {
-    invariant: InequalitySystem,
+    invariant: System,
     outgoing: Guards,
 }
 
@@ -25,7 +25,7 @@ struct Location {
 pub struct Locations {
     data: Vec<Location>,
     pub initial: LocationHandle,
-    terminating_invariant: InequalitySystem,
+    terminating_invariant: System,
 }
 
 impl<'a> Locations {
@@ -72,7 +72,7 @@ impl<'a> Locations {
         Ok(())
     }
 
-    pub fn set_invariant(&mut self, location: LocationHandle, invariant: InequalitySystem) {
+    pub fn set_invariant(&mut self, location: LocationHandle, invariant: System) {
         if location.is_none() {
             self.terminating_invariant = invariant;
         } else {
@@ -89,7 +89,7 @@ impl<'a> Locations {
         .chain(once::<Option<usize>>(None))
     }
 
-    pub fn get_invariant(&self, handle: LocationHandle) -> Option<&InequalitySystem> {
+    pub fn get_invariant(&self, handle: LocationHandle) -> Option<&System> {
         match handle {
             Some(n) => self.data.get(n).map(|x| &x.invariant),
             None => Some(&self.terminating_invariant),

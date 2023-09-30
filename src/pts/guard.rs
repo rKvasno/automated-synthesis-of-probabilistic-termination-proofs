@@ -1,8 +1,8 @@
 use std::fmt;
 
-use crate::pts::{inequality, linear_polynomial, transition};
-use inequality::InequalitySystem;
+use crate::pts::{linear_polynomial, system, transition};
 use linear_polynomial::constant::Constant;
+use system::System;
 use transition::Transition;
 
 use super::{variable_map::VariableMap, DisplayLabel};
@@ -13,7 +13,7 @@ pub type Probability = Constant;
 #[cfg_attr(test, derive(PartialEq))]
 #[derive(Debug)]
 pub enum Guards {
-    Logic(Vec<(InequalitySystem, Transition)>),
+    Logic(Vec<(System, Transition)>),
     Probabilistic(Vec<(Probability, Transition)>),
     Nondeterministic(Vec<Transition>),
     Unguarded(Box<Transition>),
@@ -59,7 +59,7 @@ impl fmt::Display for GuardsError {
 }
 
 pub enum GuardedTransition<'a> {
-    Logic(&'a (InequalitySystem, Transition)),
+    Logic(&'a (System, Transition)),
     Probabilistic(&'a (Probability, Transition)),
     Nondeterministic(&'a Transition),
     Unguarded(&'a Transition),
@@ -124,8 +124,9 @@ impl<'a> Iterator for GuardsIterator<'a> {
 mod tests {
     use crate::pts::{
         guard::GuardedTransition,
-        inequality::{Inequality, InequalitySystem},
         linear_polynomial::{constant::Constant, LinearPolynomial},
+        relation::{Relation, RelationType},
+        system::System,
         transition::{Assignment, Transition},
         variable_map::{Variable, VariableMap},
         DisplayLabel,
@@ -134,8 +135,8 @@ mod tests {
     #[test]
     fn logic_label() {
         let data = (
-            InequalitySystem::mock(vec![Inequality::mock(
-                true,
+            System::mock(vec![Relation::mock(
+                RelationType::StrictInequality,
                 LinearPolynomial::mock(vec![Constant(1.0)]),
             )]),
             Transition {
@@ -148,13 +149,13 @@ mod tests {
         assert_eq!(guarded_transition.label(&map), "0 < -1");
 
         let data = (
-            InequalitySystem::mock(vec![
-                Inequality::mock(
-                    false,
+            System::mock(vec![
+                Relation::mock(
+                    RelationType::NonstrictInequality,
                     LinearPolynomial::mock(vec![Constant(0.0), Constant(1.0)]),
                 ),
-                Inequality::mock(
-                    true,
+                Relation::mock(
+                    RelationType::StrictInequality,
                     LinearPolynomial::mock(vec![Constant(1.0), Constant(2.0), Constant(1.0)]),
                     // 1 + 2a + len > 0
                     // 2a + len > -1
