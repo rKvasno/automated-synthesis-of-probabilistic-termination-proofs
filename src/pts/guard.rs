@@ -126,19 +126,19 @@ mod tests {
         guard::GuardedTransition,
         linear_polynomial::{constant::Constant, LinearPolynomial},
         relation::{Relation, RelationType},
-        system::System,
         transition::{Assignment, Transition},
         variable_map::{Variable, VariableMap},
         DisplayLabel,
     };
+    use crate::system;
 
     #[test]
     fn logic_label() {
         let data = (
-            System::mock(vec![Relation::mock(
+            system![Relation::mock(
                 RelationType::StrictInequality,
                 LinearPolynomial::mock(vec![Constant(1.0)]),
-            )]),
+            )],
             Transition {
                 assignments: Vec::default(),
                 target: None,
@@ -149,7 +149,7 @@ mod tests {
         assert_eq!(guarded_transition.label(&map), "0 < -1");
 
         let data = (
-            System::mock(vec![
+            system!(
                 Relation::mock(
                     RelationType::NonstrictInequality,
                     LinearPolynomial::mock(vec![Constant(0.0), Constant(1.0)]),
@@ -159,8 +159,8 @@ mod tests {
                     LinearPolynomial::mock(vec![Constant(1.0), Constant(2.0), Constant(1.0)]),
                     // 1 + 2a + len > 0
                     // 2a + len > -1
-                ),
-            ]),
+                )
+            ),
             Transition {
                 assignments: vec![Assignment(Variable::new("a"), LinearPolynomial::default())],
                 target: None,

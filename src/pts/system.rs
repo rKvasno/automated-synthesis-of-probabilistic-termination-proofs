@@ -5,6 +5,20 @@ use super::relation::Relation;
 use super::variable_map::VariableMap;
 use super::DisplayLabel;
 
+// Rust Book 19.5 Macros: example vec! macro
+#[macro_export]
+macro_rules! system {
+    [ $( $x:expr ), * $(,)?] => {
+        {
+            let mut temp_system = $crate::pts::system::System::default();
+            $(
+                temp_system.push($x);
+            )*
+            temp_system
+        }
+    };
+}
+
 pub type RelationIter<'a> = Iter<'a, Relation>;
 
 #[cfg_attr(test, derive(PartialEq))]
