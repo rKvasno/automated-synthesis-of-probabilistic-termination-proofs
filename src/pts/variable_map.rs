@@ -65,6 +65,10 @@ impl VariableMap {
             .find(|(_, element)| element == &var)
             .map(|(index, _)| index + 1)
     }
+
+    pub fn iter(&self) -> VariableIterator {
+        self.variables.iter()
+    }
 }
 
 #[cfg(test)]
@@ -88,6 +92,8 @@ impl fmt::Display for VariableError {
         write!(f, "\"{}\" is not a program variable!", self.0)
     }
 }
+
+type VariableIterator<'a> = std::slice::Iter<'a, Variable>;
 
 #[cfg(test)]
 mod tests {
