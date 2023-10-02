@@ -91,6 +91,32 @@ impl<'a> LinearPolynomial {
         (self, new_pol)
     }
 
+    // only affects the smaller range of the map and polynomial
+    pub fn separate_with<F: FnMut(&Term) -> bool>(
+        mut self,
+        variables: &VariableMap,
+        mut filter: F,
+    ) -> (LinearPolynomial, LinearPolynomial) {
+        let mut new_pol = LinearPolynomial {
+            coefficients: Vec::with_capacity(self.len()),
+        };
+
+        for i in 0..std::cmp::min(self.len(), variables.len()) {
+            if filter(&Term {
+                coefficient: self.coefficients[i],
+                variable: variables.get_variable(i).unwrap().cloned(),
+            }) {
+                unsafe {
+                    // see min a few lines above
+                    std::mem::swap(
+                        self.coefficients.get_unchecked_mut(i),
+                        new_pol.coefficients.get_unchecked_mut(i),
+                    );
+                }
+            }
+        }
+        (self, new_pol)
+    }
     pub fn iter(&'a self, variable_map: &'a VariableMap) -> TermIterator<'a> {
         TermIterator(self, variable_map, 0)
     }
