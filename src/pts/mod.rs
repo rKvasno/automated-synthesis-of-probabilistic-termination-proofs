@@ -118,7 +118,11 @@ impl<'a> dot::Labeller<'a, LocationHandle, Edge> for PTS {
 #[cfg(test)]
 mod tests {
     use crate::{
-        misc::read_test_string,
+        misc::test_data::dot::{
+            DEFAULT, SIMPLE_IF_PROGRAM, SIMPLE_NONDET_PROGRAM, SIMPLE_ODDS_PROGRAM, SIMPLE_PROGRAM,
+            TRIVIAL_IF_PROGRAM, TRIVIAL_NONDET_PROGRAM, TRIVIAL_ODDS_PROGRAM, TRIVIAL_PROGRAM,
+            WHILE_LOGIC_PROGRAM, WHILE_NONDET_PROGRAM, WHILE_PROB_PROGRAM,
+        },
         pts::{
             guard::Guards,
             linear_polynomial::{constant::Constant, LinearPolynomial},
@@ -140,7 +144,7 @@ mod tests {
         };
         dot::render(&pts, &mut string).unwrap();
         let string = std::str::from_utf8(string.as_slice()).unwrap().to_string();
-        assert_eq!(string, read_test_string("dot/default.gv"));
+        assert_eq!(string, DEFAULT);
     }
 
     #[test]
@@ -190,7 +194,7 @@ mod tests {
         let mut string = Vec::<u8>::default();
         dot::render(&pts, &mut string).unwrap();
         let string = std::str::from_utf8(string.as_slice()).unwrap().to_string();
-        assert_eq!(string, read_test_string("dot/trivial_program.gv"));
+        assert_eq!(string, TRIVIAL_PROGRAM);
     }
 
     #[test]
@@ -363,7 +367,7 @@ mod tests {
         dot::render(&pts, &mut string).unwrap();
         let string = std::str::from_utf8(string.as_slice()).unwrap().to_string();
         print!("{}", string);
-        assert_eq!(string, read_test_string("dot/simple_program.gv"));
+        assert_eq!(string, SIMPLE_PROGRAM);
     }
 
     #[test]
@@ -613,7 +617,7 @@ mod tests {
         dot::render(&pts, &mut string).unwrap();
         let string = std::str::from_utf8(string.as_slice()).unwrap().to_string();
         print!("{}", string);
-        assert_eq!(string, read_test_string("dot/simple_if_program.gv"));
+        assert_eq!(string, SIMPLE_IF_PROGRAM);
     }
 
     #[test]
@@ -739,7 +743,7 @@ mod tests {
         dot::render(&pts, &mut string).unwrap();
         let string = std::str::from_utf8(string.as_slice()).unwrap().to_string();
         print!("{}", string);
-        assert_eq!(string, read_test_string("dot/trivial_if_program.gv"));
+        assert_eq!(string, TRIVIAL_IF_PROGRAM);
     }
 
     #[test]
@@ -883,7 +887,7 @@ mod tests {
         dot::render(&pts, &mut string).unwrap();
         let string = std::str::from_utf8(string.as_slice()).unwrap().to_string();
         print!("{}", string);
-        assert_eq!(string, read_test_string("dot/simple_odds_program.gv"));
+        assert_eq!(string, SIMPLE_ODDS_PROGRAM);
     }
 
     #[test]
@@ -995,7 +999,7 @@ mod tests {
         dot::render(&pts, &mut string).unwrap();
         let string = std::str::from_utf8(string.as_slice()).unwrap().to_string();
         print!("{}", string);
-        assert_eq!(string, read_test_string("dot/trivial_odds_program.gv"));
+        assert_eq!(string, TRIVIAL_ODDS_PROGRAM);
     }
 
     #[test]
@@ -1154,7 +1158,7 @@ mod tests {
         dot::render(&pts, &mut string).unwrap();
         let string = std::str::from_utf8(string.as_slice()).unwrap().to_string();
         print!("{}", string);
-        assert_eq!(string, read_test_string("dot/simple_nondet_program.gv"));
+        assert_eq!(string, SIMPLE_NONDET_PROGRAM);
     }
 
     #[test]
@@ -1259,7 +1263,7 @@ mod tests {
         dot::render(&pts, &mut string).unwrap();
         let string = std::str::from_utf8(string.as_slice()).unwrap().to_string();
         print!("{}", string);
-        assert_eq!(string, read_test_string("dot/trivial_nondet_program.gv"));
+        assert_eq!(string, TRIVIAL_NONDET_PROGRAM);
     }
 
     #[test]
@@ -1388,7 +1392,7 @@ mod tests {
         dot::render(&pts, &mut string).unwrap();
         let string = std::str::from_utf8(string.as_slice()).unwrap().to_string();
         print!("{}", string);
-        assert_eq!(string, read_test_string("dot/while_logic_program.gv"));
+        assert_eq!(string, WHILE_LOGIC_PROGRAM);
     }
 
     #[test]
@@ -1499,7 +1503,7 @@ mod tests {
         dot::render(&pts, &mut string).unwrap();
         let string = std::str::from_utf8(string.as_slice()).unwrap().to_string();
         print!("{}", string);
-        assert_eq!(string, read_test_string("dot/while_prob_program.gv"));
+        assert_eq!(string, WHILE_PROB_PROGRAM);
     }
 
     #[test]
@@ -1604,7 +1608,7 @@ mod tests {
         dot::render(&pts, &mut string).unwrap();
         let string = std::str::from_utf8(string.as_slice()).unwrap().to_string();
         print!("{}", string);
-        assert_eq!(string, read_test_string("dot/while_nondet_program.gv"));
+        assert_eq!(string, WHILE_NONDET_PROGRAM);
     }
 }
 // #[cfg(test)]

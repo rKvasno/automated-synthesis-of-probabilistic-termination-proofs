@@ -487,7 +487,14 @@ mod tests {
         Variable, VariableMap,
     };
     use crate::{
-        misc::{read_test_string, setup_test_map},
+        misc::{
+            setup_test_map,
+            test_data::code::default::{
+                SIMPLE_IF_PROGRAM, SIMPLE_NONDET_PROGRAM, SIMPLE_ODDS_PROGRAM, SIMPLE_PROGRAM,
+                TRIVIAL_IF_PROGRAM, TRIVIAL_NONDET_PROGRAM, TRIVIAL_ODDS_PROGRAM, TRIVIAL_PROGRAM,
+                WHILE_LOGIC_PROGRAM, WHILE_NONDET_PROGRAM, WHILE_PROB_PROGRAM,
+            },
+        },
         parsers::default::{parse_assignment, parse_inequality, parse_inequality_system},
         pts::{
             guard::Guards,
@@ -698,8 +705,8 @@ mod tests {
 
     #[test]
     fn parse_program_trivial() {
-        let input = read_test_string("code/default/trivial_program");
-        let parsed = parse(input.as_str()).unwrap();
+        let input = TRIVIAL_PROGRAM;
+        let parsed = parse(input).unwrap();
 
         let mut locations = Locations::default();
         let handle = locations.new_location();
@@ -749,8 +756,8 @@ mod tests {
 
     #[test]
     fn parse_program_simple() {
-        let input = read_test_string("code/default/simple_program");
-        let parsed = parse(input.as_str()).unwrap();
+        let input = SIMPLE_PROGRAM;
+        let parsed = parse(input).unwrap();
 
         let mut locations = Locations::default();
         let mut locations_iter = locations.new_n_locations(3);
@@ -922,8 +929,8 @@ mod tests {
 
     #[test]
     fn parse_simple_if_program() {
-        let input = read_test_string("code/default/simple_if_program");
-        let parsed = parse(input.as_str()).unwrap();
+        let input = SIMPLE_IF_PROGRAM;
+        let parsed = parse(input).unwrap();
 
         let mut locations = Locations::default();
         let mut locations_iter = locations.new_n_locations(5);
@@ -1171,8 +1178,8 @@ mod tests {
 
     #[test]
     fn parse_trivial_if_program() {
-        let input = read_test_string("code/default/trivial_if_program");
-        let parsed = parse(input.as_str()).unwrap();
+        let input = TRIVIAL_IF_PROGRAM;
+        let parsed = parse(input).unwrap();
 
         let mut locations = Locations::default();
         let mut locations_iter = locations.new_n_locations(3);
@@ -1297,8 +1304,8 @@ mod tests {
 
     #[test]
     fn parse_simple_odds_program() {
-        let input = read_test_string("code/default/simple_odds_program");
-        let parsed = parse(input.as_str()).unwrap();
+        let input = SIMPLE_ODDS_PROGRAM;
+        let parsed = parse(input).unwrap();
 
         let mut locations = Locations::default();
         let mut locations_iter = locations.new_n_locations(4);
@@ -1441,8 +1448,8 @@ mod tests {
 
     #[test]
     fn parse_trivial_odds_program() {
-        let input = read_test_string("code/default/trivial_odds_program");
-        let parsed = parse(input.as_str()).unwrap();
+        let input = TRIVIAL_ODDS_PROGRAM;
+        let parsed = parse(input).unwrap();
 
         let mut locations = Locations::default();
         let mut locations_iter = locations.new_n_locations(3);
@@ -1553,8 +1560,8 @@ mod tests {
 
     #[test]
     fn parse_simple_nondet_program() {
-        let input = read_test_string("code/default/simple_nondet_program");
-        let parsed = parse(input.as_str()).unwrap();
+        let input = SIMPLE_NONDET_PROGRAM;
+        let parsed = parse(input).unwrap();
 
         let mut locations = Locations::default();
         let mut locations_iter = locations.new_n_locations(5);
@@ -1712,8 +1719,8 @@ mod tests {
 
     #[test]
     fn parse_trivial_nondet_program() {
-        let input = read_test_string("code/default/trivial_nondet_program");
-        let parsed = parse(input.as_str()).unwrap();
+        let input = TRIVIAL_NONDET_PROGRAM;
+        let parsed = parse(input).unwrap();
 
         let mut locations = Locations::default();
         let mut locations_iter = locations.new_n_locations(3);
@@ -1817,8 +1824,8 @@ mod tests {
 
     #[test]
     fn parse_logic_while_program() {
-        let input = read_test_string("code/default/while_logic_program");
-        let parsed = parse(input.as_str()).unwrap();
+        let input = WHILE_LOGIC_PROGRAM;
+        let parsed = parse(input).unwrap();
 
         let mut locations = Locations::default();
         let mut locations_iter = locations.new_n_locations(3);
@@ -1946,8 +1953,8 @@ mod tests {
 
     #[test]
     fn parse_prob_while_program() {
-        let input = read_test_string("code/default/while_prob_program");
-        let parsed = parse(input.as_str()).unwrap();
+        let input = WHILE_PROB_PROGRAM;
+        let parsed = parse(input).unwrap();
 
         let mut locations = Locations::default();
         let mut locations_iter = locations.new_n_locations(3);
@@ -2057,8 +2064,8 @@ mod tests {
 
     #[test]
     fn parse_nondet_while_program() {
-        let input = read_test_string("code/default/while_nondet_program");
-        let parsed = parse(input.as_str()).unwrap();
+        let input = WHILE_NONDET_PROGRAM;
+        let parsed = parse(input).unwrap();
 
         let mut locations = Locations::default();
         let mut locations_iter = locations.new_n_locations(3);
