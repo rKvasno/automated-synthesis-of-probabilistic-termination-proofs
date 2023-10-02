@@ -12,6 +12,9 @@ pub type NonterminatingLocationIter = Map<Range<usize>, IndexToHandleFn>;
 pub type LocationIter = Chain<Map<Range<usize>, IndexToHandleFn>, Once<LocationHandle>>;
 type IndexToHandleFn = fn(usize) -> LocationHandle;
 
+// must implement Display that doesnt violate DOT label restrictions and Clone
+pub type LocationID = usize;
+
 #[cfg_attr(test, derive(PartialEq))]
 #[derive(Debug, Default)]
 #[repr(align(64))] // 64 bytes
@@ -44,6 +47,23 @@ impl<'a> Locations {
 
     pub fn get_terminating_location(&self) -> LocationHandle {
         None
+    }
+
+    pub fn is_terminating_location(&self, handle: LocationHandle) -> bool {
+        handle.is_none()
+    }
+
+    pub fn is_nonterminating_location(&self, handle: LocationHandle) -> bool {
+        handle.is_none()
+    }
+
+    // Gets a unique id for a location
+    // Ids get invalidated when locations are added
+    pub fn get_id(&self, handle: LocationHandle) -> LocationID {
+        match handle {
+            Some(i) => i,
+            None => self.len(),
+        }
     }
 
     pub fn new_n_locations(&mut self, n: usize) -> NonterminatingLocationIter {
