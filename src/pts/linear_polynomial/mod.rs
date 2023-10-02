@@ -45,7 +45,7 @@ impl<'a> LinearPolynomial {
             self.coefficients[0] += term.coefficient;
             Ok(())
         } else {
-            let index = map.get_index(term.variable.as_ref().unwrap());
+            let index = map.get_index(&term.variable);
             // if variable is not in the map, its not a program variable
             if index.is_none() {
                 Err(VariableError::new(term.variable.as_ref().unwrap()))
@@ -61,7 +61,7 @@ impl<'a> LinearPolynomial {
             self.coefficients[0] += term.coefficient;
             self.resize_to_map(map);
         } else {
-            let index = map.find_or_add(term.variable.unwrap());
+            let index = map.get_or_push(&term.variable);
             self.resize_to_map(map);
             self.coefficients[index] += term.coefficient;
         }

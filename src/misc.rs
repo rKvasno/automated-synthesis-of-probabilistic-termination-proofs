@@ -81,9 +81,9 @@ pub mod test_data {
 
 pub fn setup_test_map() -> VariableMap {
     let mut map = VariableMap::default();
-    map.find_or_add(Variable::new("a"));
-    map.find_or_add(Variable::new("b"));
-    map.find_or_add(Variable::new("c"));
+    map.get_or_push(&Some(Variable::new("a")));
+    map.get_or_push(&Some(Variable::new("b")));
+    map.get_or_push(&Some(Variable::new("c")));
     map
 }
 

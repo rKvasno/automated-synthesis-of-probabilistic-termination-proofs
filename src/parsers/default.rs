@@ -159,10 +159,10 @@ fn parse_linear_polynomial<'a>(map: &mut VariableMap, parse: Pair<'a, Rule>) -> 
 fn parse_assignment<'a>(map: &mut VariableMap, parse: Pair<'a, Rule>) -> Assignment {
     assert_eq!(parse.clone().as_rule(), Rule::assign_inst);
     let mut pairs = parse.into_inner();
-    let var: Variable = parse_variable(pairs.next().unwrap());
-    map.find_or_add(var.clone());
+    let var = Some(parse_variable(pairs.next().unwrap()));
+    map.get_or_push(&var);
     let pol: LinearPolynomial = parse_linear_polynomial(map, pairs.next().unwrap());
-    Assignment(var, pol)
+    Assignment(var.unwrap(), pol)
 }
 
 // assumes the parses rule is Rule::comparison_op
