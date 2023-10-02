@@ -19,6 +19,19 @@ macro_rules! system {
     };
 }
 
+#[macro_export]
+macro_rules! system_append {
+    [ $( $x:expr ), * $(,)?] => {
+        {
+            let mut temp_system = $crate::pts::system::System::default();
+            $(
+                temp_system.append($x);
+            )*
+            temp_system
+        }
+    };
+}
+
 pub type RelationIter<'a> = Iter<'a, Relation>;
 
 #[cfg_attr(test, derive(PartialEq))]
