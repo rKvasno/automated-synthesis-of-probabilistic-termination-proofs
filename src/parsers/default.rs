@@ -3,7 +3,7 @@ use crate::pts::relation::{Relation, RelationSign};
 use crate::pts::system::System;
 use crate::pts::transition::Transition;
 use crate::pts::PTS;
-use crate::{parsers, pts};
+use crate::{consume, parsers, pts};
 use parsers::grammars::default::{DefaultParser, Rule};
 use parsers::{ErrorLocation, ParserError};
 use pts::linear_polynomial::constant::Constant;
@@ -146,8 +146,12 @@ fn parse_linear_polynomial<'a>(map: &mut VariableMap, parse: Pair<'a, Rule>) -> 
     for pair in pairs {
         match pair.as_rule() {
             Rule::additive_op => op = parse_operation(pair),
-            Rule::term if op == Operation::Addition => pol.add_term(map, parse_term(pair)),
-            Rule::term if op == Operation::Subtraction => pol.add_term(map, -parse_term(pair)),
+            Rule::term if op == Operation::Addition => {
+                consume!(pol.add_term(map, parse_term(pair)))
+            }
+            Rule::term if op == Operation::Subtraction => {
+                consume!(pol.add_term(map, -parse_term(pair)))
+            }
             //_ => panic!(invariant_error!()),
             rule => panic!("{:?}", rule),
         }

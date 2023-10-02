@@ -39,11 +39,11 @@ impl<'a> LinearPolynomial {
         }
     }
 
-    pub fn try_add_term(&mut self, map: &VariableMap, term: Term) -> Result<(), VariableError> {
+    pub fn try_add_term(&mut self, map: &VariableMap, term: Term) -> Result<usize, VariableError> {
         self.resize_to_map(map);
         if term.variable.is_none() {
             self.coefficients[0] += term.coefficient;
-            Ok(())
+            Ok(0)
         } else {
             let index = map.get_index(&term.variable);
             // if variable is not in the map, its not a program variable
@@ -51,31 +51,34 @@ impl<'a> LinearPolynomial {
                 Err(VariableError::new(term.variable.as_ref().unwrap()))
             } else {
                 self.coefficients[index.unwrap()] += term.coefficient;
-                Ok(())
+                Ok(index.unwrap())
             }
         }
     }
 
-    pub fn add_term(&mut self, map: &mut VariableMap, term: Term) {
+    pub fn add_term(&mut self, map: &mut VariableMap, term: Term) -> usize {
         if term.variable.is_none() {
             self.coefficients[0] += term.coefficient;
             self.resize_to_map(map);
+            0
         } else {
             let index = map.get_or_push(&term.variable);
             self.resize_to_map(map);
             self.coefficients[index] += term.coefficient;
+            index
         }
     }
 
-    pub fn get_coefficient(&self, index: usize) -> Option<Constant> {
-        self.coefficients.get(index).map(|x| x.clone())
+    pub fn get_coefficient(&self, index: usize) -> Option<&Constant> {
+        self.coefficients.get(index)
     }
 
-    pub fn separate_constant_term(&mut self) -> LinearPolynomial {
-        let mut new_pol = LinearPolynomial {
-            coefficients: vec![Constant(0.0)],
-        };
+    pub fn get_mut_coefficient(&mut self, index: usize) -> Option<&mut Constant> {
+        self.coefficients.get_mut(index)
+    }
 
+    pub fn separate_constant_term(mut self) -> (LinearPolynomial, LinearPolynomial) {
+        let mut new_pol = LinearPolynomial::default();
         unsafe {
             // we assume all polynomials to have atleast the constant term
             assert!(self.coefficients.len() > 0);
@@ -85,7 +88,7 @@ impl<'a> LinearPolynomial {
                 new_pol.coefficients.get_unchecked_mut(0),
             );
         }
-        new_pol
+        (self, new_pol)
     }
 
     pub fn iter(&'a self, variable_map: &'a VariableMap) -> TermIterator<'a> {
@@ -104,7 +107,7 @@ impl<'a> Iterator for TermIterator<'a> {
         match (variable, coefficient) {
             (Some(v), Some(c)) => Some(Term {
                 variable: v.map(|x| x.clone()),
-                coefficient: c,
+                coefficient: c.clone(),
             }),
             _ => None,
         }
@@ -343,7 +346,7 @@ mod tests {
                     coefficient: Constant(0.0)
                 }
             ),
-            Ok(())
+            Ok(1)
         );
         assert_eq!(pol.len(), map.len() + 1);
         assert_eq!(
@@ -534,14 +537,14 @@ mod tests {
     #[test]
     fn separate_constant_term() {
         let mut map = setup_test_map();
-        let mut lhs = setup_test_polynomial(
+        let lhs = setup_test_polynomial(
             &mut map,
             Constant(9.0),
             Constant(-3.0),
             Constant(4.0),
             Constant(-5.0),
         );
-        let rhs = lhs.separate_constant_term();
+        let (lhs, rhs) = lhs.separate_constant_term();
         assert_eq!(
             lhs,
             setup_test_polynomial(

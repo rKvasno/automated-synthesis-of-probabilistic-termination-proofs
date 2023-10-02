@@ -91,7 +91,7 @@ impl DisplayLabel for Relation {
             .find(|x| x.coefficient != Constant(0.0));
 
         let sign;
-        let mut left_side;
+        let left_side;
         match leading_linear_term {
             Some(t) if t.coefficient < Constant(0.0) => {
                 // the leading linear coefficient is negative =>
@@ -114,7 +114,7 @@ impl DisplayLabel for Relation {
                 left_side = self.pol.clone();
             }
         }
-        let right_side = left_side.separate_constant_term();
+        let (left_side, right_side) = left_side.separate_constant_term();
         label.push_str(left_side.label(variable_map).as_str());
         label.push_str(sign);
         // neg because its separated from left side

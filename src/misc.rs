@@ -79,6 +79,13 @@ pub mod test_data {
     }
 }
 
+#[macro_export]
+macro_rules! consume {
+    ($x:expr) => {{
+        $x;
+    }};
+}
+
 pub fn setup_test_map() -> VariableMap {
     let mut map = VariableMap::default();
     map.get_or_push(&Some(Variable::new("a")));
