@@ -1,0 +1,46 @@
+Nondeterministic while
+
+=======
+
+# 0 >= 0
+while nondet {
+  # a > a
+  a = b
+}
+# 0 >= 0
+
+=======
+
+(program
+  (locations
+    (location
+      (invariants
+        (linear_polynomial: "0")
+        (comparison_op: ">=")
+        (linear_polynomial: "0")
+      )
+      (while_inst
+        (nondet_condition: "nondet")
+        (locations
+          (location
+            (invariants
+              (linear_polynomial: "a")
+              (comparison_op: ">")
+              (linear_polynomial: "a")
+            )
+            (assign_inst
+              (variable: "a")
+              (linear_polynomial: "b")
+            )
+          )
+        )
+      )
+    )
+  )
+  (invariants
+    (linear_polynomial: "0")
+    (comparison_op: ">=")
+    (linear_polynomial: "0")
+  )
+  (EOI: "")
+)

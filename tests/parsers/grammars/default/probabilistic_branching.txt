@@ -1,0 +1,65 @@
+Probabilistic branching
+
+=======
+
+# 0 >= 0
+odds 0:1:0 {
+ # a < a
+ a = a
+}
+{
+ # b >= a
+ b = a
+}
+# 0 >= 0
+
+=======
+
+(program
+  (locations
+    (location
+      (invariants
+        (linear_polynomial: "0")
+        (comparison_op: ">=")
+        (linear_polynomial: "0")
+      )
+      (prob_inst
+        (constant: "0")
+        (constant: "1")
+        (constant: "0")
+        (locations
+          (location
+            (invariants
+              (linear_polynomial: "a")
+              (comparison_op: "<")
+              (linear_polynomial: "a")
+            )
+            (assign_inst
+              (variable: "a")
+              (linear_polynomial: "a")
+            )
+          )
+        )
+        (locations
+          (location
+            (invariants
+              (linear_polynomial: "b")
+              (comparison_op: ">=")
+              (linear_polynomial: "a")
+            )
+            (assign_inst
+              (variable: "b")
+              (linear_polynomial: "a")
+            )
+          )
+        )
+      )
+    )
+  )
+  (invariants
+    (linear_polynomial: "0")
+    (comparison_op: ">=")
+    (linear_polynomial: "0")
+  )
+  (EOI: "")
+)

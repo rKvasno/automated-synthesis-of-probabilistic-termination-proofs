@@ -1,0 +1,20 @@
+Two terms negative
+
+=======
+-1.2 - 1
+=======
+
+(linear_polynomial
+  (additive_op: "-")
+  (term
+    (constant_expr
+      (constant: "1.2")
+    )
+  )
+  (additive_op: "-")
+  (term
+    (constant_expr
+      (constant: "1")
+    )
+  )
+)

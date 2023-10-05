@@ -1,0 +1,31 @@
+Trivial program
+
+=======
+
+# 1 > 0
+a = 1
+# 1 < 0
+
+=======
+
+(program
+  (locations
+    (location
+      (invariants
+        (linear_polynomial: "1")
+        (comparison_op: ">")
+        (linear_polynomial: "0")
+      )
+      (assign_inst
+        (variable: "a")
+        (linear_polynomial: "1")
+      )
+    )
+  )
+  (invariants
+    (linear_polynomial: "1")
+    (comparison_op: "<")
+    (linear_polynomial: "0")
+  )
+  (EOI: "")
+)

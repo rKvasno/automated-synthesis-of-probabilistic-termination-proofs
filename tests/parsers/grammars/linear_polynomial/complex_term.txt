@@ -1,0 +1,34 @@
+Complex term
+
+========
+( 3 * 0 - (1^2/12) )a
+========
+
+(linear_polynomial
+  (term
+    (constant_expr
+      (constant_expr
+        (constant: "3")
+      )
+      (multiplicative_op: "*")
+      (constant_expr
+        (constant: "0")
+      )
+      (additive_op: "-")
+      (constant_expr
+        (constant_expr
+          (constant: "1")
+        )
+        (power_op: "^")
+        (constant_expr
+          (constant: "2")
+        )
+        (multiplicative_op: "/")
+        (constant_expr
+          (constant: "12")
+        )
+      )
+    )
+    (variable: "a")
+  )
+)

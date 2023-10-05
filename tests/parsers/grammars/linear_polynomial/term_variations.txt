@@ -1,0 +1,14 @@
+Short form multiplication
+
+=======
+1a
+=======
+
+(linear_polynomial
+  (term
+    (constant_expr
+      (constant: "1")
+    )
+    (variable: "a")
+  )
+)

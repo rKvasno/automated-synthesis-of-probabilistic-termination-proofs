@@ -1,5 +1,8 @@
 pub mod default;
 mod grammars;
+use pest::error::{Error as PestError, LineColLocation};
+use pest::RuleType;
+
 use crate::pts::PTS;
 
 use std::error;
@@ -9,8 +12,8 @@ type LineColumnPair = (usize, usize);
 
 #[derive(Debug)]
 pub struct ParserError {
-    location: ErrorLocation,
-    message: String,
+    pub location: ErrorLocation,
+    pub message: String,
 }
 
 #[derive(Debug)]
@@ -46,5 +49,16 @@ pub enum Parser {
 pub fn parse<'a>(parser: Parser, input: &str) -> Result<PTS, ParserError> {
     match parser {
         Parser::Default => default::parse(input),
+    }
+}
+
+pub fn handle_pest_error<R: RuleType>(error: PestError<R>) -> ParserError {
+    let location: ErrorLocation = match error.line_col {
+        LineColLocation::Pos(pair) => ErrorLocation::Position(pair),
+        LineColLocation::Span(start, end) => ErrorLocation::Span(start, end),
+    };
+    ParserError {
+        location,
+        message: error.variant.message().to_string(),
     }
 }

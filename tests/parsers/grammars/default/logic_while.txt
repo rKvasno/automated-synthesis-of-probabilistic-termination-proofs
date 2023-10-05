@@ -1,0 +1,53 @@
+Logic while
+
+=======
+
+# 0 >= 0
+while a > a and a < a {
+    # a > a
+    a = b
+}
+# 0 >= 0
+
+=======
+
+(program
+  (locations
+    (location
+      (invariants
+        (linear_polynomial: "0")
+        (comparison_op: ">=")
+        (linear_polynomial: "0")
+      )
+      (while_inst
+        (logic_condition
+          (linear_polynomial: "a")
+          (comparison_op: ">")
+          (linear_polynomial: "a")
+          (linear_polynomial: "a")
+          (comparison_op: "<")
+          (linear_polynomial: "a")
+        )
+        (locations
+          (location
+            (invariants
+              (linear_polynomial: "a")
+              (comparison_op: ">")
+              (linear_polynomial: "a")
+            )
+            (assign_inst
+              (variable: "a")
+              (linear_polynomial: "b")
+            )
+          )
+        )
+      )
+    )
+  )
+  (invariants
+    (linear_polynomial: "0")
+    (comparison_op: ">=")
+    (linear_polynomial: "0")
+  )
+  (EOI: "")
+)

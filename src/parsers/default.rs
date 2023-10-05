@@ -2,18 +2,18 @@ use crate::pts::guard::Guards;
 use crate::pts::relation::{Relation, RelationSign};
 use crate::pts::system::System;
 use crate::pts::transition::Transition;
+use crate::pts::variable_map::Variable;
 use crate::pts::PTS;
 use crate::{consume, parsers, pts};
 use parsers::grammars::default::{DefaultParser, Rule};
-use parsers::{ErrorLocation, ParserError};
+use parsers::{handle_pest_error, ParserError};
 use pts::linear_polynomial::constant::Constant;
 use pts::linear_polynomial::term::Term;
 use pts::linear_polynomial::LinearPolynomial;
 use pts::location::LocationHandle;
 use pts::transition::Assignment;
-use pts::variable_map::{Variable, VariableMap};
+use pts::variable_map::VariableMap;
 
-use pest::error::{Error as PestError, LineColLocation};
 use pest::iterators::{Pair, Pairs};
 use pest::Parser;
 use std::iter::{once, zip};
@@ -46,20 +46,9 @@ pub fn parse<'a>(input: &str) -> Result<pts::PTS, ParserError> {
         Ok(mut parse) => {
             let mut pts = Default::default();
             parse_program(&mut pts, parse.next().unwrap());
-            // assert_eq!(parse.next(), None);
+            assert_eq!(parse.next(), None);
             Ok(pts)
         }
-    }
-}
-
-fn handle_pest_error(error: PestError<Rule>) -> ParserError {
-    let location: ErrorLocation = match error.line_col {
-        LineColLocation::Pos(pair) => ErrorLocation::Position(pair),
-        LineColLocation::Span(start, end) => ErrorLocation::Span(start, end),
-    };
-    ParserError {
-        location,
-        message: error.variant.message().to_string(),
     }
 }
 
@@ -493,7 +482,7 @@ mod tests {
     use crate::{
         misc::{
             setup_test_map,
-            test_data::code::default::{
+            tests::parsers::default::{
                 SIMPLE_IF_PROGRAM, SIMPLE_NONDET_PROGRAM, SIMPLE_ODDS_PROGRAM, SIMPLE_PROGRAM,
                 TRIVIAL_IF_PROGRAM, TRIVIAL_NONDET_PROGRAM, TRIVIAL_ODDS_PROGRAM, TRIVIAL_PROGRAM,
                 WHILE_LOGIC_PROGRAM, WHILE_NONDET_PROGRAM, WHILE_PROB_PROGRAM,

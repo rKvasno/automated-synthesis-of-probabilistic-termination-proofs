@@ -1,11 +1,14 @@
 [package]
-name = "automated-synthesis-of-probabilistic-termination-proofs"
+name = "automated_synthesis_of_probabilistic_termination_proofs"
 version = "0.1.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
 dot = "0.1.4"
-pest = "2.7"
-pest_derive = "2.7"
+pest = "2.5"
+pest_derive = "2.5"
+
+[dev-dependencies]
+lazy_static = "1.4.0"
+pest-test = {git = "https://github.com/jdidion/pest-test.git"}
+pest-test-gen = {git = "https://github.com/jdidion/pest-test.git"}

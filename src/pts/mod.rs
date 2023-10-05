@@ -118,7 +118,7 @@ impl<'a> dot::Labeller<'a, LocationHandle, Edge> for PTS {
 #[cfg(test)]
 mod tests {
     use crate::{
-        misc::test_data::dot::{
+        misc::tests::pts::{
             DEFAULT, SIMPLE_IF_PROGRAM, SIMPLE_NONDET_PROGRAM, SIMPLE_ODDS_PROGRAM, SIMPLE_PROGRAM,
             TRIVIAL_IF_PROGRAM, TRIVIAL_NONDET_PROGRAM, TRIVIAL_ODDS_PROGRAM, TRIVIAL_PROGRAM,
             WHILE_LOGIC_PROGRAM, WHILE_NONDET_PROGRAM, WHILE_PROB_PROGRAM,

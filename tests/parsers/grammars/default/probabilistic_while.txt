@@ -1,0 +1,49 @@
+Probabilistic while
+
+=======
+
+# 0 >= 0
+while 1 : 0 {
+  # a > a
+  a = b
+}
+# 0 >= 0
+
+=======
+
+(program
+  (locations
+    (location
+      (invariants
+        (linear_polynomial: "0")
+        (comparison_op: ">=")
+        (linear_polynomial: "0")
+      )
+      (while_inst
+        (prob_condition
+          (constant: "1")
+          (constant: "0")
+        )
+        (locations
+          (location
+            (invariants
+              (linear_polynomial: "a")
+              (comparison_op: ">")
+              (linear_polynomial: "a")
+            )
+            (assign_inst
+              (variable: "a")
+              (linear_polynomial: "b")
+            )
+          )
+        )
+      )
+    )
+  )
+  (invariants
+    (linear_polynomial: "0")
+    (comparison_op: ">=")
+    (linear_polynomial: "0")
+  )
+  (EOI: "")
+)

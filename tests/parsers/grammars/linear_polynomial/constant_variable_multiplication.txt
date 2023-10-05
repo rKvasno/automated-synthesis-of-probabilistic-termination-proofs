@@ -1,0 +1,14 @@
+Constant variable multiplication
+
+=======
+5 * a
+=======
+
+(linear_polynomial
+  (term
+    (constant_expr
+      (constant: "5")
+    )
+    (variable: "a")
+  )
+)

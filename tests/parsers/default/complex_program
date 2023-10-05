@@ -5,11 +5,11 @@
 dealer_bank = bank
 
 # bank >= 0
-# dealers_bank >= 0
+# dealer_bank >= 0
 quit = 0
 
 # bank >= -1
-# dealers_bank >= -1
+# dealer_bank >= -1
 # quit >= 0
 while quit <= 0.5 and bank > 0 and dealer_bank > 0 {
 
@@ -39,5 +39,5 @@ while quit <= 0.5 and bank > 0 and dealer_bank > 0 {
 }
 
 # bank >= -1
-# dealers_bank >= -1
+# dealer_bank >= -1
 # quit >= 0

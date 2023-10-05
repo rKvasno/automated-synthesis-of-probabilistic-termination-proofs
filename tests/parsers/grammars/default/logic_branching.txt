@@ -1,0 +1,89 @@
+Logic branching
+
+=======
+
+# 0 >= 0
+if a >= b {
+  # a > a
+  a = a
+}
+else if b <= c {
+  # a < a
+  a = a
+}
+else {
+  # a > a
+  a = a
+}
+# 0 >= 0
+
+=======
+
+(program
+  (locations
+    (location
+      (invariants
+        (linear_polynomial: "0")
+        (comparison_op: ">=")
+        (linear_polynomial: "0")
+      )
+      (if_inst
+        (logic_condition
+          (linear_polynomial: "a")
+          (comparison_op: ">=")
+          (linear_polynomial: "b")
+        )
+        (locations
+          (location
+            (invariants
+              (linear_polynomial: "a")
+              (comparison_op: ">")
+              (linear_polynomial: "a")
+            )
+            (assign_inst
+              (variable: "a")
+              (linear_polynomial: "a")
+            )
+          )
+        )
+        (logic_condition
+          (linear_polynomial: "b")
+          (comparison_op: "<=")
+          (linear_polynomial: "c")
+        )
+        (locations
+          (location
+            (invariants
+              (linear_polynomial: "a")
+              (comparison_op: "<")
+              (linear_polynomial: "a")
+            )
+            (assign_inst
+              (variable: "a")
+              (linear_polynomial: "a")
+            )
+          )
+        )
+        (locations
+          (location
+            (invariants
+              (linear_polynomial: "a")
+              (comparison_op: ">")
+              (linear_polynomial: "a")
+            )
+            (assign_inst
+              (variable: "a")
+              (linear_polynomial: "a")
+            )
+          )
+        )
+      )
+    )
+  )
+  (invariants
+    (linear_polynomial: "0")
+    (comparison_op: ">=")
+    (linear_polynomial: "0")
+  )
+  (EOI: "")
+)

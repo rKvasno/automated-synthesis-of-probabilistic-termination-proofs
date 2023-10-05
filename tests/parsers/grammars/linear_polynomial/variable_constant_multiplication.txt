@@ -1,0 +1,14 @@
+Variable constant multiplication
+
+=======
+a * 0
+=======
+
+(linear_polynomial
+  (term
+    (variable: "a")
+    (constant_expr
+      (constant: "0")
+    )
+  )
+)

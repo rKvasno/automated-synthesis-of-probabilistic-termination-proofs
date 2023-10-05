@@ -1,0 +1,14 @@
+First term negative
+
+=======
+-1.2
+=======
+
+(linear_polynomial
+  (additive_op: "-")
+  (term
+    (constant_expr
+      (constant: "1.2")
+    )
+  )
+)

@@ -1,0 +1,79 @@
+Nondeterministic branching
+
+=======
+
+# 0 >= 0
+nondet {
+  # a > a
+  a = a
+}
+or {
+  # a > a
+  a = a
+}
+or {
+  # a > a
+  a = a
+}
+# 0 >= 0
+
+=======
+
+(program
+  (locations
+    (location
+      (invariants
+        (linear_polynomial: "0")
+        (comparison_op: ">=")
+        (linear_polynomial: "0")
+      )
+      (nondet_inst
+        (locations
+          (location
+            (invariants
+              (linear_polynomial: "a")
+              (comparison_op: ">")
+              (linear_polynomial: "a")
+            )
+            (assign_inst
+              (variable: "a")
+              (linear_polynomial: "a")
+            )
+          )
+        )
+        (locations
+          (location
+            (invariants
+              (linear_polynomial: "a")
+              (comparison_op: ">")
+              (linear_polynomial: "a")
+            )
+            (assign_inst
+              (variable: "a")
+              (linear_polynomial: "a")
+            )
+          )
+        )
+        (locations
+          (location
+            (invariants
+              (linear_polynomial: "a")
+              (comparison_op: ">")
+              (linear_polynomial: "a")
+            )
+            (assign_inst
+              (variable: "a")
+              (linear_polynomial: "a")
+            )
+          )
+        )
+      )
+    )
+  )
+  (invariants
+    (linear_polynomial: "0")
+    (comparison_op: ">=")
+    (linear_polynomial: "0")
+  )
+  (EOI: "")
+)

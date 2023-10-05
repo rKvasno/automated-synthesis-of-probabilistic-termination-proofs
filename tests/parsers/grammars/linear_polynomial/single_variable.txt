@@ -1,0 +1,11 @@
+Single variable
+
+=======
+a1b2c3
+=======
+
+(linear_polynomial
+  (term
+    (variable: "a1b2c3")
+  )
+)
