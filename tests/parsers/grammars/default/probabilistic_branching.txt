@@ -18,10 +18,14 @@ odds 0:1:0 {
 (program
   (locations
     (location
-      (invariants
-        (linear_polynomial: "0")
-        (comparison_op: ">=")
-        (linear_polynomial: "0")
+      (invariant
+        (logic_condition
+          (inequality
+            (linear_polynomial: "0")
+            (comparison_op: ">=")
+            (linear_polynomial: "0")
+          )
+        )
       )
       (prob_inst
         (constant: "0")
@@ -29,10 +33,14 @@ odds 0:1:0 {
         (constant: "0")
         (locations
           (location
-            (invariants
-              (linear_polynomial: "a")
-              (comparison_op: "<")
-              (linear_polynomial: "a")
+            (invariant
+              (logic_condition
+                (inequality
+                  (linear_polynomial: "a")
+                  (comparison_op: "<")
+                  (linear_polynomial: "a")
+                )
+              )
             )
             (assign_inst
               (variable: "a")
@@ -42,10 +50,14 @@ odds 0:1:0 {
         )
         (locations
           (location
-            (invariants
-              (linear_polynomial: "b")
-              (comparison_op: ">=")
-              (linear_polynomial: "a")
+            (invariant
+              (logic_condition
+                (inequality
+                  (linear_polynomial: "b")
+                  (comparison_op: ">=")
+                  (linear_polynomial: "a")
+                )
+              )
             )
             (assign_inst
               (variable: "b")
@@ -56,10 +68,14 @@ odds 0:1:0 {
       )
     )
   )
-  (invariants
-    (linear_polynomial: "0")
-    (comparison_op: ">=")
-    (linear_polynomial: "0")
+  (invariant
+    (logic_condition
+      (inequality
+        (linear_polynomial: "0")
+        (comparison_op: ">=")
+        (linear_polynomial: "0")
+      )
+    )
   )
   (EOI: "")
 )

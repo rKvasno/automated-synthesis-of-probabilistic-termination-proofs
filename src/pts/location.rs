@@ -6,6 +6,8 @@ use std::iter::once;
 use std::iter::{Chain, Map, Once};
 use std::ops::Range;
 
+use super::DisplayLabel;
+
 // use of handles across different instances of Locations is undefined
 pub type LocationHandle = Option<usize>;
 pub type NonterminatingLocationIter = Map<Range<usize>, IndexToHandleFn>;
@@ -15,11 +17,42 @@ type IndexToHandleFn = fn(usize) -> LocationHandle;
 // must implement Display that doesnt violate DOT label restrictions and Clone
 pub type LocationID = usize;
 
+// test only, uses mock_relation
+#[cfg(test)]
+#[macro_export]
+macro_rules! mock_invariant {
+    [
+        $(
+            [
+                $(
+
+                   $sign:literal, $( $x:expr ),*
+
+                );*
+            ]
+        ),* $(,)?
+    ] => {
+
+
+        {
+            $crate::pts::location::Invariant{ assertions:
+                vec![
+                    $($crate::system![
+                        $( $crate::mock_relation![
+                            $sign, $($x, )*
+                        ], ) *
+                    ], )*
+                ]
+            }
+        }
+    };
+}
+
 #[cfg_attr(test, derive(PartialEq))]
 #[derive(Debug, Default)]
 #[repr(align(64))] // 64 bytes
 struct Location {
-    invariant: System,
+    invariant: Invariant,
     outgoing: Guards,
 }
 
@@ -28,7 +61,13 @@ struct Location {
 pub struct Locations {
     data: Vec<Location>,
     pub initial: LocationHandle,
-    terminating_invariant: System,
+    terminating_invariant: Invariant,
+}
+
+#[cfg_attr(test, derive(PartialEq))]
+#[derive(Debug, Default)]
+pub struct Invariant {
+    pub assertions: Vec<System>,
 }
 
 impl<'a> Locations {
@@ -92,7 +131,18 @@ impl<'a> Locations {
         Ok(())
     }
 
-    pub fn set_invariant(&mut self, location: LocationHandle, invariant: System) {
+    pub fn extend_invariant(&mut self, location: LocationHandle, assertion: System) {
+        if location.is_none() {
+            self.terminating_invariant.assertions.push(assertion);
+        } else {
+            self.data[location.unwrap()]
+                .invariant
+                .assertions
+                .push(assertion);
+        }
+    }
+
+    pub fn set_invariant(&mut self, location: LocationHandle, invariant: Invariant) {
         if location.is_none() {
             self.terminating_invariant = invariant;
         } else {
@@ -109,7 +159,7 @@ impl<'a> Locations {
         .chain(once::<Option<usize>>(None))
     }
 
-    pub fn get_invariant(&self, handle: LocationHandle) -> Option<&System> {
+    pub fn get_invariant(&self, handle: LocationHandle) -> Option<&Invariant> {
         match handle {
             Some(n) => self.data.get(n).map(|x| &x.invariant),
             None => Some(&self.terminating_invariant),
@@ -121,5 +171,49 @@ impl<'a> Locations {
             Some(n) => self.data.get(n).map(|x| &x.outgoing),
             None => None,
         }
+    }
+}
+impl DisplayLabel for Invariant {
+    fn label(&self, variables: &pts::variable_map::VariableMap) -> String {
+        let mut label: String = Default::default();
+        let mut iter = self.assertions.iter();
+
+        let assertion = iter.next();
+        if assertion.is_some() {
+            label.push_str(assertion.unwrap().label(variables).as_str());
+
+            for assertion in iter {
+                label.push_str(format!("\n\n{}", assertion.label(variables)).as_str());
+            }
+        }
+        label
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{mock_relation, pts::location::Invariant, system};
+
+    #[test]
+    fn mock_invariant() {
+        assert_eq!(
+            Invariant {
+                assertions: vec![system!(
+                    mock_relation!(">", 0.0, 12.4, -3.5, 2.4, -0.0),
+                    mock_relation!("<=", -1.0, -2.4),
+                    mock_relation!("=", 0.0, 0.0, 0.0, 0.0),
+                    mock_relation!("!=", 111.111)
+                )]
+            },
+            mock_invariant!(
+
+                [
+                    ">", 0.0, 12.4, -3.5, 2.4, -0.0;
+                    "<=", -1.0, -2.4;
+                    "=", 0.0, 0.0, 0.0, 0.0;
+                    "!=", 111.111
+                ]
+            ),
+        );
     }
 }

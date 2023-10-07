@@ -10,7 +10,7 @@ use super::DisplayLabel;
 macro_rules! system {
     [ $( $x:expr ), * $(,)?] => {
         {
-            let mut temp_system = $crate::pts::system::System::default();
+            let mut temp_system: $crate::pts::system::System = $crate::pts::system::System::default();
             $(
                 temp_system.push($x);
             )*
@@ -19,22 +19,11 @@ macro_rules! system {
     };
 }
 
-// test only, uses mock_relation
-#[cfg(test)]
-#[macro_export]
-macro_rules! mock_invariant {
-    [ $( $sign:literal, $( $x:expr ),* );* $(;)?] => {
-        {
-            $crate::system![$( $crate::mock_relation![$sign, $($x, )*], )*]
-        }
-    };
-}
-
 #[macro_export]
 macro_rules! system_append {
     [ $( $x:expr ), * $(,)?] => {
         {
-            let mut temp_system = $crate::pts::system::System::default();
+            let mut temp_system: $crate::pts::system::System = $crate::pts::system::System::default();
             $(
                 temp_system.append($x);
             )*
@@ -149,24 +138,6 @@ mod tests {
                     &mut system!(),
                     &mut system!(mock_relation!("!=", 111.111))
                 )
-            );
-        }
-
-        #[test]
-        fn mock_invariant() {
-            assert_eq!(
-                system!(
-                    mock_relation!(">", 0.0, 12.4, -3.5, 2.4, -0.0),
-                    mock_relation!("<=", -1.0, -2.4),
-                    mock_relation!("=", 0.0, 0.0, 0.0, 0.0),
-                    mock_relation!("!=", 111.111)
-                ),
-                mock_invariant!(
-                    ">", 0.0, 12.4, -3.5, 2.4, -0.0;
-                    "<=", -1.0, -2.4;
-                    "=", 0.0, 0.0, 0.0, 0.0;
-                    "!=", 111.111
-                ),
             );
         }
     }

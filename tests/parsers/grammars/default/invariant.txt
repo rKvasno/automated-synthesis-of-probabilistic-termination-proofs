@@ -1,0 +1,98 @@
+invariant
+
+=======
+
+# a < 4 and b > 3
+# b > a and b >= 4
+# a < b and a > 0
+a = c
+# 1 < a and c > a and b > 0
+# c < 2 and c < a and b < c
+
+=======
+
+(program
+  (locations
+    (location
+      (invariant
+        (logic_condition
+          (inequality
+            (linear_polynomial: "a")
+            (comparison_op: "<")
+            (linear_polynomial: "4")
+          )
+          (inequality
+            (linear_polynomial: "b")
+            (comparison_op: ">")
+            (linear_polynomial: "3")
+          )
+        )
+        (logic_condition
+          (inequality
+            (linear_polynomial: "b")
+            (comparison_op: ">")
+            (linear_polynomial: "a")
+          )
+          (inequality
+            (linear_polynomial: "b")
+            (comparison_op: ">=")
+            (linear_polynomial: "4")
+          )
+        )
+        (logic_condition
+          (inequality
+            (linear_polynomial: "a")
+            (comparison_op: "<")
+            (linear_polynomial: "b")
+          )
+          (inequality
+            (linear_polynomial: "a")
+            (comparison_op: ">")
+            (linear_polynomial: "0")
+          )
+        )
+      )
+      (assign_inst
+        (variable: "a")
+        (linear_polynomial: "c")
+      )
+    )
+  )
+  (invariant
+    (logic_condition
+      (inequality
+        (linear_polynomial: "1")
+        (comparison_op: "<")
+        (linear_polynomial: "a")
+      )
+      (inequality
+        (linear_polynomial: "c")
+        (comparison_op: ">")
+        (linear_polynomial: "a")
+      )
+      (inequality
+        (linear_polynomial: "b")
+        (comparison_op: ">")
+        (linear_polynomial: "0")
+      )
+    )
+    (logic_condition
+      (inequality
+        (linear_polynomial: "c")
+        (comparison_op: "<")
+        (linear_polynomial: "2")
+      )
+      (inequality
+        (linear_polynomial: "c")
+        (comparison_op: "<")
+        (linear_polynomial: "a")
+      )
+      (inequality
+        (linear_polynomial: "b")
+        (comparison_op: "<")
+        (linear_polynomial: "c")
+      )
+    )
+  )
+  (EOI: "")
+)

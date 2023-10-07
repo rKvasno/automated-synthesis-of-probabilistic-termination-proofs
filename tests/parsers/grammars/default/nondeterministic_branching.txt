@@ -22,18 +22,26 @@ or {
 (program
   (locations
     (location
-      (invariants
-        (linear_polynomial: "0")
-        (comparison_op: ">=")
-        (linear_polynomial: "0")
+      (invariant
+        (logic_condition
+          (inequality
+            (linear_polynomial: "0")
+            (comparison_op: ">=")
+            (linear_polynomial: "0")
+          )
+        )
       )
       (nondet_inst
         (locations
           (location
-            (invariants
-              (linear_polynomial: "a")
-              (comparison_op: ">")
-              (linear_polynomial: "a")
+            (invariant
+              (logic_condition
+                (inequality
+                  (linear_polynomial: "a")
+                  (comparison_op: ">")
+                  (linear_polynomial: "a")
+                )
+              )
             )
             (assign_inst
               (variable: "a")
@@ -43,10 +51,14 @@ or {
         )
         (locations
           (location
-            (invariants
-              (linear_polynomial: "a")
-              (comparison_op: ">")
-              (linear_polynomial: "a")
+            (invariant
+              (logic_condition
+                (inequality
+                  (linear_polynomial: "a")
+                  (comparison_op: ">")
+                  (linear_polynomial: "a")
+                )
+              )
             )
             (assign_inst
               (variable: "a")
@@ -56,10 +68,14 @@ or {
         )
         (locations
           (location
-            (invariants
-              (linear_polynomial: "a")
-              (comparison_op: ">")
-              (linear_polynomial: "a")
+            (invariant
+              (logic_condition
+                (inequality
+                  (linear_polynomial: "a")
+                  (comparison_op: ">")
+                  (linear_polynomial: "a")
+                )
+              )
             )
             (assign_inst
               (variable: "a")
@@ -70,10 +86,14 @@ or {
       )
     )
   )
-  (invariants
-    (linear_polynomial: "0")
-    (comparison_op: ">=")
-    (linear_polynomial: "0")
+  (invariant
+    (logic_condition
+      (inequality
+        (linear_polynomial: "0")
+        (comparison_op: ">=")
+        (linear_polynomial: "0")
+      )
+    )
   )
   (EOI: "")
 )

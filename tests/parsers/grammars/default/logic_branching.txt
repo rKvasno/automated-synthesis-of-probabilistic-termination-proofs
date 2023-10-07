@@ -22,23 +22,33 @@ else {
 (program
   (locations
     (location
-      (invariants
-        (linear_polynomial: "0")
-        (comparison_op: ">=")
-        (linear_polynomial: "0")
+      (invariant
+        (logic_condition
+          (inequality
+            (linear_polynomial: "0")
+            (comparison_op: ">=")
+            (linear_polynomial: "0")
+          )
+        )
       )
       (if_inst
         (logic_condition
-          (linear_polynomial: "a")
-          (comparison_op: ">=")
-          (linear_polynomial: "b")
+          (inequality
+            (linear_polynomial: "a")
+            (comparison_op: ">=")
+            (linear_polynomial: "b")
+          )
         )
         (locations
           (location
-            (invariants
-              (linear_polynomial: "a")
-              (comparison_op: ">")
-              (linear_polynomial: "a")
+            (invariant
+              (logic_condition
+                (inequality
+                  (linear_polynomial: "a")
+                  (comparison_op: ">")
+                  (linear_polynomial: "a")
+                )
+              )
             )
             (assign_inst
               (variable: "a")
@@ -47,16 +57,22 @@ else {
           )
         )
         (logic_condition
-          (linear_polynomial: "b")
-          (comparison_op: "<=")
-          (linear_polynomial: "c")
+          (inequality
+            (linear_polynomial: "b")
+            (comparison_op: "<=")
+            (linear_polynomial: "c")
+          )
         )
         (locations
           (location
-            (invariants
-              (linear_polynomial: "a")
-              (comparison_op: "<")
-              (linear_polynomial: "a")
+            (invariant
+              (logic_condition
+                (inequality
+                  (linear_polynomial: "a")
+                  (comparison_op: "<")
+                  (linear_polynomial: "a")
+                )
+              )
             )
             (assign_inst
               (variable: "a")
@@ -66,10 +82,14 @@ else {
         )
         (locations
           (location
-            (invariants
-              (linear_polynomial: "a")
-              (comparison_op: ">")
-              (linear_polynomial: "a")
+            (invariant
+              (logic_condition
+                (inequality
+                  (linear_polynomial: "a")
+                  (comparison_op: ">")
+                  (linear_polynomial: "a")
+                )
+              )
             )
             (assign_inst
               (variable: "a")
@@ -80,10 +100,14 @@ else {
       )
     )
   )
-  (invariants
-    (linear_polynomial: "0")
-    (comparison_op: ">=")
-    (linear_polynomial: "0")
+  (invariant
+    (logic_condition
+      (inequality
+        (linear_polynomial: "0")
+        (comparison_op: ">=")
+        (linear_polynomial: "0")
+      )
+    )
   )
   (EOI: "")
 )

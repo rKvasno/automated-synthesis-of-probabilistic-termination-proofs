@@ -14,10 +14,14 @@ while 1 : 0 {
 (program
   (locations
     (location
-      (invariants
-        (linear_polynomial: "0")
-        (comparison_op: ">=")
-        (linear_polynomial: "0")
+      (invariant
+        (logic_condition
+          (inequality
+            (linear_polynomial: "0")
+            (comparison_op: ">=")
+            (linear_polynomial: "0")
+          )
+        )
       )
       (while_inst
         (prob_condition
@@ -26,10 +30,14 @@ while 1 : 0 {
         )
         (locations
           (location
-            (invariants
-              (linear_polynomial: "a")
-              (comparison_op: ">")
-              (linear_polynomial: "a")
+            (invariant
+              (logic_condition
+                (inequality
+                  (linear_polynomial: "a")
+                  (comparison_op: ">")
+                  (linear_polynomial: "a")
+                )
+              )
             )
             (assign_inst
               (variable: "a")
@@ -40,10 +48,14 @@ while 1 : 0 {
       )
     )
   )
-  (invariants
-    (linear_polynomial: "0")
-    (comparison_op: ">=")
-    (linear_polynomial: "0")
+  (invariant
+    (logic_condition
+      (inequality
+        (linear_polynomial: "0")
+        (comparison_op: ">=")
+        (linear_polynomial: "0")
+      )
+    )
   )
   (EOI: "")
 )

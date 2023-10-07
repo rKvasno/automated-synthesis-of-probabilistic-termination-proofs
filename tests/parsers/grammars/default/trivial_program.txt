@@ -11,10 +11,14 @@ a = 1
 (program
   (locations
     (location
-      (invariants
-        (linear_polynomial: "1")
-        (comparison_op: ">")
-        (linear_polynomial: "0")
+      (invariant
+        (logic_condition
+          (inequality
+            (linear_polynomial: "1")
+            (comparison_op: ">")
+            (linear_polynomial: "0")
+          )
+        )
       )
       (assign_inst
         (variable: "a")
@@ -22,10 +26,14 @@ a = 1
       )
     )
   )
-  (invariants
-    (linear_polynomial: "1")
-    (comparison_op: "<")
-    (linear_polynomial: "0")
+  (invariant
+    (logic_condition
+      (inequality
+        (linear_polynomial: "1")
+        (comparison_op: "<")
+        (linear_polynomial: "0")
+      )
+    )
   )
   (EOI: "")
 )

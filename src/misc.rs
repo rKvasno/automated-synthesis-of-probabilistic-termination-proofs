@@ -32,6 +32,8 @@ pub mod tests {
     }
     pub mod parsers {
         pub mod default {
+            pub const INVARIANT_PROGRAM: &'static str =
+                include_str!("../tests/parsers/default/invariant_program");
             pub const SIMPLE_IF_PROGRAM: &'static str =
                 include_str!("../tests/parsers/default/simple_if_program");
             pub const SIMPLE_NONDET_PROGRAM: &'static str =

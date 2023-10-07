@@ -1,7 +1,7 @@
-program = { SOI ~ locations ~ invariants ~ NEWLINE* ~ EOI }
-location = { invariants ~ instruction }
+program = { SOI ~ locations ~ invariant ~ NEWLINE* ~ EOI }
+location = { invariant ~ instruction }
 
-invariants = { ("#" ~ conjunction ~ NEWLINE)+ }
+invariant = { ("#" ~ logic_condition ~ NEWLINE)+ }
 
 locations = { NEWLINE* ~ location ~ (NEWLINE+ ~ location)* ~ NEWLINE* | 
             NEWLINE* ~ location ~ NEWLINE*             }
@@ -29,12 +29,11 @@ assign_inst = { variable ~ "=" ~ linear_polynomial}
 condition = _{ logic_condition   |
              prob_condition    |
              nondet_condition  }
-logic_condition = { conjunction }
+logic_condition = { inequality ~ ( "and" ~ inequality )* }
 prob_condition = { constant ~ ":" ~ constant }
 nondet_condition = { "nondet" }
 
-conjunction = _{ inequality ~ ( "and" ~ inequality )* }
-inequality = _{ linear_polynomial ~ comparison_op ~ linear_polynomial }
+inequality = { linear_polynomial ~ comparison_op ~ linear_polynomial }
 comparison_op = @{ "<=" | ">=" | "<" | ">" }
 
 COMMENT = _{ "##" ~ (!NEWLINE ~ ANY)* ~ NEWLINE }

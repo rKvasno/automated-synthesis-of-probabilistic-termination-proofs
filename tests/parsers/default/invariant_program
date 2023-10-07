@@ -1,0 +1,7 @@
+# a <= a and b < a
+# b > a and b > b
+# a < b and a >= a
+a = a
+# a <= a and b < a
+# b > a and b > b
+# a < b and a >= a

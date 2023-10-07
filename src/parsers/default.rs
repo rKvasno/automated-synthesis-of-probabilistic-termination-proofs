@@ -1,4 +1,5 @@
 use crate::pts::guard::Guards;
+use crate::pts::location::Invariant;
 use crate::pts::relation::{Relation, RelationSign};
 use crate::pts::system::System;
 use crate::pts::transition::Transition;
@@ -14,7 +15,7 @@ use pts::location::LocationHandle;
 use pts::transition::Assignment;
 use pts::variable_map::VariableMap;
 
-use pest::iterators::{Pair, Pairs};
+use pest::iterators::Pair;
 use pest::Parser;
 use std::iter::{once, zip};
 
@@ -169,27 +170,37 @@ fn parse_comparison_op<'a>(parse: Pair<'a, Rule>) -> RelationSign {
     }
 }
 
-// assumes pairs is the iterator of a parse with rule Rule::invariants or Rule::logic_condition
-fn parse_inequality<'a>(map: &mut VariableMap, pairs: &mut Pairs<'a, Rule>) -> Relation {
-    // assert is checked before calling
+// assumes the parses rule is Rule::inequality
+fn parse_inequality<'a>(map: &mut VariableMap, parse: Pair<'a, Rule>) -> Relation {
+    assert!(parse.clone().as_rule() == Rule::inequality);
+    let mut pairs = parse.into_inner();
     let lhs: LinearPolynomial = parse_linear_polynomial(map, pairs.next().unwrap());
     let op = parse_comparison_op(pairs.next().unwrap());
     let rhs: LinearPolynomial = parse_linear_polynomial(map, pairs.next().unwrap());
+    // assert!(pairs.next().is_none());
     Relation::new(lhs, op, rhs)
 }
 
-// assumes the parses rule is Rule::invariants or Rule::logic_condition
+// assumes the parses rule is Rule::logic_condition
 fn parse_inequality_system<'a>(map: &mut VariableMap, parse: Pair<'a, Rule>) -> System {
-    assert!(
-        parse.clone().as_rule() == Rule::invariants
-            || parse.clone().as_rule() == Rule::logic_condition
-    );
-    let mut pairs = parse.into_inner();
+    assert!(parse.clone().as_rule() == Rule::logic_condition);
     let mut system = System::default();
-    while pairs.peek().is_some() {
-        system.push(parse_inequality(map, &mut pairs));
+    for pair in parse.into_inner() {
+        system.push(parse_inequality(map, pair));
     }
     system
+}
+
+// assumes the parses rule is Rule::invariant
+fn parse_invariant<'a>(map: &mut VariableMap, parse: Pair<'a, Rule>) -> Invariant {
+    assert!(parse.clone().as_rule() == Rule::invariant);
+    let mut invariant = Invariant::default();
+    for pair in parse.into_inner() {
+        invariant
+            .assertions
+            .push(parse_inequality_system(map, pair));
+    }
+    invariant
 }
 
 // assumes the parses rule is Rule::program
@@ -206,7 +217,7 @@ fn parse_program<'a>(pts: &mut PTS, parse: Pair<'a, Rule>) {
     pts.locations.initial = transition.target;
     pts.locations.set_invariant(
         pts.locations.get_terminating_location(),
-        parse_inequality_system(&mut pts.variables, iter.next().unwrap()),
+        parse_invariant(&mut pts.variables, iter.next().unwrap()),
     );
 }
 
@@ -238,7 +249,7 @@ fn parse_locations<'a>(
         let invariant_parse = location_iter.next().unwrap();
         pts.locations.set_invariant(
             local_start,
-            parse_inequality_system(&mut pts.variables, invariant_parse),
+            parse_invariant(&mut pts.variables, invariant_parse),
         );
 
         let instruction_parse = location_iter.next().unwrap();
@@ -479,9 +490,9 @@ mod tests {
     use crate::{
         assignment, guards,
         misc::tests::parsers::default::{
-            SIMPLE_IF_PROGRAM, SIMPLE_NONDET_PROGRAM, SIMPLE_ODDS_PROGRAM, SIMPLE_PROGRAM,
-            TRIVIAL_IF_PROGRAM, TRIVIAL_NONDET_PROGRAM, TRIVIAL_ODDS_PROGRAM, TRIVIAL_PROGRAM,
-            WHILE_LOGIC_PROGRAM, WHILE_NONDET_PROGRAM, WHILE_PROB_PROGRAM,
+            INVARIANT_PROGRAM, SIMPLE_IF_PROGRAM, SIMPLE_NONDET_PROGRAM, SIMPLE_ODDS_PROGRAM,
+            SIMPLE_PROGRAM, TRIVIAL_IF_PROGRAM, TRIVIAL_NONDET_PROGRAM, TRIVIAL_ODDS_PROGRAM,
+            TRIVIAL_PROGRAM, WHILE_LOGIC_PROGRAM, WHILE_NONDET_PROGRAM, WHILE_PROB_PROGRAM,
         },
         mock_invariant, mock_polynomial, mock_relation, mock_varmap,
         parsers::{
@@ -591,11 +602,10 @@ mod tests {
     #[test]
     fn inequality_sanity() {
         let mut map = mock_varmap!();
-        let mut parse = DefaultParser::parse(Rule::logic_condition, "3a - 4 + b < 0").unwrap();
-        let mut pairs = parse.next().unwrap().into_inner();
+        let mut parse = DefaultParser::parse(Rule::inequality, "3a - 4 + b < 0").unwrap();
+        let pair = parse.next().unwrap();
         assert!(parse.next().is_none());
-        let cond = parse_inequality(&mut map, &mut pairs);
-        assert!(pairs.next().is_none());
+        let cond = parse_inequality(&mut map, pair);
         assert_eq!(cond, mock_relation!["<", -4.0, 3.0, 1.0]);
     }
 
@@ -619,8 +629,8 @@ mod tests {
     }
 
     #[test]
-    fn parse_program_trivial() {
-        let input = TRIVIAL_PROGRAM;
+    fn invariant_sanity() {
+        let input = INVARIANT_PROGRAM;
         let parsed = parse(input).unwrap();
 
         let mut locations = Locations::default();
@@ -629,18 +639,29 @@ mod tests {
 
         // line #
         // 1
-        locations.set_invariant(handle, mock_invariant!(">", -1.0));
+        locations.set_invariant(
+            handle,
+            mock_invariant!(
+                ["<=", 0.0, 0.0; "<", 0.0, -1.0, 1.0],
+                [">", 0.0, 1.0, -1.0; ">", 0.0, 0.0, 0.0],
+                ["<", 0.0, 1.0, -1.0; ">=", 0.0, 0.0, 0.0]
+            ),
+        );
         // 2
         locations
-            .set_outgoing(handle, guards!(transition![None; "a", 1.0, 0.0]))
+            .set_outgoing(handle, guards!(transition![None; "a", 0.0, 1.0, 0.0]))
             .unwrap();
         // 3
         locations.set_invariant(
             locations.get_terminating_location(),
-            mock_invariant!("<", 1.0, 0.0),
+            mock_invariant!(
+                ["<=", 0.0, 0.0, 0.0; "<", 0.0, -1.0, 1.0],
+                [">", 0.0, 1.0, -1.0; ">", 0.0, 0.0, 0.0],
+                ["<", 0.0, 1.0, -1.0; ">=", 0.0, 0.0, 0.0]
+            ),
         );
 
-        let variables = mock_varmap!("a");
+        let variables = mock_varmap!("a", "b");
 
         assert_eq!(
             parsed,
@@ -664,7 +685,7 @@ mod tests {
 
         // line #
         // 1
-        locations.set_invariant(handle, mock_invariant!(">", 0.0, -1.0));
+        locations.set_invariant(handle, mock_invariant!([">", 0.0, -1.0]));
         // 2
         let next_location = locations_iter.next().unwrap();
         locations
@@ -678,9 +699,10 @@ mod tests {
         locations.set_invariant(
             handle,
             mock_invariant!(
+            [
                 ">=", 1.0, 0.0, -1.0;
                 ">", 0.0, -1.0, 0.0
-            ),
+            ]),
         );
 
         // 4
@@ -697,10 +719,11 @@ mod tests {
         locations.set_invariant(
             handle,
             mock_invariant!(
+            [
                 ">=", 1.0, 0.0, -1.0, 0.0;
                 ">", 0.0, -1.0, 0.0, 0.0;
                 ">", 1.0, 0.0, 0.0, -1.0
-            ),
+            ]),
         );
         // 6
         let next_location = locations.get_terminating_location();
@@ -715,13 +738,47 @@ mod tests {
         locations.set_invariant(
             handle,
             mock_invariant!(
+            [
                 ">", 1.0, 0.0, -1.0, 0.0;
                 ">", 0.0, -1.0, 0.0, 0.0;
                 ">", 1.0, 0.0, 0.0, -1.0
-            ),
+            ]),
         );
 
         let variables = mock_varmap!("a", "b", "c");
+        assert_eq!(
+            parsed,
+            PTS {
+                locations,
+                variables
+            }
+        );
+    }
+
+    #[test]
+    fn parse_program_trivial() {
+        let input = TRIVIAL_PROGRAM;
+        let parsed = parse(input).unwrap();
+
+        let mut locations = Locations::default();
+        let handle = locations.new_location();
+        locations.initial = handle;
+
+        // line #
+        // 1
+        locations.set_invariant(handle, mock_invariant!([">", -1.0]));
+        // 2
+        locations
+            .set_outgoing(handle, guards!(transition![None; "a", 1.0, 0.0]))
+            .unwrap();
+        // 3
+        locations.set_invariant(
+            locations.get_terminating_location(),
+            mock_invariant!(["<", 1.0, 0.0]),
+        );
+
+        let variables = mock_varmap!("a");
+
         assert_eq!(
             parsed,
             PTS {
@@ -744,7 +801,7 @@ mod tests {
 
         // line #
         // 1
-        locations.set_invariant(start, mock_invariant!("<", 0.0));
+        locations.set_invariant(start, mock_invariant!(["<", 0.0]));
         let junction = locations_iter.next().unwrap();
         let branch_1 = locations_iter.next().unwrap();
         let branch_2 = locations_iter.next().unwrap();
@@ -773,7 +830,7 @@ mod tests {
             .unwrap();
 
         // 3
-        locations.set_invariant(branch_1, mock_invariant!(">", 0.0, 0.0, 0.0));
+        locations.set_invariant(branch_1, mock_invariant!([">", 0.0, 0.0, 0.0]));
 
         // 4
         locations
@@ -781,7 +838,7 @@ mod tests {
             .unwrap();
 
         // 7
-        locations.set_invariant(branch_2, mock_invariant!("<", 0.0, 0.0, 0.0, 0.0));
+        locations.set_invariant(branch_2, mock_invariant!(["<", 0.0, 0.0, 0.0, 0.0]));
 
         // 8
         locations
@@ -792,7 +849,7 @@ mod tests {
             .unwrap();
 
         // 11
-        locations.set_invariant(branch_3, mock_invariant!(">", 0.0, 0.0, 0.0, 0.0));
+        locations.set_invariant(branch_3, mock_invariant!([">", 0.0, 0.0, 0.0, 0.0]));
 
         // 12
         locations
@@ -803,7 +860,7 @@ mod tests {
             .unwrap();
 
         // 14
-        locations.set_invariant(junction, mock_invariant!(">", 0.0, 0.0, 0.0, 0.0));
+        locations.set_invariant(junction, mock_invariant!([">", 0.0, 0.0, 0.0, 0.0]));
 
         // 15
         locations
@@ -816,7 +873,7 @@ mod tests {
         // 16
         locations.set_invariant(
             locations.get_terminating_location(),
-            mock_invariant!("<", 0.0, 0.0, 0.0, 0.0),
+            mock_invariant!(["<", 0.0, 0.0, 0.0, 0.0]),
         );
 
         let variables = mock_varmap!("a", "b", "c",);
@@ -843,7 +900,7 @@ mod tests {
 
         // line #
         // 1
-        locations.set_invariant(start, mock_invariant!("<", 0.0));
+        locations.set_invariant(start, mock_invariant!(["<", 0.0]));
         let junction = locations_iter.next().unwrap();
         let branch_1 = locations_iter.next().unwrap();
         locations
@@ -863,7 +920,7 @@ mod tests {
             .unwrap();
 
         // 3
-        locations.set_invariant(branch_1, mock_invariant!(">", 0.0, 0.0, 0.0));
+        locations.set_invariant(branch_1, mock_invariant!([">", 0.0, 0.0, 0.0]));
 
         // 4
         locations
@@ -871,7 +928,7 @@ mod tests {
             .unwrap();
 
         // 6
-        locations.set_invariant(junction, mock_invariant!(">", 0.0, 0.0, 0.0));
+        locations.set_invariant(junction, mock_invariant!([">", 0.0, 0.0, 0.0]));
 
         // 7
         locations
@@ -886,7 +943,7 @@ mod tests {
         // 8
         locations.set_invariant(
             locations.get_terminating_location(),
-            mock_invariant!("<", 0.0, 0.0, 0.0),
+            mock_invariant!(["<", 0.0, 0.0, 0.0]),
         );
 
         let variables = mock_varmap!("a", "b");
@@ -913,7 +970,7 @@ mod tests {
 
         // line #
         // 1
-        locations.set_invariant(start, mock_invariant!("<", 0.0));
+        locations.set_invariant(start, mock_invariant!(["<", 0.0]));
         let junction = locations_iter.next().unwrap();
         let branch_1 = locations_iter.next().unwrap();
         let branch_2 = locations_iter.next().unwrap();
@@ -935,7 +992,7 @@ mod tests {
             .unwrap();
 
         // 3
-        locations.set_invariant(branch_1, mock_invariant!("<", 0.0, 0.0));
+        locations.set_invariant(branch_1, mock_invariant!(["<", 0.0, 0.0]));
 
         // 4
         locations
@@ -943,7 +1000,7 @@ mod tests {
             .unwrap();
 
         // 7
-        locations.set_invariant(branch_2, mock_invariant!(">=", 0.0, 1.0, -1.0));
+        locations.set_invariant(branch_2, mock_invariant!([">=", 0.0, 1.0, -1.0]));
 
         // 8
         locations
@@ -951,7 +1008,7 @@ mod tests {
             .unwrap();
 
         // 10
-        locations.set_invariant(junction, mock_invariant!("<", 0.0, 0.0, 0.0));
+        locations.set_invariant(junction, mock_invariant!(["<", 0.0, 0.0, 0.0]));
 
         // 11
         locations
@@ -964,7 +1021,7 @@ mod tests {
         // 12
         locations.set_invariant(
             locations.get_terminating_location(),
-            mock_invariant!("<", 0.0, 0.0, 0.0),
+            mock_invariant!(["<", 0.0, 0.0, 0.0]),
         );
 
         let variables = mock_varmap!("a", "b");
@@ -991,7 +1048,7 @@ mod tests {
 
         // line #
         // 1
-        locations.set_invariant(start, mock_invariant!("<", 0.0));
+        locations.set_invariant(start, mock_invariant!(["<", 0.0]));
         let junction = locations_iter.next().unwrap();
         let branch_1 = locations_iter.next().unwrap();
         locations
@@ -1009,7 +1066,7 @@ mod tests {
             .unwrap();
 
         // 3
-        locations.set_invariant(branch_1, mock_invariant!("<", 0.0, 0.0));
+        locations.set_invariant(branch_1, mock_invariant!(["<", 0.0, 0.0]));
 
         // 4
         locations
@@ -1017,7 +1074,7 @@ mod tests {
             .unwrap();
 
         // 6
-        locations.set_invariant(junction, mock_invariant!(">", 0.0, 0.0));
+        locations.set_invariant(junction, mock_invariant!([">", 0.0, 0.0]));
 
         // 7
         locations
@@ -1035,7 +1092,7 @@ mod tests {
         // 8
         locations.set_invariant(
             locations.get_terminating_location(),
-            mock_invariant!("<", 0.0, 0.0),
+            mock_invariant!(["<", 0.0, 0.0]),
         );
 
         let variables = mock_varmap!("a");
@@ -1062,7 +1119,7 @@ mod tests {
 
         // line #
         // 1
-        locations.set_invariant(start, mock_invariant!("<", 0.0));
+        locations.set_invariant(start, mock_invariant!(["<", 0.0]));
         let junction = locations_iter.next().unwrap();
         let branch_1 = locations_iter.next().unwrap();
         let branch_2 = locations_iter.next().unwrap();
@@ -1082,7 +1139,7 @@ mod tests {
             .unwrap();
 
         // 3
-        locations.set_invariant(branch_1, mock_invariant!(">", 0.0, 0.0));
+        locations.set_invariant(branch_1, mock_invariant!([">", 0.0, 0.0]));
 
         // 4
         locations
@@ -1090,7 +1147,7 @@ mod tests {
             .unwrap();
 
         // 7
-        locations.set_invariant(branch_2, mock_invariant!(">", 0.0, 0.0));
+        locations.set_invariant(branch_2, mock_invariant!([">", 0.0, 0.0]));
 
         // 8
         locations
@@ -1098,7 +1155,7 @@ mod tests {
             .unwrap();
 
         // 11
-        locations.set_invariant(branch_3, mock_invariant!(">", 0.0, 0.0));
+        locations.set_invariant(branch_3, mock_invariant!([">", 0.0, 0.0]));
 
         // 12
         locations
@@ -1106,7 +1163,7 @@ mod tests {
             .unwrap();
 
         // 14
-        locations.set_invariant(junction, mock_invariant!("<", 0.0, 0.0));
+        locations.set_invariant(junction, mock_invariant!(["<", 0.0, 0.0]));
 
         // 15
         locations
@@ -1120,7 +1177,7 @@ mod tests {
         // 16
         locations.set_invariant(
             locations.get_terminating_location(),
-            mock_invariant!("<", 0.0, 0.0),
+            mock_invariant!(["<", 0.0, 0.0]),
         );
 
         let variables = mock_varmap!("a");
@@ -1147,7 +1204,7 @@ mod tests {
 
         // line #
         // 1
-        locations.set_invariant(start, mock_invariant!("<", 0.0));
+        locations.set_invariant(start, mock_invariant!(["<", 0.0]));
 
         let junction = locations_iter.next().unwrap();
         let branch_1 = locations_iter.next().unwrap();
@@ -1164,14 +1221,14 @@ mod tests {
             .unwrap();
 
         // 3
-        locations.set_invariant(branch_1, mock_invariant!(">", 0.0, 0.0));
+        locations.set_invariant(branch_1, mock_invariant!([">", 0.0, 0.0]));
 
         // 4
         locations
             .set_outgoing(branch_1, guards!(transition!(junction; "a", 0.0, 1.0)))
             .unwrap();
         // 6
-        locations.set_invariant(junction, mock_invariant!(">", 0.0, 0.0));
+        locations.set_invariant(junction, mock_invariant!([">", 0.0, 0.0]));
 
         // 7
         locations
@@ -1187,7 +1244,7 @@ mod tests {
         // 8
         locations.set_invariant(
             locations.get_terminating_location(),
-            mock_invariant!("<", 0.0, 0.0),
+            mock_invariant!(["<", 0.0, 0.0]),
         );
 
         let variables = mock_varmap!("a");
@@ -1214,7 +1271,7 @@ mod tests {
 
         // line #
         // 1
-        locations.set_invariant(start, mock_invariant!("<", 0.0));
+        locations.set_invariant(start, mock_invariant!(["<", 0.0]));
         let junction = locations_iter.next().unwrap();
         let branch_1 = locations_iter.next().unwrap();
         locations
@@ -1222,24 +1279,30 @@ mod tests {
                 start,
                 guards!(L:
                     // 2
-                    mock_invariant!(">", 0.0, 0.0; "<", 0.0, 0.0),
+                    system!(
+                        mock_relation!(">", 0.0, 0.0),
+                        mock_relation!("<", 0.0, 0.0)
+                    ),
                     transition!(branch_1),
                     // 5
-                    mock_invariant!("<=", 0.0, 0.0; ">=", 0.0, 0.0),
+                    system!(
+                        mock_relation!("<=", 0.0, 0.0),
+                        mock_relation!(">=", 0.0, 0.0)
+                    ),
                     transition!(junction),
                 ),
             )
             .unwrap();
 
         // 3
-        locations.set_invariant(branch_1, mock_invariant!(">", 0.0, 0.0));
+        locations.set_invariant(branch_1, mock_invariant!([">", 0.0, 0.0]));
 
         // 4
         locations
             .set_outgoing(branch_1, guards!(transition!(start; "a", 0.0, 0.0, 1.0)))
             .unwrap();
         // 6
-        locations.set_invariant(junction, mock_invariant!(">", 0.0, 0.0, 0.0));
+        locations.set_invariant(junction, mock_invariant!([">", 0.0, 0.0, 0.0]));
 
         // 7
         locations
@@ -1254,7 +1317,7 @@ mod tests {
         // 8
         locations.set_invariant(
             locations.get_terminating_location(),
-            mock_invariant!("<", 0.0, 0.0, 0.0),
+            mock_invariant!(["<", 0.0, 0.0, 0.0]),
         );
 
         let variables = mock_varmap!("a", "b");
@@ -1281,7 +1344,7 @@ mod tests {
 
         // line #
         // 1
-        locations.set_invariant(start, mock_invariant!("<", 0.0));
+        locations.set_invariant(start, mock_invariant!(["<", 0.0]));
 
         let junction = locations_iter.next().unwrap();
         let branch_1 = locations_iter.next().unwrap();
@@ -1300,7 +1363,7 @@ mod tests {
             .unwrap();
 
         // 3
-        locations.set_invariant(branch_1, mock_invariant!(">", 0.0, 0.0));
+        locations.set_invariant(branch_1, mock_invariant!([">", 0.0, 0.0]));
 
         // 4
         locations
@@ -1308,7 +1371,7 @@ mod tests {
             .unwrap();
 
         // 6
-        locations.set_invariant(junction, mock_invariant!(">", 0.0, 0.0, 0.0));
+        locations.set_invariant(junction, mock_invariant!([">", 0.0, 0.0, 0.0]));
 
         // 7
         locations
@@ -1324,7 +1387,7 @@ mod tests {
         // 8
         locations.set_invariant(
             locations.get_terminating_location(),
-            mock_invariant!("<", 0.0, 0.0, 0.0),
+            mock_invariant!(["<", 0.0, 0.0, 0.0]),
         );
 
         let variables = mock_varmap!("a", "b");
@@ -1351,7 +1414,7 @@ mod tests {
 
         // line #
         // 1
-        locations.set_invariant(start, mock_invariant!("<", 0.0));
+        locations.set_invariant(start, mock_invariant!(["<", 0.0]));
 
         let junction = locations_iter.next().unwrap();
         let branch_1 = locations_iter.next().unwrap();
@@ -1363,14 +1426,14 @@ mod tests {
             .unwrap();
 
         // 3
-        locations.set_invariant(branch_1, mock_invariant!(">", 0.0, 0.0));
+        locations.set_invariant(branch_1, mock_invariant!([">", 0.0, 0.0]));
 
         // 4
         locations
             .set_outgoing(branch_1, guards!(transition!(start; "a", 0.0, 0.0, 1.0)))
             .unwrap();
         // 6
-        locations.set_invariant(junction, mock_invariant!(">", 0.0, 0.0, 0.0));
+        locations.set_invariant(junction, mock_invariant!([">", 0.0, 0.0, 0.0]));
 
         // 7
         locations
@@ -1386,7 +1449,7 @@ mod tests {
         // 8
         locations.set_invariant(
             locations.get_terminating_location(),
-            mock_invariant!("<", 0.0, 0.0, 0.0),
+            mock_invariant!(["<", 0.0, 0.0, 0.0]),
         );
 
         let variables = mock_varmap!("a", "b");
