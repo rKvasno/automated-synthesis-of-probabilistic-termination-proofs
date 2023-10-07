@@ -19,6 +19,17 @@ macro_rules! system {
     };
 }
 
+// test only, uses mock_relation
+#[cfg(test)]
+#[macro_export]
+macro_rules! mock_invariant {
+    [ $( $sign:literal, $( $x:expr ),* );* $(;)?] => {
+        {
+            $crate::system![$( $crate::mock_relation![$sign, $($x, )*], )*]
+        }
+    };
+}
+
 #[macro_export]
 macro_rules! system_append {
     [ $( $x:expr ), * $(,)?] => {
@@ -93,71 +104,96 @@ impl Not for System {
 }
 
 #[cfg(test)]
-impl System {
-    pub fn mock(relations: Vec<Relation>) -> Self {
-        System { relations }
-    }
-}
-
-#[cfg(test)]
 mod tests {
-    use crate::pts::{
-        linear_polynomial::{constant::Constant, LinearPolynomial},
-        relation::{Relation, RelationType},
-        variable_map::{Variable, VariableMap},
-        DisplayLabel,
-    };
 
-    use super::System;
+    mod macros {
+        use crate::{mock_relation, pts::system::System};
 
-    #[test]
-    fn label() {
-        let system = System {
-            relations: vec![
-                Relation::mock(
-                    RelationType::NonstrictInequality,
-                    LinearPolynomial::mock(vec![Constant(0.0)]),
-                ),
-                Relation::mock(
-                    RelationType::NonstrictInequality,
-                    LinearPolynomial::mock(vec![Constant(0.0)]),
-                ),
-            ],
-        };
-        let map = VariableMap::mock(vec![]);
-        assert_eq!(system.label(&map), "0 <= 0\n0 <= 0");
+        #[test]
+        fn system() {
+            let mut system = System::default();
+            system.push(mock_relation!(">", 0.0, 12.4, -3.5, 2.4, -0.0));
 
-        let system = System {
-            relations: vec![
-                Relation::mock(
-                    RelationType::NonstrictInequality,
-                    LinearPolynomial::mock(vec![Constant(0.0), Constant(1.0)]),
-                ),
-                Relation::mock(
-                    RelationType::NonstrictInequality,
-                    LinearPolynomial::mock(vec![Constant(0.0), Constant(-1.0)]),
-                ),
-            ],
-        };
-        let map = VariableMap::mock(vec![Variable::new("a"), Variable::new("b")]);
-        assert_eq!(system.label(&map), "a <= 0\na >= 0");
+            system.push(mock_relation!("<=", -1.0, -2.4));
 
-        let system = System {
-            relations: vec![Relation::mock(
-                RelationType::StrictInequality,
-                LinearPolynomial::mock(vec![
-                    Constant(0.0),
-                    Constant(-1.0),
-                    Constant(0.0),
-                    Constant(0.0),
-                ]),
-            )],
-        };
-        let map = VariableMap::mock(vec![
-            Variable::new("test1"),
-            Variable::new("test2"),
-            Variable::new("test3"),
-        ]);
-        assert_eq!(system.label(&map), "test1 > 0");
+            system.push(mock_relation!("=", 0.0, 0.0, 0.0, 0.0));
+
+            system.push(mock_relation!("!=", 111.111));
+
+            assert_eq!(
+                system,
+                system!(
+                    mock_relation!(">", 0.0, 12.4, -3.5, 2.4, -0.0),
+                    mock_relation!("<=", -1.0, -2.4),
+                    mock_relation!("=", 0.0, 0.0, 0.0, 0.0),
+                    mock_relation!("!=", 111.111)
+                ),
+            );
+        }
+
+        #[test]
+        fn system_append() {
+            assert_eq!(
+                system!(
+                    mock_relation!(">", 0.0, 12.4, -3.5, 2.4, -0.0),
+                    mock_relation!("<=", -1.0, -2.4),
+                    mock_relation!("=", 0.0, 0.0, 0.0, 0.0),
+                    mock_relation!("!=", 111.111)
+                ),
+                system_append!(
+                    &mut system!(mock_relation!(">", 0.0, 12.4, -3.5, 2.4, -0.0),),
+                    &mut system!(
+                        mock_relation!("<=", -1.0, -2.4),
+                        mock_relation!("=", 0.0, 0.0, 0.0, 0.0),
+                    ),
+                    &mut system!(),
+                    &mut system!(mock_relation!("!=", 111.111))
+                )
+            );
+        }
+
+        #[test]
+        fn mock_invariant() {
+            assert_eq!(
+                system!(
+                    mock_relation!(">", 0.0, 12.4, -3.5, 2.4, -0.0),
+                    mock_relation!("<=", -1.0, -2.4),
+                    mock_relation!("=", 0.0, 0.0, 0.0, 0.0),
+                    mock_relation!("!=", 111.111)
+                ),
+                mock_invariant!(
+                    ">", 0.0, 12.4, -3.5, 2.4, -0.0;
+                    "<=", -1.0, -2.4;
+                    "=", 0.0, 0.0, 0.0, 0.0;
+                    "!=", 111.111
+                ),
+            );
+        }
+    }
+
+    mod label {
+        use crate::{mock_relation, mock_varmap, pts::DisplayLabel};
+
+        #[test]
+        fn zeroes() {
+            let system = system!(mock_relation!("<=", 0.0), mock_relation!("<=", 0.0),);
+            let map = mock_varmap!();
+            assert_eq!(system.label(&map), "0 <= 0\n0 <= 0");
+        }
+        #[test]
+        fn vars() {
+            let system = system!(
+                mock_relation!("<=", 0.0, 1.0),
+                mock_relation!("<=", 0.0, -1.0),
+            );
+            let map = mock_varmap!("a", "b");
+            assert_eq!(system.label(&map), "a <= 0\na >= 0");
+        }
+        #[test]
+        fn neg() {
+            let system = system!(mock_relation!("<", 0.0, -1.0, 0.0, 0.0));
+            let map = mock_varmap!("test1", "test2", "test3",);
+            assert_eq!(system.label(&map), "test1 > 0");
+        }
     }
 }

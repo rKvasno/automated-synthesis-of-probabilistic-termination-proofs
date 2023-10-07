@@ -7,6 +7,30 @@ use transition::Transition;
 
 use super::{variable_map::VariableMap, DisplayLabel};
 
+#[macro_export]
+macro_rules! guards {
+    [ $t:expr ] => {
+        {
+            $crate::pts::guard::Guards::Unguarded(std::boxed::Box::new($t))
+        }
+    };
+    [ P: $( $p:expr, $t:expr ), + $(,)?] => {
+        {
+            $crate::pts::guard::Guards::Probabilistic(std::vec![$(($crate::pts::linear_polynomial::constant::Constant($p), $t),)*])
+        }
+    };
+    [ L: $( $c:expr, $t:expr ), + $(,)?] => {
+        {
+            $crate::pts::guard::Guards::Logic(std::vec![$(($c, $t),)*])
+        }
+    };
+    [ $( $t:expr ), + $(,)?] => {
+        {
+            $crate::pts::guard::Guards::Nondeterministic(std::vec![$($t,)*])
+        }
+    };
+}
+
 pub type Probability = Constant;
 
 // 32 bytes
@@ -122,133 +146,176 @@ impl<'a> Iterator for GuardsIterator<'a> {
 
 #[cfg(test)]
 mod tests {
-    use crate::pts::{
-        guard::GuardedTransition,
-        linear_polynomial::{constant::Constant, LinearPolynomial},
-        relation::{Relation, RelationType},
-        transition::{Assignment, Transition},
-        variable_map::{Variable, VariableMap},
-        DisplayLabel,
-    };
-    use crate::system;
 
-    #[test]
-    fn logic_label() {
-        let data = (
-            system![Relation::mock(
-                RelationType::StrictInequality,
-                LinearPolynomial::mock(vec![Constant(1.0)]),
-            )],
-            Transition {
-                assignments: Vec::default(),
-                target: None,
-            },
-        );
-        let guarded_transition = GuardedTransition::Logic(&data);
-        let map = VariableMap::mock(Default::default());
-        assert_eq!(guarded_transition.label(&map), "0 < -1");
+    mod macros {
 
-        let data = (
-            system!(
-                Relation::mock(
-                    RelationType::NonstrictInequality,
-                    LinearPolynomial::mock(vec![Constant(0.0), Constant(1.0)]),
+        mod guards {
+            use crate::{
+                mock_relation,
+                pts::{guard::Guards, linear_polynomial::constant::Constant},
+                system, transition,
+            };
+            #[test]
+            fn unguarded() {
+                assert_eq!(
+                    guards!(transition!(Some(23); "as", 2.4, 1.3; "df", 1.0, -1.0)),
+                    Guards::Unguarded(std::boxed::Box::new(
+                        transition!(Some(23); "as", 2.4, 1.3; "df", 1.0, -1.0)
+                    ))
+                );
+            }
+
+            #[test]
+            fn nondeterministic() {
+                assert_eq!(
+                    guards!(
+                        transition!(Some(23); "as", 2.4, 1.3; "df", 1.0, -1.0),
+                        transition!(None; "fd", 1.3, 2.4; "pt", 13.0, -1.8),
+                        transition!(Some(21); "se", -20.4, 1.3; "xy", 0.0, 0.0)
+                    ),
+                    Guards::Nondeterministic(vec![
+                        transition!(Some(23); "as", 2.4, 1.3; "df", 1.0, -1.0),
+                        transition!(None; "fd", 1.3, 2.4; "pt", 13.0, -1.8),
+                        transition!(Some(21); "se", -20.4, 1.3; "xy", 0.0, 0.0)
+                    ])
+                );
+            }
+
+            #[test]
+            fn logic() {
+                assert_eq!(
+                    guards!(L:
+                        system!(mock_relation!(">", 0.1, -2.3)),
+                        transition!(Some(23); "as", 2.4, 1.3; "df", 1.0, -1.0),
+                        system!(
+                            mock_relation!("<=", -0.1, 2.3),
+                            mock_relation!(">=", 0.0, 3.8),
+                        ),
+                        transition!(None; "fd", 1.3, 2.4; "pt", 13.0, -1.8),
+                        system!(
+                            mock_relation!("<=", -0.1, 2.3),
+                            mock_relation!("<", 0.0, -3.8),
+                        ),
+                        transition!(Some(21); "se", -20.4, 1.3; "xy", 0.0, 0.0)
+                    ),
+                    Guards::Logic(vec![
+                        (
+                            system!(mock_relation!(">", 0.1, -2.3)),
+                            transition!(Some(23); "as", 2.4, 1.3; "df", 1.0, -1.0)
+                        ),
+                        (
+                            system!(
+                                mock_relation!("<=", -0.1, 2.3),
+                                mock_relation!(">=", 0.0, 3.8),
+                            ),
+                            transition!(None; "fd", 1.3, 2.4; "pt", 13.0, -1.8)
+                        ),
+                        (
+                            system!(
+                                mock_relation!("<=", -0.1, 2.3),
+                                mock_relation!("<", 0.0, -3.8),
+                            ),
+                            transition!(Some(21); "se", -20.4, 1.3; "xy", 0.0, 0.0)
+                        )
+                    ])
+                );
+            }
+
+            #[test]
+            fn probabilistic() {
+                assert_eq!(
+                    guards!(P:
+                        0.0,
+                        transition!(Some(23); "as", 2.4, 1.3; "df", 1.0, -1.0),
+                        0.3,
+                        transition!(None; "fd", 1.3, 2.4; "pt", 13.0, -1.8),
+                        0.7,
+                        transition!(Some(21); "se", -20.4, 1.3; "xy", 0.0, 0.0)
+                    ),
+                    Guards::Probabilistic(vec![
+                        (
+                            Constant(0.0),
+                            transition!(Some(23); "as", 2.4, 1.3; "df", 1.0, -1.0)
+                        ),
+                        (
+                            Constant(0.3),
+                            transition!(None; "fd", 1.3, 2.4; "pt", 13.0, -1.8)
+                        ),
+                        (
+                            Constant(0.7),
+                            transition!(Some(21); "se", -20.4, 1.3; "xy", 0.0, 0.0)
+                        )
+                    ])
+                );
+            }
+        }
+    }
+    mod label {
+        use crate::{
+            mock_relation, mock_varmap,
+            pts::{guard::GuardedTransition, linear_polynomial::constant::Constant, DisplayLabel},
+            system, transition,
+        };
+
+        #[test]
+        fn logic() {
+            let data = (system![mock_relation!("<", 1.0)], transition!(None));
+            let guarded_transition = GuardedTransition::Logic(&data);
+            let map = mock_varmap!();
+            assert_eq!(guarded_transition.label(&map), "0 < -1");
+
+            let data = (
+                system!(
+                    mock_relation!("<=", 0.0, 1.0),
+                    mock_relation!("<", 1.0, 2.0, 1.0)
                 ),
-                Relation::mock(
-                    RelationType::StrictInequality,
-                    LinearPolynomial::mock(vec![Constant(1.0), Constant(2.0), Constant(1.0)]),
-                    // 1 + 2a + len > 0
-                    // 2a + len > -1
-                )
-            ),
-            Transition {
-                assignments: vec![Assignment(Variable::new("a"), LinearPolynomial::default())],
-                target: None,
-            },
-        );
-        let guarded_transition = GuardedTransition::Logic(&data);
-        let map = VariableMap::mock(vec![Variable::new("a"), Variable::new("len")]);
-        assert_eq!(
-            guarded_transition.label(&map),
-            "a <= 0\n2a + len < -1\na = 0"
-        );
-    }
+                transition!(None; "a", 0.0),
+            );
+            let guarded_transition = GuardedTransition::Logic(&data);
+            let map = mock_varmap!("a", "len");
+            assert_eq!(
+                guarded_transition.label(&map),
+                "a <= 0\n2a + len < -1\na = 0"
+            );
+        }
 
-    #[test]
-    fn prob_label() {
-        let data = (
-            Constant(0.0),
-            Transition {
-                assignments: vec![
-                    Assignment(
-                        Variable::new("a"),
-                        LinearPolynomial::mock(vec![Constant(0.0), Constant(0.0)]),
-                    ),
-                    Assignment(
-                        Variable::new("b"),
-                        LinearPolynomial::mock(vec![
-                            Constant(2.0),
-                            Constant(1.0),
-                            Constant(2.0),
-                            Constant(0.0),
-                        ]),
-                    ),
-                    Assignment(
-                        Variable::new("a"),
-                        LinearPolynomial::mock(vec![
-                            Constant(-4.0),
-                            Constant(0.0),
-                            Constant(0.0),
-                            Constant(1.0),
-                        ]),
-                    ),
-                ],
+        #[test]
+        fn probabilistic() {
+            let data = (
+                Constant(0.0),
+                transition!(None;
+                    "a", 0.0, 0.0;
+                    "b", 2.0, 1.0, 2.0, 0.0;
+                    "a", -4.0, 0.0, 0.0, 1.0
+                ),
+            );
+            let guarded_transition = GuardedTransition::Probabilistic(&data);
+            let map = mock_varmap!("a", "b", "c",);
+            assert_eq!(
+                guarded_transition.label(&map),
+                "0\na = 0\nb = a + 2b + 2\na = c - 4"
+            );
 
-                target: None,
-            },
-        );
-        let guarded_transition = GuardedTransition::Probabilistic(&data);
-        let map = VariableMap::mock(vec![
-            Variable::new("a"),
-            Variable::new("b"),
-            Variable::new("c"),
-        ]);
-        assert_eq!(
-            guarded_transition.label(&map),
-            "0\na = 0\nb = a + 2b + 2\na = c - 4"
-        );
+            let data = (Constant(0.2222), transition!(None));
+            let guarded_transition = GuardedTransition::Probabilistic(&data);
+            let map = mock_varmap!();
+            assert_eq!(guarded_transition.label(&map), "0.2222");
+        }
 
-        let data = (
-            Constant(0.2222),
-            Transition {
-                assignments: Vec::default(),
-                target: None,
-            },
-        );
-        let guarded_transition = GuardedTransition::Probabilistic(&data);
-        let map = VariableMap::mock(Default::default());
-        assert_eq!(guarded_transition.label(&map), "0.2222");
-    }
+        #[test]
+        fn nondeterministic() {
+            let data = transition!(None);
+            let guarded_transition = GuardedTransition::Nondeterministic(&data);
+            let map = mock_varmap!();
+            assert_eq!(guarded_transition.label(&map), "");
+        }
 
-    #[test]
-    fn nondet_label() {
-        let data = Transition {
-            assignments: Vec::default(),
-            target: None,
-        };
-        let guarded_transition = GuardedTransition::Nondeterministic(&data);
-        let map = VariableMap::mock(Default::default());
-        assert_eq!(guarded_transition.label(&map), "");
-    }
-
-    #[test]
-    fn unguarded_label() {
-        let data = Transition {
-            assignments: Vec::default(),
-            target: None,
-        };
-        let guarded_transition = GuardedTransition::Unguarded(&data);
-        let map = VariableMap::mock(Default::default());
-        assert_eq!(guarded_transition.label(&map), "");
+        #[test]
+        fn unguarded() {
+            let data = transition!(None);
+            let guarded_transition = GuardedTransition::Unguarded(&data);
+            let map = mock_varmap!(Default::default());
+            assert_eq!(guarded_transition.label(&map), "");
+        }
     }
 }

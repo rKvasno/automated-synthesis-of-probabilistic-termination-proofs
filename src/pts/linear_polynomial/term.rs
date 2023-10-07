@@ -4,6 +4,20 @@ use variable_map::Variable;
 
 use std::{fmt, ops::Neg};
 
+#[macro_export]
+macro_rules! term {
+    [ $constant:expr, $var:expr ] => {
+        {
+            $crate::pts::linear_polynomial::term::Term{variable: Some($crate::pts::variable_map::Variable::new($var)), coefficient: $crate::pts::linear_polynomial::constant::Constant($constant)}
+        }
+    };
+    [ $constant:expr ] => {
+        {
+            $crate::pts::linear_polynomial::term::Term{variable: None, coefficient: $crate::pts::linear_polynomial::constant::Constant($constant)}
+        }
+    };
+}
+
 // default: constant term 0
 #[derive(Debug, Default, PartialEq)]
 pub struct Term {
@@ -71,76 +85,89 @@ impl fmt::Display for Term {
 
 #[cfg(test)]
 mod tests {
-    use crate::pts::{linear_polynomial::constant::Constant, variable_map::Variable};
-
-    use super::Term;
-
-    #[test]
-    fn fmt() {
-        let term = Term {
-            variable: Some(Variable::new("Test")),
-            coefficient: Constant(50.0),
+    mod macros {
+        use crate::pts::{
+            linear_polynomial::{constant::Constant, term::Term},
+            variable_map::Variable,
         };
-        assert_eq!(term.to_string(), "50Test");
 
-        let term = Term {
-            variable: Some(Variable::new("a")),
-            coefficient: Constant(-0.5),
-        };
-        assert_eq!(term.to_string(), "-0.5a");
+        #[test]
+        fn coeff_var() {
+            assert_eq!(
+                term!(40.0, "test"),
+                Term {
+                    variable: Some(Variable::new("test")),
+                    coefficient: Constant(40.0)
+                }
+            );
+        }
 
-        let term = Term {
-            variable: Some(Variable::new("a")),
-            coefficient: Constant(-1.0),
-        };
-        assert_eq!(term.to_string(), "-a");
+        #[test]
+        fn constant() {
+            assert_eq!(
+                term!(-45.3),
+                Term {
+                    variable: None,
+                    coefficient: Constant(-45.3)
+                }
+            );
+        }
+    }
 
-        let term = Term {
-            variable: Some(Variable::new("a")),
-            coefficient: Constant(1.0),
-        };
-        assert_eq!(term.to_string(), "a");
+    mod fmt {
+        #[test]
+        fn coeff_var() {
+            assert_eq!(term!(50.0, "Test").to_string(), "50Test");
+        }
 
-        let term = Term {
-            variable: Some(Variable::new("a")),
-            coefficient: Constant(0.0),
-        };
-        assert_eq!(term.to_string(), "");
+        #[test]
+        fn neg_coeff_var() {
+            assert_eq!(term!(-0.5, "a").to_string(), "-0.5a");
+        }
 
-        let term = Term {
-            variable: None,
-            coefficient: Constant(0.0),
-        };
-        assert_eq!(term.to_string(), "0");
+        #[test]
+        fn neg_var() {
+            assert_eq!(term!(-1.0, "a").to_string(), "-a");
+        }
 
-        let term = Term {
-            variable: None,
-            coefficient: Constant(-0.0),
-        };
-        assert_eq!(term.to_string(), "0");
+        #[test]
+        fn pos_var() {
+            assert_eq!(term!(1.0, "a").to_string(), "a");
+        }
 
-        let term = Term {
-            variable: Some(Variable::new("a")),
-            coefficient: Constant(-0.0),
-        };
-        assert_eq!(term.to_string(), "");
+        #[test]
+        fn zero_coeff() {
+            assert_eq!(term!(0.0, "test").to_string(), "");
+        }
 
-        let term = Term {
-            variable: None,
-            coefficient: Constant(-5.0),
-        };
-        assert_eq!(term.to_string(), "-5");
+        #[test]
+        fn neg_zero_coeff() {
+            assert_eq!(term!(-0.0, "test").to_string(), "");
+        }
 
-        let term = Term {
-            variable: None,
-            coefficient: Constant(-1.0),
-        };
-        assert_eq!(term.to_string(), "-1");
+        #[test]
+        fn zero() {
+            assert_eq!(term!(0.0).to_string(), "0");
+        }
 
-        let term = Term {
-            variable: None,
-            coefficient: Constant(1.0),
-        };
-        assert_eq!(term.to_string(), "1");
+        #[test]
+        fn neg_zero() {
+            assert_eq!(term!(-0.0).to_string(), "0");
+        }
+
+        #[test]
+        fn neg_const() {
+            assert_eq!(term!(-5.0).to_string(), "-5");
+        }
+
+        #[test]
+        fn neg_one() {
+            assert_eq!(term!(-1.0).to_string(), "-1");
+        }
+
+        #[test]
+        fn one() {
+            assert_eq!(term!(1.0).to_string(), "1");
+        }
     }
 }

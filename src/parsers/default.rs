@@ -474,31 +474,31 @@ fn parse_odds<'a>(
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        parse, parse_constant, parse_constant_expr, parse_linear_polynomial, parse_operation,
-        parse_term, parse_variable, Constant, DefaultParser, Operation, Parser, Rule, Term,
-        Variable, VariableMap,
-    };
+    use pest::Parser;
+
     use crate::{
-        misc::{
-            setup_test_map,
-            tests::parsers::default::{
-                SIMPLE_IF_PROGRAM, SIMPLE_NONDET_PROGRAM, SIMPLE_ODDS_PROGRAM, SIMPLE_PROGRAM,
-                TRIVIAL_IF_PROGRAM, TRIVIAL_NONDET_PROGRAM, TRIVIAL_ODDS_PROGRAM, TRIVIAL_PROGRAM,
-                WHILE_LOGIC_PROGRAM, WHILE_NONDET_PROGRAM, WHILE_PROB_PROGRAM,
+        assignment, guards,
+        misc::tests::parsers::default::{
+            SIMPLE_IF_PROGRAM, SIMPLE_NONDET_PROGRAM, SIMPLE_ODDS_PROGRAM, SIMPLE_PROGRAM,
+            TRIVIAL_IF_PROGRAM, TRIVIAL_NONDET_PROGRAM, TRIVIAL_ODDS_PROGRAM, TRIVIAL_PROGRAM,
+            WHILE_LOGIC_PROGRAM, WHILE_NONDET_PROGRAM, WHILE_PROB_PROGRAM,
+        },
+        mock_invariant, mock_polynomial, mock_relation, mock_varmap,
+        parsers::{
+            default::{
+                parse, parse_assignment, parse_constant, parse_constant_expr, parse_inequality,
+                parse_inequality_system, parse_linear_polynomial, parse_operation, parse_term,
+                parse_variable,
             },
+            grammars::default::{DefaultParser, Rule},
         },
-        parsers::default::{parse_assignment, parse_inequality, parse_inequality_system},
         pts::{
-            guard::Guards,
-            linear_polynomial::LinearPolynomial,
-            location::Locations,
-            relation::{Relation, RelationType},
-            transition::{Assignment, Transition},
-            PTS,
+            linear_polynomial::constant::Constant, location::Locations, variable_map::Variable, PTS,
         },
-        system,
+        system, term, transition,
     };
+
+    use super::Operation;
     use std::iter::zip;
 
     #[test]
@@ -556,40 +556,16 @@ mod tests {
     #[test]
     fn term_sanity() {
         let mut parse = DefaultParser::parse(Rule::term, "5a").unwrap();
-        assert_eq!(
-            parse_term(parse.next().unwrap()),
-            Term {
-                variable: Some(Variable::new("a")),
-                coefficient: Constant(5.0)
-            }
-        );
+        assert_eq!(parse_term(parse.next().unwrap()), term![5.0, "a"]);
         assert!(parse.next().is_none());
         parse = DefaultParser::parse(Rule::term, "a * 5").unwrap();
-        assert_eq!(
-            parse_term(parse.next().unwrap()),
-            Term {
-                variable: Some(Variable::new("a")),
-                coefficient: Constant(5.0)
-            }
-        );
+        assert_eq!(parse_term(parse.next().unwrap()), term![5.0, "a"]);
         assert!(parse.next().is_none());
         parse = DefaultParser::parse(Rule::term, "a").unwrap();
-        assert_eq!(
-            parse_term(parse.next().unwrap()),
-            Term {
-                variable: Some(Variable::new("a")),
-                coefficient: Constant(1.0)
-            }
-        );
+        assert_eq!(parse_term(parse.next().unwrap()), term![1.0, "a"]);
         assert!(parse.next().is_none());
         parse = DefaultParser::parse(Rule::term, "5").unwrap();
-        assert_eq!(
-            parse_term(parse.next().unwrap()),
-            Term {
-                variable: None,
-                coefficient: Constant(5.0)
-            }
-        );
+        assert_eq!(parse_term(parse.next().unwrap()), term![5.0]);
         assert!(parse.next().is_none());
     }
 
@@ -597,56 +573,35 @@ mod tests {
     fn linear_polynomial_sanity() {
         let mut parse =
             DefaultParser::parse(Rule::linear_polynomial, "- a + 5 -(1/2) * b").unwrap();
-        let mut map = VariableMap::default();
+        let mut map = mock_varmap!();
         let pol = parse_linear_polynomial(&mut map, parse.next().unwrap());
         assert!(parse.next().is_none());
-        assert_eq!(
-            &pol,
-            &LinearPolynomial::mock(vec!(Constant(5.0), Constant(-1.0), Constant(-0.5)))
-        );
+        assert_eq!(&pol, &mock_polynomial!(5.0, -1.0, -0.5));
     }
 
     #[test]
     fn assignment_sanity() {
         let mut parse = DefaultParser::parse(Rule::assign_inst, "x = -2a + 4b - 0c - 2").unwrap();
-        let mut map = VariableMap::default();
+        let mut map = mock_varmap!();
         let assign = parse_assignment(&mut map, parse.next().unwrap());
         assert!(parse.next().is_none());
-        assert_eq!(
-            assign,
-            Assignment(
-                Variable::new("x"),
-                LinearPolynomial::mock(vec!(
-                    Constant(-2.0),
-                    Constant(0.0),
-                    Constant(-2.0),
-                    Constant(4.0),
-                    Constant(0.0)
-                ))
-            )
-        );
+        assert_eq!(assign, assignment!("x", -2.0, 0.0, -2.0, 4.0, 0.0));
     }
 
     #[test]
     fn inequality_sanity() {
-        let mut map = VariableMap::default();
+        let mut map = mock_varmap!();
         let mut parse = DefaultParser::parse(Rule::logic_condition, "3a - 4 + b < 0").unwrap();
         let mut pairs = parse.next().unwrap().into_inner();
         assert!(parse.next().is_none());
         let cond = parse_inequality(&mut map, &mut pairs);
         assert!(pairs.next().is_none());
-        assert_eq!(
-            cond,
-            Relation::mock(
-                RelationType::StrictInequality,
-                LinearPolynomial::mock(vec!(Constant(-4.0), Constant(3.0), Constant(1.0)))
-            )
-        );
+        assert_eq!(cond, mock_relation!["<", -4.0, 3.0, 1.0]);
     }
 
     #[test]
     fn inequality_system_sanity() {
-        let mut map = setup_test_map();
+        let mut map = mock_varmap!("a", "b", "c");
         let mut parse = DefaultParser::parse(
             Rule::logic_condition,
             "- 2b - 4 < - a and 0 >= 0 and a >= 0",
@@ -655,44 +610,11 @@ mod tests {
         let system = parse_inequality_system(&mut map, parse.next().unwrap());
         assert!(parse.next().is_none());
         let cond = system.get(0).unwrap();
-        assert_eq!(
-            *cond,
-            Relation::mock(
-                RelationType::StrictInequality,
-                LinearPolynomial::mock(vec!(
-                    Constant(-4.0),
-                    Constant(1.0),
-                    Constant(-2.0),
-                    Constant(0.0)
-                ))
-            )
-        );
+        assert_eq!(*cond, mock_relation!("<", -4.0, 1.0, -2.0, 0.0));
         let cond = system.get(1).unwrap();
-        assert_eq!(
-            *cond,
-            Relation::mock(
-                RelationType::NonstrictInequality,
-                LinearPolynomial::mock(vec!(
-                    Constant(0.0),
-                    Constant(0.0),
-                    Constant(0.0),
-                    Constant(0.0)
-                ))
-            )
-        );
+        assert_eq!(*cond, mock_relation!(">=", 0.0, 0.0, 0.0, 0.0));
         let cond = system.get(2).unwrap();
-        assert_eq!(
-            *cond,
-            Relation::mock(
-                RelationType::NonstrictInequality,
-                LinearPolynomial::mock(vec!(
-                    Constant(0.0),
-                    Constant(-1.0),
-                    Constant(0.0),
-                    Constant(0.0)
-                ))
-            )
-        );
+        assert_eq!(*cond, mock_relation!(">=", 0.0, -1.0, 0.0, 0.0));
         assert!(system.get(3).is_none());
     }
 
@@ -707,36 +629,18 @@ mod tests {
 
         // line #
         // 1
-        locations.set_invariant(
-            handle,
-            system!(Relation::mock(
-                RelationType::StrictInequality,
-                LinearPolynomial::mock(vec![Constant(-1.0)])
-            )),
-        );
+        locations.set_invariant(handle, mock_invariant!(">", -1.0));
         // 2
         locations
-            .set_outgoing(
-                handle,
-                Guards::Unguarded(Box::new(Transition {
-                    assignments: vec![Assignment(
-                        Variable::new("a"),
-                        LinearPolynomial::mock(vec![Constant(1.0), Constant(0.0)]),
-                    )],
-                    target: locations.get_terminating_location(),
-                })),
-            )
+            .set_outgoing(handle, guards!(transition![None; "a", 1.0, 0.0]))
             .unwrap();
         // 3
         locations.set_invariant(
             locations.get_terminating_location(),
-            system!(Relation::mock(
-                RelationType::StrictInequality,
-                LinearPolynomial::mock(vec![Constant(1.0), Constant(0.0)])
-            )),
+            mock_invariant!("<", 1.0, 0.0),
         );
 
-        let variables = VariableMap::mock(vec![Variable::new("a")]);
+        let variables = mock_varmap!("a");
 
         assert_eq!(
             parsed,
@@ -760,40 +664,22 @@ mod tests {
 
         // line #
         // 1
-        locations.set_invariant(
-            handle,
-            system!(Relation::mock(
-                RelationType::StrictInequality,
-                LinearPolynomial::mock(vec![Constant(0.0), Constant(-1.0)])
-            )),
-        );
+        locations.set_invariant(handle, mock_invariant!(">", 0.0, -1.0));
         // 2
         let next_location = locations_iter.next().unwrap();
         locations
             .set_outgoing(
                 handle,
-                Guards::Unguarded(Box::new(Transition {
-                    assignments: vec![Assignment(
-                        Variable::new("b"),
-                        LinearPolynomial::mock(vec![Constant(1.0), Constant(0.0), Constant(0.0)]),
-                    )],
-                    target: next_location,
-                })),
+                guards!(transition!(next_location; "b", 1.0, 0.0, 0.0)),
             )
             .unwrap();
         // 3
         let handle = next_location;
         locations.set_invariant(
             handle,
-            system!(
-                Relation::mock(
-                    RelationType::NonstrictInequality,
-                    LinearPolynomial::mock(vec![Constant(1.0), Constant(0.0), Constant(-1.0)])
-                ),
-                Relation::mock(
-                    RelationType::StrictInequality,
-                    LinearPolynomial::mock(vec![Constant(0.0), Constant(-1.0), Constant(0.0)]),
-                )
+            mock_invariant!(
+                ">=", 1.0, 0.0, -1.0;
+                ">", 0.0, -1.0, 0.0
             ),
         );
 
@@ -802,18 +688,7 @@ mod tests {
         locations
             .set_outgoing(
                 handle,
-                Guards::Unguarded(Box::new(Transition {
-                    assignments: vec![Assignment(
-                        Variable::new("c"),
-                        LinearPolynomial::mock(vec![
-                            Constant(0.0),
-                            Constant(1.0),
-                            Constant(1.0),
-                            Constant(0.0),
-                        ]),
-                    )],
-                    target: next_location,
-                })),
+                guards!(transition!(next_location; "c", 0.0, 1.0, 1.0, 0.0)),
             )
             .unwrap();
 
@@ -821,34 +696,10 @@ mod tests {
         let handle = next_location;
         locations.set_invariant(
             handle,
-            system!(
-                Relation::mock(
-                    RelationType::NonstrictInequality,
-                    LinearPolynomial::mock(vec![
-                        Constant(1.0),
-                        Constant(0.0),
-                        Constant(-1.0),
-                        Constant(0.0),
-                    ]),
-                ),
-                Relation::mock(
-                    RelationType::StrictInequality,
-                    LinearPolynomial::mock(vec![
-                        Constant(0.0),
-                        Constant(-1.0),
-                        Constant(0.0),
-                        Constant(0.0),
-                    ]),
-                ),
-                Relation::mock(
-                    RelationType::StrictInequality,
-                    LinearPolynomial::mock(vec![
-                        Constant(1.0),
-                        Constant(0.0),
-                        Constant(0.0),
-                        Constant(-1.0),
-                    ]),
-                )
+            mock_invariant!(
+                ">=", 1.0, 0.0, -1.0, 0.0;
+                ">", 0.0, -1.0, 0.0, 0.0;
+                ">", 1.0, 0.0, 0.0, -1.0
             ),
         );
         // 6
@@ -856,61 +707,21 @@ mod tests {
         locations
             .set_outgoing(
                 handle,
-                Guards::Unguarded(Box::new(Transition {
-                    assignments: vec![Assignment(
-                        Variable::new("b"),
-                        LinearPolynomial::mock(vec![
-                            Constant(0.0),
-                            Constant(2.0),
-                            Constant(0.0),
-                            Constant(1.0),
-                        ]),
-                    )],
-                    target: next_location,
-                })),
+                guards!(transition!(next_location; "b", 0.0, 2.0, 0.0, 1.0)),
             )
             .unwrap();
         // 7
         let handle = next_location;
         locations.set_invariant(
             handle,
-            system!(
-                Relation::mock(
-                    RelationType::StrictInequality,
-                    LinearPolynomial::mock(vec![
-                        Constant(1.0),
-                        Constant(0.0),
-                        Constant(-1.0),
-                        Constant(0.0),
-                    ]),
-                ),
-                Relation::mock(
-                    RelationType::StrictInequality,
-                    LinearPolynomial::mock(vec![
-                        Constant(0.0),
-                        Constant(-1.0),
-                        Constant(0.0),
-                        Constant(0.0),
-                    ]),
-                ),
-                Relation::mock(
-                    RelationType::StrictInequality,
-                    LinearPolynomial::mock(vec![
-                        Constant(1.0),
-                        Constant(0.0),
-                        Constant(0.0),
-                        Constant(-1.0),
-                    ]),
-                )
+            mock_invariant!(
+                ">", 1.0, 0.0, -1.0, 0.0;
+                ">", 0.0, -1.0, 0.0, 0.0;
+                ">", 1.0, 0.0, 0.0, -1.0
             ),
         );
 
-        let variables = VariableMap::mock(vec![
-            Variable::new("a"),
-            Variable::new("b"),
-            Variable::new("c"),
-        ]);
-
+        let variables = mock_varmap!("a", "b", "c");
         assert_eq!(
             parsed,
             PTS {
@@ -933,232 +744,82 @@ mod tests {
 
         // line #
         // 1
-        locations.set_invariant(
-            start,
-            system!(Relation::mock(
-                RelationType::StrictInequality,
-                LinearPolynomial::mock(vec![Constant(0.0)])
-            )),
-        );
+        locations.set_invariant(start, mock_invariant!("<", 0.0));
         let junction = locations_iter.next().unwrap();
-        let br_1 = locations_iter.next().unwrap();
-        let br_2 = locations_iter.next().unwrap();
-        let br_3 = locations_iter.next().unwrap();
+        let branch_1 = locations_iter.next().unwrap();
+        let branch_2 = locations_iter.next().unwrap();
+        let branch_3 = locations_iter.next().unwrap();
         locations
             .set_outgoing(
                 start,
-                Guards::Logic(vec![
-                    (
-                        // 2
-                        system!(Relation::mock(
-                            RelationType::NonstrictInequality,
-                            LinearPolynomial::mock(vec![
-                                Constant(0.0),
-                                Constant(-1.0),
-                                Constant(1.0),
-                            ]),
-                        )),
-                        Transition {
-                            assignments: vec![],
-                            target: br_1,
-                        },
+                guards!(L:
+                    // 2
+                    system!(mock_relation!(">=", 0.0, -1.0, 1.0)),
+                    transition!(branch_1),
+                    // 6
+                    system!(mock_relation!(
+                        "<", 0.0, 1.0, -1.0),
+                        mock_relation!("<=", 0.0, 0.0, 1.0, -1.0)
                     ),
-                    (
-                        // 6
-                        system!(
-                            Relation::mock(
-                                RelationType::StrictInequality,
-                                LinearPolynomial::mock(vec![
-                                    Constant(0.0),
-                                    Constant(1.0),
-                                    Constant(-1.0),
-                                ]),
-                            ),
-                            Relation::mock(
-                                RelationType::NonstrictInequality,
-                                LinearPolynomial::mock(vec![
-                                    Constant(0.0),
-                                    Constant(0.0),
-                                    Constant(1.0),
-                                    Constant(-1.0),
-                                ]),
-                            )
-                        ),
-                        Transition {
-                            assignments: vec![],
-                            target: br_2,
-                        },
+                    transition!(branch_2),
+                    // 10
+                    system!(mock_relation!(
+                        "<", 0.0, 1.0, -1.0),
+                        mock_relation!(">", 0.0, 0.0, -1.0, 1.0)
                     ),
-                    (
-                        // 10
-                        system!(
-                            Relation::mock(
-                                RelationType::StrictInequality,
-                                LinearPolynomial::mock(vec![
-                                    Constant(0.0),
-                                    Constant(1.0),
-                                    Constant(-1.0),
-                                ]),
-                            ),
-                            Relation::mock(
-                                RelationType::StrictInequality,
-                                LinearPolynomial::mock(vec![
-                                    Constant(0.0),
-                                    Constant(0.0),
-                                    Constant(-1.0),
-                                    Constant(1.0),
-                                ]),
-                            )
-                        ),
-                        Transition {
-                            assignments: vec![],
-                            target: br_3,
-                        },
-                    ),
-                ]),
+                    transition!(branch_3),
+                ),
             )
             .unwrap();
 
         // 3
-        locations.set_invariant(
-            br_1,
-            system!(Relation::mock(
-                RelationType::StrictInequality,
-                LinearPolynomial::mock(vec![Constant(0.0), Constant(0.0), Constant(0.0)]),
-            )),
-        );
+        locations.set_invariant(branch_1, mock_invariant!(">", 0.0, 0.0, 0.0));
 
         // 4
         locations
-            .set_outgoing(
-                br_1,
-                Guards::Unguarded(Box::new(Transition {
-                    assignments: vec![Assignment(
-                        Variable::new("a"),
-                        LinearPolynomial::mock(vec![Constant(0.0), Constant(1.0), Constant(0.0)]),
-                    )],
-                    target: junction,
-                })),
-            )
+            .set_outgoing(branch_1, guards!(transition!(junction; "a", 0.0, 1.0, 0.0)))
             .unwrap();
+
         // 7
-        locations.set_invariant(
-            br_2,
-            system!(Relation::mock(
-                RelationType::StrictInequality,
-                LinearPolynomial::mock(vec![
-                    Constant(0.0),
-                    Constant(0.0),
-                    Constant(0.0),
-                    Constant(0.0),
-                ]),
-            )),
-        );
+        locations.set_invariant(branch_2, mock_invariant!("<", 0.0, 0.0, 0.0, 0.0));
 
         // 8
         locations
             .set_outgoing(
-                br_2,
-                Guards::Unguarded(Box::new(Transition {
-                    assignments: vec![Assignment(
-                        Variable::new("a"),
-                        LinearPolynomial::mock(vec![
-                            Constant(0.0),
-                            Constant(1.0),
-                            Constant(0.0),
-                            Constant(0.0),
-                        ]),
-                    )],
-                    target: junction,
-                })),
+                branch_2,
+                guards!(transition!(junction; "a", 0.0, 1.0, 0.0, 0.0)),
             )
             .unwrap();
 
         // 11
-        locations.set_invariant(
-            br_3,
-            system!(Relation::mock(
-                RelationType::StrictInequality,
-                LinearPolynomial::mock(vec![
-                    Constant(0.0),
-                    Constant(0.0),
-                    Constant(0.0),
-                    Constant(0.0),
-                ]),
-            )),
-        );
+        locations.set_invariant(branch_3, mock_invariant!(">", 0.0, 0.0, 0.0, 0.0));
 
         // 12
         locations
             .set_outgoing(
-                br_3,
-                Guards::Unguarded(Box::new(Transition {
-                    assignments: vec![Assignment(
-                        Variable::new("a"),
-                        LinearPolynomial::mock(vec![
-                            Constant(0.0),
-                            Constant(1.0),
-                            Constant(0.0),
-                            Constant(0.0),
-                        ]),
-                    )],
-                    target: junction,
-                })),
+                branch_3,
+                guards!(transition!(junction; "a", 0.0, 1.0, 0.0, 0.0)),
             )
             .unwrap();
 
         // 14
-        locations.set_invariant(
-            junction,
-            system!(Relation::mock(
-                RelationType::StrictInequality,
-                LinearPolynomial::mock(vec![
-                    Constant(0.0),
-                    Constant(0.0),
-                    Constant(0.0),
-                    Constant(0.0),
-                ]),
-            )),
-        );
+        locations.set_invariant(junction, mock_invariant!(">", 0.0, 0.0, 0.0, 0.0));
 
         // 15
         locations
             .set_outgoing(
                 junction,
-                Guards::Unguarded(Box::new(Transition {
-                    assignments: vec![Assignment(
-                        Variable::new("a"),
-                        LinearPolynomial::mock(vec![
-                            Constant(0.0),
-                            Constant(1.0),
-                            Constant(0.0),
-                            Constant(0.0),
-                        ]),
-                    )],
-                    target: locations.get_terminating_location(),
-                })),
+                guards!(transition!(locations.get_terminating_location(); "a", 0.0, 1.0, 0.0, 0.0)),
             )
             .unwrap();
 
         // 16
         locations.set_invariant(
             locations.get_terminating_location(),
-            system!(Relation::mock(
-                RelationType::StrictInequality,
-                LinearPolynomial::mock(vec![
-                    Constant(0.0),
-                    Constant(0.0),
-                    Constant(0.0),
-                    Constant(0.0),
-                ]),
-            )),
+            mock_invariant!("<", 0.0, 0.0, 0.0, 0.0),
         );
 
-        let variables = VariableMap::mock(vec![
-            Variable::new("a"),
-            Variable::new("b"),
-            Variable::new("c"),
-        ]);
+        let variables = mock_varmap!("a", "b", "c",);
 
         assert_eq!(
             parsed,
@@ -1182,109 +843,53 @@ mod tests {
 
         // line #
         // 1
-        locations.set_invariant(
-            start,
-            system!(Relation::mock(
-                RelationType::StrictInequality,
-                LinearPolynomial::mock(vec![Constant(0.0)]),
-            )),
-        );
+        locations.set_invariant(start, mock_invariant!("<", 0.0));
         let junction = locations_iter.next().unwrap();
-        let br_1 = locations_iter.next().unwrap();
+        let branch_1 = locations_iter.next().unwrap();
         locations
             .set_outgoing(
                 start,
-                Guards::Logic(vec![
-                    (
-                        // 2
-                        system!(Relation::mock(
-                            RelationType::NonstrictInequality,
-                            LinearPolynomial::mock(vec![
-                                Constant(0.0),
-                                Constant(-1.0),
-                                Constant(1.0),
-                            ]),
-                        )),
-                        Transition {
-                            assignments: vec![],
-                            target: br_1,
-                        },
-                    ),
-                    (
-                        // 5
-                        system!(Relation::mock(
-                            RelationType::StrictInequality,
-                            LinearPolynomial::mock(vec![
-                                Constant(0.0),
-                                Constant(1.0),
-                                Constant(-1.0),
-                            ]),
-                        )),
-                        Transition {
-                            assignments: vec![],
-                            target: junction,
-                        },
-                    ),
-                ]),
+                guards!(L:
+                    // 2
+                    system!(mock_relation!(">=", 0.0, -1.0, 1.0)),
+                    transition!(branch_1),
+
+                    // 5
+                    system!(mock_relation!("<", 0.0, 1.0, -1.0))
+                    ,
+                    transition!(junction)
+                ),
             )
             .unwrap();
 
         // 3
-        locations.set_invariant(
-            br_1,
-            system!(Relation::mock(
-                RelationType::StrictInequality,
-                LinearPolynomial::mock(vec![Constant(0.0), Constant(0.0), Constant(0.0)]),
-            )),
-        );
+        locations.set_invariant(branch_1, mock_invariant!(">", 0.0, 0.0, 0.0));
 
         // 4
         locations
-            .set_outgoing(
-                br_1,
-                Guards::Unguarded(Box::new(Transition {
-                    assignments: vec![Assignment(
-                        Variable::new("a"),
-                        LinearPolynomial::mock(vec![Constant(0.0), Constant(1.0), Constant(0.0)]),
-                    )],
-                    target: junction,
-                })),
-            )
+            .set_outgoing(branch_1, guards!(transition!(junction; "a", 0.0, 1.0, 0.0)))
             .unwrap();
 
         // 6
-        locations.set_invariant(
-            junction,
-            system!(Relation::mock(
-                RelationType::StrictInequality,
-                LinearPolynomial::mock(vec![Constant(0.0), Constant(0.0), Constant(0.0)]),
-            )),
-        );
+        locations.set_invariant(junction, mock_invariant!(">", 0.0, 0.0, 0.0));
 
         // 7
         locations
             .set_outgoing(
                 junction,
-                Guards::Unguarded(Box::new(Transition {
-                    assignments: vec![Assignment(
-                        Variable::new("a"),
-                        LinearPolynomial::mock(vec![Constant(0.0), Constant(1.0), Constant(0.0)]),
-                    )],
-                    target: locations.get_terminating_location(),
-                })),
+                guards!(transition!(
+                    locations.get_terminating_location();
+                    "a", 0.0, 1.0, 0.0)),
             )
             .unwrap();
 
         // 8
         locations.set_invariant(
             locations.get_terminating_location(),
-            system!(Relation::mock(
-                RelationType::StrictInequality,
-                LinearPolynomial::mock(vec![Constant(0.0), Constant(0.0), Constant(0.0)]),
-            )),
+            mock_invariant!("<", 0.0, 0.0, 0.0),
         );
 
-        let variables = VariableMap::mock(vec![Variable::new("a"), Variable::new("b")]);
+        let variables = mock_varmap!("a", "b");
 
         assert_eq!(
             parsed,
@@ -1308,127 +913,61 @@ mod tests {
 
         // line #
         // 1
-        locations.set_invariant(
-            start,
-            system!(Relation::mock(
-                RelationType::StrictInequality,
-                LinearPolynomial::mock(vec![Constant(0.0)]),
-            )),
-        );
+        locations.set_invariant(start, mock_invariant!("<", 0.0));
         let junction = locations_iter.next().unwrap();
-        let br_1 = locations_iter.next().unwrap();
-        let br_2 = locations_iter.next().unwrap();
+        let branch_1 = locations_iter.next().unwrap();
+        let branch_2 = locations_iter.next().unwrap();
         locations
             .set_outgoing(
                 start,
-                Guards::Probabilistic(vec![
-                    (
-                        // 2
-                        Constant(0.0),
-                        Transition {
-                            assignments: vec![],
-                            target: br_1,
-                        },
-                    ),
-                    (
-                        // 6
-                        Constant(1.0),
-                        Transition {
-                            assignments: vec![],
-                            target: br_2,
-                        },
-                    ),
-                    (
-                        // 9
-                        Constant(0.0),
-                        Transition {
-                            assignments: vec![],
-                            target: junction,
-                        },
-                    ),
-                ]),
+                guards!(P:
+                    // 2
+                    0.0,
+                    transition!(branch_1),
+                    // 5
+                    1.0,
+                    transition!(branch_2),
+                    // 9
+                    0.0,
+                    transition!(junction),
+                ),
             )
             .unwrap();
 
         // 3
-        locations.set_invariant(
-            br_1,
-            system!(Relation::mock(
-                RelationType::StrictInequality,
-                LinearPolynomial::mock(vec![Constant(0.0), Constant(0.0)]),
-            )),
-        );
+        locations.set_invariant(branch_1, mock_invariant!("<", 0.0, 0.0));
 
         // 4
         locations
-            .set_outgoing(
-                br_1,
-                Guards::Unguarded(Box::new(Transition {
-                    assignments: vec![Assignment(
-                        Variable::new("a"),
-                        LinearPolynomial::mock(vec![Constant(0.0), Constant(1.0)]),
-                    )],
-                    target: junction,
-                })),
-            )
+            .set_outgoing(branch_1, guards!(transition!(junction; "a", 0.0, 1.0)))
             .unwrap();
 
         // 7
-        locations.set_invariant(
-            br_2,
-            system!(Relation::mock(
-                RelationType::NonstrictInequality,
-                LinearPolynomial::mock(vec![Constant(0.0), Constant(1.0), Constant(-1.0)]),
-            )),
-        );
+        locations.set_invariant(branch_2, mock_invariant!(">=", 0.0, 1.0, -1.0));
 
         // 8
         locations
-            .set_outgoing(
-                br_2,
-                Guards::Unguarded(Box::new(Transition {
-                    assignments: vec![Assignment(
-                        Variable::new("b"),
-                        LinearPolynomial::mock(vec![Constant(0.0), Constant(1.0), Constant(0.0)]),
-                    )],
-                    target: junction,
-                })),
-            )
+            .set_outgoing(branch_2, guards!(transition!(junction; "b", 0.0, 1.0, 0.0)))
             .unwrap();
 
         // 10
-        locations.set_invariant(
-            junction,
-            system!(Relation::mock(
-                RelationType::StrictInequality,
-                LinearPolynomial::mock(vec![Constant(0.0), Constant(0.0), Constant(0.0)]),
-            )),
-        );
+        locations.set_invariant(junction, mock_invariant!("<", 0.0, 0.0, 0.0));
 
         // 11
         locations
             .set_outgoing(
                 junction,
-                Guards::Unguarded(Box::new(Transition {
-                    assignments: vec![Assignment(
-                        Variable::new("a"),
-                        LinearPolynomial::mock(vec![Constant(0.0), Constant(1.0), Constant(0.0)]),
-                    )],
-                    target: locations.get_terminating_location(),
-                })),
+                guards!(transition!(locations.get_terminating_location();"a", 0.0, 1.0, 0.0)),
             )
             .unwrap();
 
         // 12
         locations.set_invariant(
             locations.get_terminating_location(),
-            system!(Relation::mock(
-                RelationType::StrictInequality,
-                LinearPolynomial::mock(vec![Constant(0.0), Constant(0.0), Constant(0.0)]),
-            )),
+            mock_invariant!("<", 0.0, 0.0, 0.0),
         );
 
-        let variables = VariableMap::mock(vec![Variable::new("a"), Variable::new("b")]);
+        let variables = mock_varmap!("a", "b");
 
         assert_eq!(
             parsed,
@@ -1452,95 +991,54 @@ mod tests {
 
         // line #
         // 1
-        locations.set_invariant(
-            start,
-            system!(Relation::mock(
-                RelationType::StrictInequality,
-                LinearPolynomial::mock(vec![Constant(0.0)]),
-            )),
-        );
+        locations.set_invariant(start, mock_invariant!("<", 0.0));
         let junction = locations_iter.next().unwrap();
-        let br_1 = locations_iter.next().unwrap();
+        let branch_1 = locations_iter.next().unwrap();
         locations
             .set_outgoing(
                 start,
-                Guards::Probabilistic(vec![
-                    (
-                        // 2
-                        Constant(0.5),
-                        Transition {
-                            assignments: vec![],
-                            target: br_1,
-                        },
-                    ),
-                    (
-                        // 9
-                        Constant(0.5),
-                        Transition {
-                            assignments: vec![],
-                            target: junction,
-                        },
-                    ),
-                ]),
+                guards!(P:
+                    // 2
+                    0.5,
+                    transition!(branch_1),
+                    // 9
+                    0.5,
+                    transition!(junction)
+                ),
             )
             .unwrap();
 
         // 3
-        locations.set_invariant(
-            br_1,
-            system!(Relation::mock(
-                RelationType::StrictInequality,
-                LinearPolynomial::mock(vec![Constant(0.0), Constant(0.0)]),
-            )),
-        );
+        locations.set_invariant(branch_1, mock_invariant!("<", 0.0, 0.0));
 
         // 4
         locations
-            .set_outgoing(
-                br_1,
-                Guards::Unguarded(Box::new(Transition {
-                    assignments: vec![Assignment(
-                        Variable::new("a"),
-                        LinearPolynomial::mock(vec![Constant(0.0), Constant(1.0)]),
-                    )],
-                    target: junction,
-                })),
-            )
+            .set_outgoing(branch_1, guards!(transition!(junction; "a", 0.0, 1.0)))
             .unwrap();
 
         // 6
-        locations.set_invariant(
-            junction,
-            system!(Relation::mock(
-                RelationType::StrictInequality,
-                LinearPolynomial::mock(vec![Constant(0.0), Constant(0.0)]),
-            )),
-        );
+        locations.set_invariant(junction, mock_invariant!(">", 0.0, 0.0));
 
         // 7
         locations
             .set_outgoing(
                 junction,
-                Guards::Unguarded(Box::new(Transition {
-                    assignments: vec![Assignment(
-                        Variable::new("a"),
-                        LinearPolynomial::mock(vec![Constant(0.0), Constant(1.0)]),
-                    )],
-                    target: locations.get_terminating_location(),
-                })),
+                guards!(transition!(
+                    locations.get_terminating_location();
+                    "a",
+                    0.0,
+                    1.0
+                )),
             )
             .unwrap();
 
         // 8
         locations.set_invariant(
             locations.get_terminating_location(),
-            system!(Relation::mock(
-                RelationType::StrictInequality,
-                LinearPolynomial::mock(vec![Constant(0.0), Constant(0.0)]),
-            )),
+            mock_invariant!("<", 0.0, 0.0),
         );
 
-        let variables = VariableMap::mock(vec![Variable::new("a")]);
+        let variables = mock_varmap!("a");
 
         assert_eq!(
             parsed,
@@ -1564,142 +1062,68 @@ mod tests {
 
         // line #
         // 1
-        locations.set_invariant(
-            start,
-            system!(Relation::mock(
-                RelationType::StrictInequality,
-                LinearPolynomial::mock(vec![Constant(0.0)]),
-            )),
-        );
+        locations.set_invariant(start, mock_invariant!("<", 0.0));
         let junction = locations_iter.next().unwrap();
-        let br_1 = locations_iter.next().unwrap();
-        let br_2 = locations_iter.next().unwrap();
-        let br_3 = locations_iter.next().unwrap();
+        let branch_1 = locations_iter.next().unwrap();
+        let branch_2 = locations_iter.next().unwrap();
+        let branch_3 = locations_iter.next().unwrap();
         locations
             .set_outgoing(
                 start,
-                Guards::Nondeterministic(vec![
+                guards!(
                     // 2
-                    Transition {
-                        assignments: vec![],
-                        target: br_1,
-                    },
-                    //6
-                    Transition {
-                        assignments: vec![],
-                        target: br_2,
-                    },
-                    //10
-                    Transition {
-                        assignments: vec![],
-                        target: br_3,
-                    },
-                ]),
+                    transition!(branch_1),
+                    // 6
+                    transition!(branch_2),
+                    // 10
+                    transition!(branch_3)
+                ),
             )
             .unwrap();
 
         // 3
-        locations.set_invariant(
-            br_1,
-            system!(Relation::mock(
-                RelationType::StrictInequality,
-                LinearPolynomial::mock(vec![Constant(0.0), Constant(0.0)]),
-            )),
-        );
+        locations.set_invariant(branch_1, mock_invariant!(">", 0.0, 0.0));
 
         // 4
         locations
-            .set_outgoing(
-                br_1,
-                Guards::Unguarded(Box::new(Transition {
-                    assignments: vec![Assignment(
-                        Variable::new("a"),
-                        LinearPolynomial::mock(vec![Constant(0.0), Constant(1.0)]),
-                    )],
-                    target: junction,
-                })),
-            )
+            .set_outgoing(branch_1, guards!(transition!(junction; "a", 0.0, 1.0)))
             .unwrap();
 
         // 7
-        locations.set_invariant(
-            br_2,
-            system!(Relation::mock(
-                RelationType::StrictInequality,
-                LinearPolynomial::mock(vec![Constant(0.0), Constant(0.0)]),
-            )),
-        );
+        locations.set_invariant(branch_2, mock_invariant!(">", 0.0, 0.0));
 
         // 8
         locations
-            .set_outgoing(
-                br_2,
-                Guards::Unguarded(Box::new(Transition {
-                    assignments: vec![Assignment(
-                        Variable::new("a"),
-                        LinearPolynomial::mock(vec![Constant(0.0), Constant(1.0)]),
-                    )],
-                    target: junction,
-                })),
-            )
+            .set_outgoing(branch_2, guards!(transition!(junction; "a", 0.0, 1.0)))
             .unwrap();
 
         // 11
-        locations.set_invariant(
-            br_3,
-            system!(Relation::mock(
-                RelationType::StrictInequality,
-                LinearPolynomial::mock(vec![Constant(0.0), Constant(0.0)]),
-            )),
-        );
+        locations.set_invariant(branch_3, mock_invariant!(">", 0.0, 0.0));
 
         // 12
         locations
-            .set_outgoing(
-                br_3,
-                Guards::Unguarded(Box::new(Transition {
-                    assignments: vec![Assignment(
-                        Variable::new("a"),
-                        LinearPolynomial::mock(vec![Constant(0.0), Constant(1.0)]),
-                    )],
-                    target: junction,
-                })),
-            )
+            .set_outgoing(branch_3, guards!(transition!(junction; "a", 0.0, 1.0)))
             .unwrap();
 
         // 14
-        locations.set_invariant(
-            junction,
-            system!(Relation::mock(
-                RelationType::StrictInequality,
-                LinearPolynomial::mock(vec![Constant(0.0), Constant(0.0)]),
-            )),
-        );
+        locations.set_invariant(junction, mock_invariant!("<", 0.0, 0.0));
 
         // 15
         locations
             .set_outgoing(
                 junction,
-                Guards::Unguarded(Box::new(Transition {
-                    assignments: vec![Assignment(
-                        Variable::new("a"),
-                        LinearPolynomial::mock(vec![Constant(0.0), Constant(1.0)]),
-                    )],
-                    target: locations.get_terminating_location(),
-                })),
+                guards!(transition!(locations.get_terminating_location();
+                    "a", 0.0, 1.0)),
             )
             .unwrap();
 
         // 16
         locations.set_invariant(
             locations.get_terminating_location(),
-            system!(Relation::mock(
-                RelationType::StrictInequality,
-                LinearPolynomial::mock(vec![Constant(0.0), Constant(0.0)]),
-            )),
+            mock_invariant!("<", 0.0, 0.0),
         );
 
-        let variables = VariableMap::mock(vec![Variable::new("a")]);
+        let variables = mock_varmap!("a");
 
         assert_eq!(
             parsed,
@@ -1723,88 +1147,50 @@ mod tests {
 
         // line #
         // 1
-        locations.set_invariant(
-            start,
-            system!(Relation::mock(
-                RelationType::StrictInequality,
-                LinearPolynomial::mock(vec![Constant(0.0)]),
-            )),
-        );
+        locations.set_invariant(start, mock_invariant!("<", 0.0));
+
         let junction = locations_iter.next().unwrap();
-        let br_1 = locations_iter.next().unwrap();
+        let branch_1 = locations_iter.next().unwrap();
         locations
             .set_outgoing(
                 start,
-                Guards::Nondeterministic(vec![
+                guards!(
                     // 2
-                    Transition {
-                        assignments: vec![],
-                        target: br_1,
-                    },
-                    //5
-                    Transition {
-                        assignments: vec![],
-                        target: junction,
-                    },
-                ]),
+                    transition!(branch_1),
+                    // 5
+                    transition!(junction),
+                ),
             )
             .unwrap();
 
         // 3
-        locations.set_invariant(
-            br_1,
-            system!(Relation::mock(
-                RelationType::StrictInequality,
-                LinearPolynomial::mock(vec![Constant(0.0), Constant(0.0)]),
-            )),
-        );
+        locations.set_invariant(branch_1, mock_invariant!(">", 0.0, 0.0));
 
         // 4
         locations
-            .set_outgoing(
-                br_1,
-                Guards::Unguarded(Box::new(Transition {
-                    assignments: vec![Assignment(
-                        Variable::new("a"),
-                        LinearPolynomial::mock(vec![Constant(0.0), Constant(1.0)]),
-                    )],
-                    target: junction,
-                })),
-            )
+            .set_outgoing(branch_1, guards!(transition!(junction; "a", 0.0, 1.0)))
             .unwrap();
         // 6
-        locations.set_invariant(
-            junction,
-            system!(Relation::mock(
-                RelationType::StrictInequality,
-                LinearPolynomial::mock(vec![Constant(0.0), Constant(0.0)]),
-            )),
-        );
+        locations.set_invariant(junction, mock_invariant!(">", 0.0, 0.0));
 
         // 7
         locations
             .set_outgoing(
                 junction,
-                Guards::Unguarded(Box::new(Transition {
-                    assignments: vec![Assignment(
-                        Variable::new("a"),
-                        LinearPolynomial::mock(vec![Constant(0.0), Constant(1.0)]),
-                    )],
-                    target: locations.get_terminating_location(),
-                })),
+                guards!(transition!(
+                    locations.get_terminating_location();
+                    "a", 0.0, 1.0
+                )),
             )
             .unwrap();
 
         // 8
         locations.set_invariant(
             locations.get_terminating_location(),
-            system!(Relation::mock(
-                RelationType::StrictInequality,
-                LinearPolynomial::mock(vec![Constant(0.0), Constant(0.0)]),
-            )),
+            mock_invariant!("<", 0.0, 0.0),
         );
 
-        let variables = VariableMap::mock(vec![Variable::new("a")]);
+        let variables = mock_varmap!("a");
 
         assert_eq!(
             parsed,
@@ -1828,112 +1214,50 @@ mod tests {
 
         // line #
         // 1
-        locations.set_invariant(
-            start,
-            system!(Relation::mock(
-                RelationType::StrictInequality,
-                LinearPolynomial::mock(vec![Constant(0.0)]),
-            )),
-        );
+        locations.set_invariant(start, mock_invariant!("<", 0.0));
         let junction = locations_iter.next().unwrap();
-        let br_1 = locations_iter.next().unwrap();
+        let branch_1 = locations_iter.next().unwrap();
         locations
             .set_outgoing(
                 start,
-                Guards::Logic(vec![
+                guards!(L:
                     // 2
-                    (
-                        system!(
-                            Relation::mock(
-                                RelationType::StrictInequality,
-                                LinearPolynomial::mock(vec![Constant(0.0), Constant(0.0)]),
-                            ),
-                            Relation::mock(
-                                RelationType::StrictInequality,
-                                LinearPolynomial::mock(vec![Constant(0.0), Constant(0.0)]),
-                            )
-                        ),
-                        Transition {
-                            assignments: vec![],
-                            target: br_1,
-                        },
-                    ),
-                    //5
-                    (
-                        system!(
-                            Relation::mock(
-                                RelationType::NonstrictInequality,
-                                LinearPolynomial::mock(vec![Constant(0.0), Constant(0.0)]),
-                            ),
-                            Relation::mock(
-                                RelationType::NonstrictInequality,
-                                LinearPolynomial::mock(vec![Constant(0.0), Constant(0.0)]),
-                            )
-                        ),
-                        Transition {
-                            assignments: vec![],
-                            target: junction,
-                        },
-                    ),
-                ]),
+                    mock_invariant!(">", 0.0, 0.0; "<", 0.0, 0.0),
+                    transition!(branch_1),
+                    // 5
+                    mock_invariant!("<=", 0.0, 0.0; ">=", 0.0, 0.0),
+                    transition!(junction),
+                ),
             )
             .unwrap();
 
         // 3
-        locations.set_invariant(
-            br_1,
-            system!(Relation::mock(
-                RelationType::StrictInequality,
-                LinearPolynomial::mock(vec![Constant(0.0), Constant(0.0)]),
-            )),
-        );
+        locations.set_invariant(branch_1, mock_invariant!(">", 0.0, 0.0));
 
         // 4
         locations
-            .set_outgoing(
-                br_1,
-                Guards::Unguarded(Box::new(Transition {
-                    assignments: vec![Assignment(
-                        Variable::new("a"),
-                        LinearPolynomial::mock(vec![Constant(0.0), Constant(0.0), Constant(1.0)]),
-                    )],
-                    target: start,
-                })),
-            )
+            .set_outgoing(branch_1, guards!(transition!(start; "a", 0.0, 0.0, 1.0)))
             .unwrap();
         // 6
-        locations.set_invariant(
-            junction,
-            system!(Relation::mock(
-                RelationType::StrictInequality,
-                LinearPolynomial::mock(vec![Constant(0.0), Constant(0.0), Constant(0.0)]),
-            )),
-        );
+        locations.set_invariant(junction, mock_invariant!(">", 0.0, 0.0, 0.0));
 
         // 7
         locations
             .set_outgoing(
                 junction,
-                Guards::Unguarded(Box::new(Transition {
-                    assignments: vec![Assignment(
-                        Variable::new("a"),
-                        LinearPolynomial::mock(vec![Constant(0.0), Constant(0.0), Constant(1.0)]),
-                    )],
-                    target: locations.get_terminating_location(),
-                })),
+                guards!(transition!(locations.get_terminating_location();
+                        "a", 0.0, 0.0, 1.0
+                )),
             )
             .unwrap();
 
         // 8
         locations.set_invariant(
             locations.get_terminating_location(),
-            system!(Relation::mock(
-                RelationType::StrictInequality,
-                LinearPolynomial::mock(vec![Constant(0.0), Constant(0.0), Constant(0.0)]),
-            )),
+            mock_invariant!("<", 0.0, 0.0, 0.0),
         );
 
-        let variables = VariableMap::mock(vec![Variable::new("a"), Variable::new("b")]);
+        let variables = mock_varmap!("a", "b");
 
         assert_eq!(
             parsed,
@@ -1957,94 +1281,53 @@ mod tests {
 
         // line #
         // 1
-        locations.set_invariant(
-            start,
-            system!(Relation::mock(
-                RelationType::StrictInequality,
-                LinearPolynomial::mock(vec![Constant(0.0)]),
-            )),
-        );
+        locations.set_invariant(start, mock_invariant!("<", 0.0));
+
         let junction = locations_iter.next().unwrap();
-        let br_1 = locations_iter.next().unwrap();
+        let branch_1 = locations_iter.next().unwrap();
         locations
             .set_outgoing(
                 start,
-                Guards::Probabilistic(vec![
+                guards!(P:
                     // 2
-                    (
-                        Constant(1.0),
-                        Transition {
-                            assignments: vec![],
-                            target: br_1,
-                        },
-                    ),
-                    //5
-                    (
-                        Constant(0.0),
-                        Transition {
-                            assignments: vec![],
-                            target: junction,
-                        },
-                    ),
-                ]),
+                    1.0,
+                    transition!(branch_1),
+                    // 5
+                    0.0,
+                    transition!(junction),
+                ),
             )
             .unwrap();
 
         // 3
-        locations.set_invariant(
-            br_1,
-            system!(Relation::mock(
-                RelationType::StrictInequality,
-                LinearPolynomial::mock(vec![Constant(0.0), Constant(0.0)]),
-            )),
-        );
+        locations.set_invariant(branch_1, mock_invariant!(">", 0.0, 0.0));
 
         // 4
         locations
-            .set_outgoing(
-                br_1,
-                Guards::Unguarded(Box::new(Transition {
-                    assignments: vec![Assignment(
-                        Variable::new("a"),
-                        LinearPolynomial::mock(vec![Constant(0.0), Constant(0.0), Constant(1.0)]),
-                    )],
-                    target: start,
-                })),
-            )
+            .set_outgoing(branch_1, guards!(transition!(start; "a", 0.0, 0.0, 1.0)))
             .unwrap();
+
         // 6
-        locations.set_invariant(
-            junction,
-            system!(Relation::mock(
-                RelationType::StrictInequality,
-                LinearPolynomial::mock(vec![Constant(0.0), Constant(0.0), Constant(0.0)]),
-            )),
-        );
+        locations.set_invariant(junction, mock_invariant!(">", 0.0, 0.0, 0.0));
 
         // 7
         locations
             .set_outgoing(
                 junction,
-                Guards::Unguarded(Box::new(Transition {
-                    assignments: vec![Assignment(
-                        Variable::new("a"),
-                        LinearPolynomial::mock(vec![Constant(0.0), Constant(0.0), Constant(1.0)]),
-                    )],
-                    target: locations.get_terminating_location(),
-                })),
+                guards!(transition!(
+                    locations.get_terminating_location();
+                    "a", 0.0, 0.0, 1.0
+                )),
             )
             .unwrap();
 
         // 8
         locations.set_invariant(
             locations.get_terminating_location(),
-            system!(Relation::mock(
-                RelationType::StrictInequality,
-                LinearPolynomial::mock(vec![Constant(0.0), Constant(0.0), Constant(0.0)]),
-            )),
+            mock_invariant!("<", 0.0, 0.0, 0.0),
         );
 
-        let variables = VariableMap::mock(vec![Variable::new("a"), Variable::new("b")]);
+        let variables = mock_varmap!("a", "b");
 
         assert_eq!(
             parsed,
@@ -2068,88 +1351,45 @@ mod tests {
 
         // line #
         // 1
-        locations.set_invariant(
-            start,
-            system!(Relation::mock(
-                RelationType::StrictInequality,
-                LinearPolynomial::mock(vec![Constant(0.0)]),
-            )),
-        );
+        locations.set_invariant(start, mock_invariant!("<", 0.0));
+
         let junction = locations_iter.next().unwrap();
-        let br_1 = locations_iter.next().unwrap();
+        let branch_1 = locations_iter.next().unwrap();
         locations
             .set_outgoing(
                 start,
-                Guards::Nondeterministic(vec![
-                    // 2
-                    Transition {
-                        assignments: vec![],
-                        target: br_1,
-                    },
-                    //5
-                    Transition {
-                        assignments: vec![],
-                        target: junction,
-                    },
-                ]),
+                guards!(transition!(branch_1), transition!(junction),),
             )
             .unwrap();
 
         // 3
-        locations.set_invariant(
-            br_1,
-            system!(Relation::mock(
-                RelationType::StrictInequality,
-                LinearPolynomial::mock(vec![Constant(0.0), Constant(0.0)]),
-            )),
-        );
+        locations.set_invariant(branch_1, mock_invariant!(">", 0.0, 0.0));
 
         // 4
         locations
-            .set_outgoing(
-                br_1,
-                Guards::Unguarded(Box::new(Transition {
-                    assignments: vec![Assignment(
-                        Variable::new("a"),
-                        LinearPolynomial::mock(vec![Constant(0.0), Constant(0.0), Constant(1.0)]),
-                    )],
-                    target: start,
-                })),
-            )
+            .set_outgoing(branch_1, guards!(transition!(start; "a", 0.0, 0.0, 1.0)))
             .unwrap();
         // 6
-        locations.set_invariant(
-            junction,
-            system!(Relation::mock(
-                RelationType::StrictInequality,
-                LinearPolynomial::mock(vec![Constant(0.0), Constant(0.0), Constant(0.0)]),
-            )),
-        );
+        locations.set_invariant(junction, mock_invariant!(">", 0.0, 0.0, 0.0));
 
         // 7
         locations
             .set_outgoing(
                 junction,
-                Guards::Unguarded(Box::new(Transition {
-                    assignments: vec![Assignment(
-                        Variable::new("a"),
-                        LinearPolynomial::mock(vec![Constant(0.0), Constant(0.0), Constant(1.0)]),
-                    )],
-                    target: locations.get_terminating_location(),
-                })),
+                guards!(transition!(
+                    locations.get_terminating_location();
+                    "a", 0.0, 0.0, 1.0
+                )),
             )
             .unwrap();
 
         // 8
         locations.set_invariant(
             locations.get_terminating_location(),
-            system!(Relation::mock(
-                RelationType::StrictInequality,
-                LinearPolynomial::mock(vec![Constant(0.0), Constant(0.0), Constant(0.0)]),
-            )),
+            mock_invariant!("<", 0.0, 0.0, 0.0),
         );
 
-        let variables = VariableMap::mock(vec![Variable::new("a"), Variable::new("b")]);
+        let variables = mock_varmap!("a", "b");
 
         assert_eq!(
             parsed,

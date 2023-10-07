@@ -1,5 +1,16 @@
 use std::fmt;
 
+// test only, breaks interface
+#[cfg(test)]
+#[macro_export]
+macro_rules! mock_varmap{
+    [ $( $x:expr ),* $(,)?] => {
+        {
+            $crate::pts::variable_map::VariableMap::mock(std::vec![$($crate::pts::variable_map::Variable::new($x),)*])
+        }
+    };
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Variable {
     name: Box<str>,
@@ -73,10 +84,8 @@ impl VariableMap {
     pub fn iter(&self) -> VariableIterator {
         self.variables.iter()
     }
-}
 
-#[cfg(test)]
-impl VariableMap {
+    #[cfg(test)]
     pub fn mock(variables: Vec<Variable>) -> Self {
         VariableMap { variables }
     }
@@ -102,6 +111,28 @@ type VariableIterator<'a> = std::slice::Iter<'a, Variable>;
 #[cfg(test)]
 mod tests {
     use super::{Variable, VariableMap};
+
+    mod macros {
+        mod varmap {
+            use crate::pts::variable_map::{Variable, VariableMap};
+
+            #[test]
+            fn non_empty() {
+                let mut varmap = VariableMap::default();
+                varmap.get_or_push(&Some(Variable::new("test")));
+                varmap.get_or_push(&Some(Variable::new("apple")));
+                varmap.get_or_push(&Some(Variable::new("testington")));
+                varmap.get_or_push(&Some(Variable::new("apple")));
+                varmap.get_or_push(&Some(Variable::new("testington")));
+                assert_eq!(varmap, mock_varmap!("test", "apple", "testington"));
+            }
+
+            #[test]
+            fn empty() {
+                assert_eq!(VariableMap::default(), mock_varmap!());
+            }
+        }
+    }
 
     #[test]
     fn out_of_bounds() {

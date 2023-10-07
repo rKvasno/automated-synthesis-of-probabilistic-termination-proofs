@@ -5,6 +5,24 @@ use variable_map::Variable;
 
 use super::{variable_map::VariableMap, DisplayLabel};
 
+#[macro_export]
+macro_rules! assignment {
+    [ $var:expr, $( $x:expr ),* $(,)?] => {
+        {
+            $crate::pts::transition::Assignment($crate::pts::variable_map::Variable::new($var), $crate::mock_polynomial![$($x, )*])
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! transition {
+    [ $tar:expr $(; $( $var:expr, $($x:expr),* );*)? ] => {
+        {
+            $crate::pts::transition::Transition{ target: $tar, assignments: std::vec![$($($crate::assignment![$var, $($x, )*], )*)? ] }
+        }
+    };
+}
+
 #[cfg_attr(test, derive(PartialEq))]
 #[derive(Debug)]
 #[repr(align(32))] // 32 bytes
@@ -30,61 +48,72 @@ impl DisplayLabel for Assignment {
 
 #[cfg(test)]
 mod tests {
-    use crate::pts::{
-        linear_polynomial::{constant::Constant, LinearPolynomial},
-        variable_map::{Variable, VariableMap},
-        DisplayLabel,
-    };
 
-    use super::Assignment;
+    mod macros {
+        use crate::{
+            mock_polynomial,
+            pts::{transition::Assignment, variable_map::Variable},
+        };
 
-    #[test]
-    fn label() {
-        let assign = Assignment(
-            Variable::new("test"),
-            LinearPolynomial::mock(vec![Constant(0.0)]),
-        );
-        let map = VariableMap::mock(Default::default());
-        assert_eq!(assign.label(&map), "test = 0");
+        #[test]
+        fn assignment() {
+            assert_eq!(
+                Assignment(
+                    Variable::new("test"),
+                    mock_polynomial!(6.8, -0.0, -6.8, 134.689, 0.0)
+                ),
+                assignment!("test", 6.8, -0.0, -6.8, 134.689, 0.0)
+            );
+        }
 
-        let assign = Assignment(
-            Variable::new("b"),
-            LinearPolynomial::mock(vec![Constant(-5.0), Constant(-2.0), Constant(1.0)]),
-        );
-        let map = VariableMap::mock(vec![Variable::new("a"), Variable::new("b")]);
-        assert_eq!(assign.label(&map), "b = -2a + b - 5");
+        mod transition {
+            use crate::pts::transition::Transition;
+
+            #[test]
+            fn some() {
+                assert_eq!(
+                    Transition {
+                        target: Some(1999),
+                        assignments: vec![
+                            assignment!("br", -0.3, 5.0, -0.0, 0.0),
+                            assignment!("test", 1234.5, 1111.0, 15.151515)
+                        ]
+                    },
+                    transition!(Some(1999); "br", -0.3, 5.0, -0.0, 0.0; "test", 1234.5, 1111.0, 15.151515)
+                );
+            }
+
+            #[test]
+            fn none() {
+                assert_eq!(
+                    Transition {
+                        target: None,
+                        assignments: vec![
+                            assignment!("a", 0.3, -5.0, 0.0, 0.0),
+                            assignment!("r", 0.0, -1.0, 15.15)
+                        ]
+                    },
+                    transition!(None; "a", 0.3, -5.0, 0.0, 0.0; "r", 0.0, -1.0, 15.15)
+                );
+            }
+        }
+    }
+    mod label {
+        use crate::{mock_varmap, pts::DisplayLabel};
+
+        #[test]
+        fn one_var() {
+            let map = mock_varmap!();
+            assert_eq!(assignment!("test", 0.0).label(&map), "test = 0");
+        }
+
+        #[test]
+        fn many_vars() {
+            let map = mock_varmap!("a", "b");
+            assert_eq!(
+                assignment!("b", -5.0, -2.0, 1.0).label(&map),
+                "b = -2a + b - 5"
+            );
+        }
     }
 }
-
-// #[cfg(test)]
-// mod tests {
-//     use std::mem;
-//     use super::{Assignment, Transition};
-//
-//     #[test]
-//     fn align_transition() {
-//         if mem::size_of::<usize>() == 8{
-//             assert_eq!(mem::align_of::<Transition>(), 32);
-//         }
-//     }
-//
-//     #[test]
-//     fn size_transition() {
-//         if mem::size_of::<usize>() == 8{
-//             assert_eq!(mem::size_of::<Transition>(), 32);
-//         }
-//     }
-//
-//     #[test]
-//     fn align_assignment() {
-//         if mem::size_of::<usize>() == 8{
-//             assert_eq!(mem::align_of::<Assignment>(), 32);
-//         }
-//     }
-//     #[test]
-//     fn size_assignment() {
-//         if mem::size_of::<usize>() == 8{
-//             assert_eq!(mem::size_of::<Assignment>(), 32);
-//         }
-//     }
-// }

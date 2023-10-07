@@ -5,6 +5,32 @@ use super::linear_polynomial::constant::Constant;
 use super::variable_map::VariableMap;
 use super::DisplayLabel;
 
+#[macro_export]
+macro_rules! relation_type {
+    [ $sign:literal] => {
+        {
+            match $sign {
+                "<=" | ">=" => $crate::pts::relation::RelationType::NonstrictInequality,
+                "<" | ">" => $crate::pts::relation::RelationType::StrictInequality,
+                "==" | "=" => $crate::pts::relation::RelationType::Equation,
+                "=/=" | "!=" => $crate::pts::relation::RelationType::Inequation,
+                _ => panic!("Invalid sign"),
+            }
+        }
+    };
+}
+
+// test only, breaks interface
+#[cfg(test)]
+#[macro_export]
+macro_rules! mock_relation {
+   [ $sign:literal, $( $x:expr ),* $(,)?] => {
+        {
+            $crate::pts::relation::Relation::mock(crate::relation_type![$sign], $crate::mock_polynomial![$($x, )+])
+        }
+    };
+}
+
 #[derive(Debug, PartialEq, Eq)]
 pub enum RelationSign {
     LT,
@@ -79,6 +105,11 @@ impl Relation {
             _ => false,
         }
     }
+
+    #[cfg(test)]
+    pub fn mock(relation_type: RelationType, pol: LinearPolynomial) -> Self {
+        Relation { relation_type, pol }
+    }
 }
 
 impl DisplayLabel for Relation {
@@ -144,329 +175,328 @@ impl Not for Relation {
 }
 
 #[cfg(test)]
-impl Relation {
-    pub fn mock(relation_type: RelationType, pol: LinearPolynomial) -> Self {
-        Relation { relation_type, pol }
-    }
-}
-
-#[cfg(test)]
 mod tests {
-    use super::{Relation, RelationSign};
     use crate::{
-        misc::{setup_test_map, setup_test_polynomial},
+        mock_polynomial,
         pts::{
-            linear_polynomial::{constant::Constant, LinearPolynomial},
-            relation::RelationType,
-            system::System,
-            variable_map::{Variable, VariableMap},
-            DisplayLabel,
+            linear_polynomial::LinearPolynomial,
+            relation::{Relation, RelationSign},
         },
+        system,
     };
 
-    #[test]
-    fn new() {
-        let map = setup_test_map();
-        let cond = Relation::new(
-            setup_test_polynomial(
-                &map,
-                Constant(4.0),
-                Constant(5.0),
-                Constant(3.0),
-                Constant(2.0),
-            ),
-            RelationSign::LT,
-            setup_test_polynomial(
-                &map,
-                Constant(1.0),
-                Constant(5.0),
-                Constant(4.0),
-                Constant(2.0),
-            ),
-        );
-        assert_eq!(
-            cond.as_linear_polynomial(),
-            &LinearPolynomial::mock(vec!(
-                Constant(3.0),
-                Constant(0.0),
-                Constant(-1.0),
-                Constant(0.0)
-            ))
-        );
-        assert!(cond.is_strict_inequality());
+    mod macros {
+        use crate::{
+            mock_polynomial,
+            pts::relation::{Relation, RelationType},
+        };
 
-        let cond = Relation::new(
-            setup_test_polynomial(
-                &map,
-                Constant(1.0),
-                Constant(0.0),
-                Constant(2.0),
-                Constant(2.0),
-            ),
-            RelationSign::GE,
-            setup_test_polynomial(
-                &map,
-                Constant(5.0),
-                Constant(1.0),
-                Constant(4.0),
-                Constant(2.0),
-            ),
-        );
-        assert_eq!(
-            cond.as_linear_polynomial(),
-            &LinearPolynomial::mock(vec!(
-                Constant(4.0),
-                Constant(1.0),
-                Constant(2.0),
-                Constant(0.0)
-            ))
-        );
-        assert!(cond.is_nonstrict_inequality());
+        mod relation_type {
+            use crate::pts::relation::RelationType;
 
-        let cond = Relation::new(
-            setup_test_polynomial(
-                &map,
-                Constant(1.0),
-                Constant(0.0),
-                Constant(2.0),
-                Constant(2.0),
-            ),
-            RelationSign::EQ,
-            setup_test_polynomial(
-                &map,
-                Constant(5.0),
-                Constant(1.0),
-                Constant(4.0),
-                Constant(2.0),
-            ),
-        );
-        assert_eq!(
-            cond.as_linear_polynomial(),
-            &LinearPolynomial::mock(vec!(
-                Constant(-4.0),
-                Constant(-1.0),
-                Constant(-2.0),
-                Constant(0.0)
-            ))
-        );
-        assert!(cond.is_equation());
+            #[test]
+            fn equation() {
+                assert_eq!(RelationType::Equation, relation_type!("="));
+            }
 
-        let cond = Relation::new(
-            setup_test_polynomial(
-                &map,
-                Constant(4.0),
-                Constant(5.0),
-                Constant(3.0),
-                Constant(2.0),
-            ),
-            RelationSign::NE,
-            setup_test_polynomial(
-                &map,
-                Constant(1.0),
-                Constant(5.0),
-                Constant(4.0),
-                Constant(2.0),
-            ),
-        );
-        assert_eq!(
-            cond.as_linear_polynomial(),
-            &LinearPolynomial::mock(vec!(
-                Constant(3.0),
-                Constant(0.0),
-                Constant(-1.0),
-                Constant(0.0)
-            ))
-        );
-        assert!(cond.is_inequation());
+            #[test]
+            fn equation_alt() {
+                assert_eq!(RelationType::Equation, relation_type!("=="));
+            }
+
+            #[test]
+            fn inequation() {
+                assert_eq!(RelationType::Inequation, relation_type!("=/="));
+            }
+
+            #[test]
+            fn inequation_alt() {
+                assert_eq!(RelationType::Inequation, relation_type!("!="));
+            }
+
+            #[test]
+            fn strict() {
+                assert_eq!(RelationType::StrictInequality, relation_type!("<"));
+            }
+
+            #[test]
+            fn strict_alt() {
+                assert_eq!(RelationType::StrictInequality, relation_type!(">"));
+            }
+
+            #[test]
+            fn nonstrict() {
+                assert_eq!(RelationType::NonstrictInequality, relation_type!("<="));
+            }
+
+            #[test]
+            fn nonstrict_alt() {
+                assert_eq!(RelationType::NonstrictInequality, relation_type!(">="));
+            }
+
+            #[test]
+            #[should_panic]
+            fn panic() {
+                relation_type!("");
+            }
+        }
+        #[test]
+        fn relation() {
+            assert_eq!(
+                Relation {
+                    relation_type: RelationType::StrictInequality,
+                    pol: mock_polynomial!(1.0, -4.5, 0.0)
+                },
+                mock_relation!("<", 1.0, -4.5, 0.0)
+            )
+        }
     }
 
-    #[test]
-    fn is() {
-        let rel = Relation::new(
-            LinearPolynomial::default(),
-            RelationSign::LT,
-            LinearPolynomial::default(),
-        );
-        assert!(!rel.is_inequation());
-        assert!(!rel.is_equation());
-        assert!(rel.is_strict_inequality());
-        assert!(!rel.is_nonstrict_inequality());
+    mod new {
+        use crate::{
+            mock_polynomial,
+            pts::relation::{Relation, RelationSign},
+        };
 
-        let rel = Relation::new(
-            LinearPolynomial::default(),
-            RelationSign::LE,
-            LinearPolynomial::default(),
-        );
-        assert!(!rel.is_inequation());
-        assert!(!rel.is_equation());
-        assert!(!rel.is_strict_inequality());
-        assert!(rel.is_nonstrict_inequality());
+        #[test]
+        fn less_than() {
+            let cond = Relation::new(
+                mock_polynomial!(4.0, 5.0, 3.0, 2.0),
+                RelationSign::LT,
+                mock_polynomial!(1.0, 5.0, 4.0, 2.0),
+            );
+            assert_eq!(
+                cond.as_linear_polynomial(),
+                &mock_polynomial!(3.0, 0.0, -1.0, 0.0)
+            );
+            assert!(cond.is_strict_inequality());
+        }
 
-        let rel = Relation::new(
-            LinearPolynomial::default(),
-            RelationSign::GT,
-            LinearPolynomial::default(),
-        );
-        assert!(!rel.is_inequation());
-        assert!(!rel.is_equation());
-        assert!(rel.is_strict_inequality());
-        assert!(!rel.is_nonstrict_inequality());
+        #[test]
+        fn greater_eq() {
+            let cond = Relation::new(
+                mock_polynomial!(1.0, 0.0, 2.0, 2.0),
+                RelationSign::GE,
+                mock_polynomial!(5.0, 1.0, 4.0, 2.0,),
+            );
+            assert_eq!(
+                cond.as_linear_polynomial(),
+                &mock_polynomial!(4.0, 1.0, 2.0, 0.0)
+            );
+            assert!(cond.is_nonstrict_inequality());
+        }
 
-        let rel = Relation::new(
-            LinearPolynomial::default(),
-            RelationSign::GE,
-            LinearPolynomial::default(),
-        );
-        assert!(!rel.is_inequation());
-        assert!(!rel.is_equation());
-        assert!(!rel.is_strict_inequality());
-        assert!(rel.is_nonstrict_inequality());
+        #[test]
+        fn equal() {
+            let cond = Relation::new(
+                mock_polynomial!(1.0, 0.0, 2.0, 2.0,),
+                RelationSign::EQ,
+                mock_polynomial!(5.0, 1.0, 4.0, 2.0,),
+            );
+            assert_eq!(
+                cond.as_linear_polynomial(),
+                &mock_polynomial!(-4.0, -1.0, -2.0, 0.0)
+            );
+            assert!(cond.is_equation());
+        }
 
-        let rel = Relation::new(
-            LinearPolynomial::default(),
-            RelationSign::EQ,
-            LinearPolynomial::default(),
-        );
-        assert!(!rel.is_inequation());
-        assert!(rel.is_equation());
-        assert!(!rel.is_strict_inequality());
-        assert!(!rel.is_nonstrict_inequality());
+        #[test]
+        fn not_equal() {
+            let cond = Relation::new(
+                mock_polynomial!(4.0, 5.0, 3.0, 2.0,),
+                RelationSign::NE,
+                mock_polynomial!(1.0, 5.0, 4.0, 2.0,),
+            );
+            assert_eq!(
+                cond.as_linear_polynomial(),
+                &mock_polynomial!(3.0, 0.0, -1.0, 0.0)
+            );
+            assert!(cond.is_inequation());
+        }
+    }
 
-        let rel = Relation::new(
-            LinearPolynomial::default(),
-            RelationSign::NE,
-            LinearPolynomial::default(),
-        );
-        assert!(rel.is_inequation());
-        assert!(!rel.is_equation());
-        assert!(!rel.is_strict_inequality());
-        assert!(!rel.is_nonstrict_inequality());
+    mod is {
+        use crate::pts::{
+            linear_polynomial::LinearPolynomial,
+            relation::{Relation, RelationSign},
+        };
+
+        #[test]
+        fn less_than() {
+            let rel = Relation::new(
+                LinearPolynomial::default(),
+                RelationSign::LT,
+                LinearPolynomial::default(),
+            );
+            assert!(!rel.is_inequation());
+            assert!(!rel.is_equation());
+            assert!(rel.is_strict_inequality());
+            assert!(!rel.is_nonstrict_inequality());
+        }
+
+        #[test]
+        fn less_eq() {
+            let rel = Relation::new(
+                LinearPolynomial::default(),
+                RelationSign::LE,
+                LinearPolynomial::default(),
+            );
+            assert!(!rel.is_inequation());
+            assert!(!rel.is_equation());
+            assert!(!rel.is_strict_inequality());
+            assert!(rel.is_nonstrict_inequality());
+        }
+
+        #[test]
+        fn greater_than() {
+            let rel = Relation::new(
+                LinearPolynomial::default(),
+                RelationSign::GT,
+                LinearPolynomial::default(),
+            );
+            assert!(!rel.is_inequation());
+            assert!(!rel.is_equation());
+            assert!(rel.is_strict_inequality());
+            assert!(!rel.is_nonstrict_inequality());
+        }
+
+        #[test]
+        fn greater_eq() {
+            let rel = Relation::new(
+                LinearPolynomial::default(),
+                RelationSign::GE,
+                LinearPolynomial::default(),
+            );
+            assert!(!rel.is_inequation());
+            assert!(!rel.is_equation());
+            assert!(!rel.is_strict_inequality());
+            assert!(rel.is_nonstrict_inequality());
+        }
+
+        #[test]
+        fn equal() {
+            let rel = Relation::new(
+                LinearPolynomial::default(),
+                RelationSign::EQ,
+                LinearPolynomial::default(),
+            );
+            assert!(!rel.is_inequation());
+            assert!(rel.is_equation());
+            assert!(!rel.is_strict_inequality());
+            assert!(!rel.is_nonstrict_inequality());
+        }
+
+        #[test]
+        fn not_equal() {
+            let rel = Relation::new(
+                LinearPolynomial::default(),
+                RelationSign::NE,
+                LinearPolynomial::default(),
+            );
+            assert!(rel.is_inequation());
+            assert!(!rel.is_equation());
+            assert!(!rel.is_strict_inequality());
+            assert!(!rel.is_nonstrict_inequality());
+        }
     }
 
     #[test]
     fn not() {
-        let map = setup_test_map();
-
-        let mut system = System::default();
-        let cond = Relation::new(
-            setup_test_polynomial(
-                &map,
-                Constant(4.0),
-                Constant(-5.0),
-                Constant(3.0),
-                Constant(-2.0),
+        let mut system = system!(
+            Relation::new(
+                mock_polynomial!(4.0, -5.0, 3.0, -2.0,),
+                RelationSign::LE,
+                LinearPolynomial::default(),
             ),
-            RelationSign::LE,
-            LinearPolynomial::default(),
+            Relation::new(
+                mock_polynomial!(1.0, 0.0, 2.0, -2.0,),
+                RelationSign::LT,
+                LinearPolynomial::default(),
+            )
         );
-        system.push(cond);
-        let cond = Relation::new(
-            setup_test_polynomial(
-                &map,
-                Constant(1.0),
-                Constant(0.0),
-                Constant(2.0),
-                Constant(-2.0),
-            ),
-            RelationSign::LT,
-            LinearPolynomial::default(),
-        );
-        system.push(cond);
 
         system = !system;
 
         assert_eq!(
             system.get(0).unwrap().as_linear_polynomial(),
-            &LinearPolynomial::mock(vec!(
-                Constant(-4.0),
-                Constant(5.0),
-                Constant(-3.0),
-                Constant(2.0)
-            ))
+            &mock_polynomial!(-4.0, 5.0, -3.0, 2.0)
         );
         assert_eq!(
             system.get(1).unwrap().as_linear_polynomial(),
-            &LinearPolynomial::mock(vec!(
-                Constant(-1.0),
-                Constant(0.0),
-                Constant(-2.0),
-                Constant(2.0)
-            ))
+            &mock_polynomial!(-1.0, 0.0, -2.0, 2.0)
         );
 
         assert!(&system.get(0).unwrap().is_strict_inequality());
         assert!(!&system.get(1).unwrap().is_strict_inequality());
     }
 
-    #[test]
-    fn label() {
-        let ineq = Relation {
-            relation_type: RelationType::NonstrictInequality,
-            pol: LinearPolynomial::mock(vec![Constant(0.0)]),
+    mod label {
+        use crate::{
+            mock_polynomial, mock_varmap,
+            pts::{
+                relation::{Relation, RelationType},
+                DisplayLabel,
+            },
         };
-        let map = VariableMap::mock(vec![]);
-        assert_eq!(ineq.label(&map), "0 <= 0");
 
-        let ineq = Relation {
-            relation_type: RelationType::StrictInequality,
-            pol: LinearPolynomial::mock(vec![Constant(-5.0)]),
-        };
-        let map = VariableMap::mock(vec![]);
-        assert_eq!(ineq.label(&map), "0 < 5");
+        #[test]
+        fn zero() {
+            let ineq = Relation {
+                relation_type: RelationType::NonstrictInequality,
+                pol: mock_polynomial!(0.0),
+            };
+            let map = mock_varmap!();
+            assert_eq!(ineq.label(&map), "0 <= 0");
+        }
 
-        let ineq = Relation {
-            relation_type: RelationType::StrictInequality,
-            pol: LinearPolynomial::mock(vec![Constant(-5.0), Constant(-1.0)]),
-        };
-        let map = VariableMap::mock(vec![Variable::new("test")]);
-        assert_eq!(ineq.label(&map), "test > -5");
+        #[test]
+        fn neg_const() {
+            let ineq = Relation {
+                relation_type: RelationType::StrictInequality,
+                pol: mock_polynomial!(-5.0),
+            };
+            let map = mock_varmap!();
+            assert_eq!(ineq.label(&map), "0 < 5");
+        }
 
-        let ineq = Relation {
-            relation_type: RelationType::NonstrictInequality,
-            pol: LinearPolynomial::mock(vec![
-                Constant(0.0),
-                Constant(-1.0),
-                Constant(0.0),
-                Constant(3.0),
-            ]),
-        };
-        let map = VariableMap::mock(vec![
-            Variable::new("a"),
-            Variable::new("b"),
-            Variable::new("c"),
-        ]);
-        assert_eq!(ineq.label(&map), "a - 3c >= 0");
+        #[test]
+        fn neg_const_neg_var() {
+            let ineq = Relation {
+                relation_type: RelationType::StrictInequality,
+                pol: mock_polynomial!(-5.0, -1.0),
+            };
+            let map = mock_varmap!("test");
+            assert_eq!(ineq.label(&map), "test > -5");
+        }
 
-        let ineq = Relation {
-            relation_type: RelationType::NonstrictInequality,
-            pol: LinearPolynomial::mock(vec![
-                Constant(-1.0),
-                Constant(1.0),
-                Constant(0.0),
-                Constant(0.0),
-            ]),
-        };
-        let map = VariableMap::mock(vec![
-            Variable::new("a"),
-            Variable::new("b"),
-            Variable::new("c"),
-        ]);
-        assert_eq!(ineq.label(&map), "a <= 1");
+        #[test]
+        fn neg_leading_var() {
+            let ineq = Relation {
+                relation_type: RelationType::NonstrictInequality,
+                pol: mock_polynomial!(0.0, -1.0, 0.0, 3.0,),
+            };
+            let map = mock_varmap!("a", "b", "c",);
+            assert_eq!(ineq.label(&map), "a - 3c >= 0");
+        }
 
-        let ineq = Relation {
-            relation_type: RelationType::NonstrictInequality,
-            pol: LinearPolynomial::mock(vec![
-                Constant(0.0),
-                Constant(1.0),
-                Constant(0.0),
-                Constant(0.0),
-            ]),
-        };
-        let map = VariableMap::mock(vec![
-            Variable::new("a"),
-            Variable::new("b"),
-            Variable::new("c"),
-        ]);
-        assert_eq!(ineq.label(&map), "a <= 0");
+        #[test]
+        fn neg_const_pos_var() {
+            let ineq = Relation {
+                relation_type: RelationType::NonstrictInequality,
+                pol: mock_polynomial!(-1.0, 1.0, 0.0, 0.0,),
+            };
+            let map = mock_varmap!("a", "b", "c",);
+            assert_eq!(ineq.label(&map), "a <= 1");
+        }
+
+        #[test]
+        fn pos_var() {
+            let ineq = Relation {
+                relation_type: RelationType::NonstrictInequality,
+                pol: mock_polynomial!(0.0, 1.0, 0.0, 0.0,),
+            };
+            let map = mock_varmap!("a", "b", "c");
+            assert_eq!(ineq.label(&map), "a <= 0");
+        }
     }
 }
