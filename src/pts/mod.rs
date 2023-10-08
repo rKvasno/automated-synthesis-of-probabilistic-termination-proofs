@@ -125,9 +125,9 @@ mod tests {
                 SIMPLE_PROGRAM, TRIVIAL_IF_PROGRAM, TRIVIAL_NONDET_PROGRAM, TRIVIAL_ODDS_PROGRAM,
                 TRIVIAL_PROGRAM, WHILE_LOGIC_PROGRAM, WHILE_NONDET_PROGRAM, WHILE_PROB_PROGRAM,
             },
-            mock_invariant, mock_relation, mock_varmap,
+            mock_invariant, mock_relation, mock_transition, mock_varmap,
             pts::{location::Locations, variable_map::VariableMap, PTS},
-            system, transition,
+            system,
         };
 
         #[test]
@@ -155,7 +155,7 @@ mod tests {
             locations
                 .set_outgoing(
                     handle,
-                    guards!(transition!(locations.get_terminating_location(); "a", 1.0, 0.0)),
+                    guards!(mock_transition!(locations.get_terminating_location(); 1, 1.0, 0.0)),
                 )
                 .unwrap();
             // 3
@@ -194,7 +194,7 @@ mod tests {
             locations
                 .set_outgoing(
                     handle,
-                    guards!(transition!(next_location; "b", 1.0, 0.0, 0.0)),
+                    guards!(mock_transition!(next_location; 2, 1.0, 0.0, 0.0)),
                 )
                 .unwrap();
 
@@ -214,7 +214,7 @@ mod tests {
             locations
                 .set_outgoing(
                     handle,
-                    guards!(transition!(next_location; "c", 0.0, 1.0, 1.0, 0.0)),
+                    guards!(mock_transition!(next_location; 3, 0.0, 1.0, 1.0, 0.0)),
                 )
                 .unwrap();
 
@@ -235,7 +235,7 @@ mod tests {
             locations
                 .set_outgoing(
                     handle,
-                    guards!(transition!(next_location; "b", 0.0, 2.0, 0.0, 1.0)),
+                    guards!(mock_transition!(next_location; 2, 0.0, 2.0, 0.0, 1.0)),
                 )
                 .unwrap();
 
@@ -287,19 +287,19 @@ mod tests {
                     guards!(L:
                         // 2
                         system!(mock_relation!("<=", 0.0, -1.0, 1.0)),
-                        transition!(branch_1),
+                        mock_transition!(branch_1),
                         // 6
                         system!(
                             mock_relation!(">", 0.0, 1.0, -1.0),
                             mock_relation!("<=", 0.0, 0.0, 1.0, -1.0)
                         ),
-                        transition!(branch_2),
+                        mock_transition!(branch_2),
                         // 10
                         system!(
                             mock_relation!(">", 0.0, 1.0, -1.0),
                             mock_relation!(">", 0.0, 0.0, -1.0, 1.0)
                         ),
-                        transition!(branch_3)
+                        mock_transition!(branch_3)
                     ),
                 )
                 .unwrap();
@@ -309,7 +309,10 @@ mod tests {
 
             // 4
             locations
-                .set_outgoing(branch_1, guards!(transition!(junction; "a", 0.0, 1.0, 0.0)))
+                .set_outgoing(
+                    branch_1,
+                    guards!(mock_transition!(junction; 1, 0.0, 1.0, 0.0)),
+                )
                 .unwrap();
 
             // 7
@@ -319,7 +322,7 @@ mod tests {
             locations
                 .set_outgoing(
                     branch_2,
-                    guards!(transition!(junction; "a", 0.0, 1.0, 0.0, 0.0)),
+                    guards!(mock_transition!(junction; 1, 0.0, 1.0, 0.0, 0.0)),
                 )
                 .unwrap();
 
@@ -330,7 +333,7 @@ mod tests {
             locations
                 .set_outgoing(
                     branch_3,
-                    guards!(transition!(junction; "a", 0.0, 1.0, 0.0, 0.0)),
+                    guards!(mock_transition!(junction; 1, 0.0, 1.0, 0.0, 0.0)),
                 )
                 .unwrap();
 
@@ -342,7 +345,7 @@ mod tests {
                 .set_outgoing(
                     junction,
                     guards!(
-                        transition!(locations.get_terminating_location(); "a", 0.0, 1.0, 0.0, 0.0)
+                        mock_transition!(locations.get_terminating_location(); 1, 0.0, 1.0, 0.0, 0.0)
                     ),
                 )
                 .unwrap();
@@ -386,11 +389,11 @@ mod tests {
                     guards!(L:
                         // 22
                         system!(mock_relation!("<=", 0.0, -1.0, 1.0)),
-                        transition!(branch_1),
+                        mock_transition!(branch_1),
 
                         // 5
                         system!(mock_relation!("<", 0.0, 1.0, -1.0)),
-                        transition!(junction),
+                        mock_transition!(junction),
 
                     ),
                 )
@@ -401,7 +404,10 @@ mod tests {
 
             // 4
             locations
-                .set_outgoing(branch_1, guards!(transition!(junction; "a", 0.0, 1.0, 0.0)))
+                .set_outgoing(
+                    branch_1,
+                    guards!(mock_transition!(junction; 1, 0.0, 1.0, 0.0)),
+                )
                 .unwrap();
 
             // 6
@@ -411,7 +417,9 @@ mod tests {
             locations
                 .set_outgoing(
                     junction,
-                    guards!(transition!(locations.get_terminating_location(); "a", 0.0, 1.0, 0.0)),
+                    guards!(
+                        mock_transition!(locations.get_terminating_location(); 1, 0.0, 1.0, 0.0)
+                    ),
                 )
                 .unwrap();
 
@@ -456,13 +464,13 @@ mod tests {
                     guards!(P:
                         // 2
                         0.0,
-                        transition!(branch_1),
+                        mock_transition!(branch_1),
                         // 6
                         1.0,
-                        transition!(branch_2),
+                        mock_transition!(branch_2),
                         // 9
                         0.0,
-                        transition!(junction),
+                        mock_transition!(junction),
                     ),
                 )
                 .unwrap();
@@ -472,7 +480,7 @@ mod tests {
 
             // 4
             locations
-                .set_outgoing(branch_1, guards!(transition!(junction; "a", 0.0, 1.0)))
+                .set_outgoing(branch_1, guards!(mock_transition!(junction; 1, 0.0, 1.0)))
                 .unwrap();
 
             // 7
@@ -480,7 +488,10 @@ mod tests {
 
             // 8
             locations
-                .set_outgoing(branch_2, guards!(transition!(junction; "b", 0.0, 1.0, 0.0)))
+                .set_outgoing(
+                    branch_2,
+                    guards!(mock_transition!(junction; 2, 0.0, 1.0, 0.0)),
+                )
                 .unwrap();
 
             // 10
@@ -490,7 +501,9 @@ mod tests {
             locations
                 .set_outgoing(
                     junction,
-                    guards!(transition!(locations.get_terminating_location(); "a", 0.0, 1.0, 0.0)),
+                    guards!(
+                        mock_transition!(locations.get_terminating_location(); 1, 0.0, 1.0, 0.0)
+                    ),
                 )
                 .unwrap();
 
@@ -533,9 +546,9 @@ mod tests {
                     start,
                     guards!(P:
                         0.5,
-                        transition!(branch_1),
+                        mock_transition!(branch_1),
                         0.5,
-                        transition!(junction),
+                        mock_transition!(junction),
                     ),
                 )
                 .unwrap();
@@ -545,7 +558,7 @@ mod tests {
 
             // 4
             locations
-                .set_outgoing(branch_1, guards!(transition!(junction; "a", 0.0, 1.0)))
+                .set_outgoing(branch_1, guards!(mock_transition!(junction; 1, 0.0, 1.0)))
                 .unwrap();
 
             // 6
@@ -555,7 +568,7 @@ mod tests {
             locations
                 .set_outgoing(
                     junction,
-                    guards!(transition!(locations.get_terminating_location(); "a", 0.0, 1.0)),
+                    guards!(mock_transition!(locations.get_terminating_location(); 1, 0.0, 1.0)),
                 )
                 .unwrap();
 
@@ -600,11 +613,11 @@ mod tests {
                     start,
                     guards!(
                         // 2
-                        transition!(branch_1),
+                        mock_transition!(branch_1),
                         // 6
-                        transition!(branch_2),
+                        mock_transition!(branch_2),
                         // 10
-                        transition!(branch_3),
+                        mock_transition!(branch_3),
                     ),
                 )
                 .unwrap();
@@ -614,7 +627,7 @@ mod tests {
 
             // 4
             locations
-                .set_outgoing(branch_1, guards!(transition!(junction; "a", 0.0, 1.0)))
+                .set_outgoing(branch_1, guards!(mock_transition!(junction; 1, 0.0, 1.0)))
                 .unwrap();
 
             // 7
@@ -622,7 +635,7 @@ mod tests {
 
             // 8
             locations
-                .set_outgoing(branch_2, guards!(transition!(junction; "a", 0.0, 1.0)))
+                .set_outgoing(branch_2, guards!(mock_transition!(junction; 1, 0.0, 1.0)))
                 .unwrap();
 
             // 11
@@ -630,7 +643,7 @@ mod tests {
 
             // 12
             locations
-                .set_outgoing(branch_3, guards!(transition!(junction; "a", 0.0, 1.0)))
+                .set_outgoing(branch_3, guards!(mock_transition!(junction; 1, 0.0, 1.0)))
                 .unwrap();
 
             // 14
@@ -640,7 +653,7 @@ mod tests {
             locations
                 .set_outgoing(
                     junction,
-                    guards!(transition!(locations.get_terminating_location(); "a", 0.0, 1.0)),
+                    guards!(mock_transition!(locations.get_terminating_location(); 1, 0.0, 1.0)),
                 )
                 .unwrap();
 
@@ -683,9 +696,9 @@ mod tests {
                     start,
                     guards!(
                         // 2
-                        transition!(branch_1),
+                        mock_transition!(branch_1),
                         // 5
-                        transition!(junction),
+                        mock_transition!(junction),
                     ),
                 )
                 .unwrap();
@@ -695,7 +708,7 @@ mod tests {
 
             // 4
             locations
-                .set_outgoing(branch_1, guards!(transition!(junction; "a", 0.0, 1.0)))
+                .set_outgoing(branch_1, guards!(mock_transition!(junction; 1, 0.0, 1.0)))
                 .unwrap();
             // 6
             locations.set_invariant(junction, mock_invariant!(["<", 0.0, 0.0]));
@@ -704,7 +717,7 @@ mod tests {
             locations
                 .set_outgoing(
                     junction,
-                    guards!(transition!(locations.get_terminating_location(); "a", 0.0, 1.0)),
+                    guards!(mock_transition!(locations.get_terminating_location(); 1, 0.0, 1.0)),
                 )
                 .unwrap();
 
@@ -755,7 +768,7 @@ mod tests {
                                 "<", 0.0, 0.0
                             )
                         ),
-                        transition!(branch_1),
+                        mock_transition!(branch_1),
                         // 5
                         system!(
                             mock_relation!(
@@ -765,7 +778,7 @@ mod tests {
                                 "<=", 0.0, 0.0
                             )
                         ),
-                        transition!(junction)
+                        mock_transition!(junction)
                     ),
                 )
                 .unwrap();
@@ -775,7 +788,7 @@ mod tests {
 
             // 4
             locations
-                .set_outgoing(branch_1, guards!(transition!(start; "a", 0.0, 0.0, 1.0)))
+                .set_outgoing(branch_1, guards!(mock_transition!(start; 1, 0.0, 0.0, 1.0)))
                 .unwrap();
 
             // 6
@@ -785,7 +798,9 @@ mod tests {
             locations
                 .set_outgoing(
                     junction,
-                    guards!(transition!(locations.get_terminating_location(); "a", 0.0, 0.0, 1.0)),
+                    guards!(
+                        mock_transition!(locations.get_terminating_location(); 1, 0.0, 0.0, 1.0)
+                    ),
                 )
                 .unwrap();
 
@@ -829,10 +844,10 @@ mod tests {
                     guards!(P:
                             // 2
                             1.0,
-                            transition!(branch_1),
+                            mock_transition!(branch_1),
                             // 5
                             0.0,
-                            transition!(junction),
+                            mock_transition!(junction),
                     ),
                 )
                 .unwrap();
@@ -842,7 +857,7 @@ mod tests {
 
             // 4
             locations
-                .set_outgoing(branch_1, guards!(transition!(start; "a", 0.0, 0.0, 1.0)))
+                .set_outgoing(branch_1, guards!(mock_transition!(start; 1, 0.0, 0.0, 1.0)))
                 .unwrap();
 
             // 6
@@ -852,7 +867,9 @@ mod tests {
             locations
                 .set_outgoing(
                     junction,
-                    guards!(transition!(locations.get_terminating_location(); "a", 0.0, 0.0, 1.0)),
+                    guards!(
+                        mock_transition!(locations.get_terminating_location(); 1, 0.0, 0.0, 1.0)
+                    ),
                 )
                 .unwrap();
 
@@ -895,9 +912,9 @@ mod tests {
                     start,
                     guards!(
                         // 2
-                        transition!(branch_1),
+                        mock_transition!(branch_1),
                         // 5
-                        transition!(junction),
+                        mock_transition!(junction),
                     ),
                 )
                 .unwrap();
@@ -907,7 +924,7 @@ mod tests {
 
             // 4
             locations
-                .set_outgoing(branch_1, guards!(transition!(start; "a", 0.0, 0.0, 1.0)))
+                .set_outgoing(branch_1, guards!(mock_transition!(start; 1, 0.0, 0.0, 1.0)))
                 .unwrap();
             // 6
             locations.set_invariant(junction, mock_invariant!(["<", 0.0, 0.0, 0.0]));
@@ -916,7 +933,9 @@ mod tests {
             locations
                 .set_outgoing(
                     junction,
-                    guards!(transition!(locations.get_terminating_location(); "a", 0.0, 0.0, 1.0)),
+                    guards!(
+                        mock_transition!(locations.get_terminating_location(); 1, 0.0, 0.0, 1.0)
+                    ),
                 )
                 .unwrap();
 

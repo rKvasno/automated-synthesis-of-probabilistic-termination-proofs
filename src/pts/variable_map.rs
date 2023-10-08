@@ -1,5 +1,8 @@
 use std::fmt;
 
+// LinearPolynomial index
+pub type VariableID = usize;
+
 // test only, breaks interface
 #[cfg(test)]
 #[macro_export]
@@ -48,19 +51,20 @@ impl VariableMap {
     }
 
     // Return the variable with specified index in a polynomial
-    pub fn get_variable(&self, index: usize) -> Option<Option<&Variable>> {
-        if index == 0 {
-            Some(None)
+    // Returns None when theres no Variable with such ID
+    pub fn get_variable(&self, id: VariableID) -> Option<&Variable> {
+        if id == 0 {
+            None
         } else {
-            self.variables.get(index - 1).map(Some)
+            self.variables.get(id - 1)
         }
     }
 
-    // Find variable and return its index, if not found, add it
-    pub fn get_or_push(&mut self, var: &Option<Variable>) -> usize {
-        let index = self.get_index(&var);
+    // Find variable and return its id, if not found, add it
+    pub fn get_or_push(&mut self, var: &Variable) -> VariableID {
+        let index = self.get_id(var);
         if index.is_none() {
-            self.variables.push(var.as_ref().unwrap().clone());
+            self.variables.push(var.clone());
             // -1 because its after push, +1 because the polynomial indexing is shifted
             self.variables.len() - 1 + 1
         } else {
@@ -68,17 +72,13 @@ impl VariableMap {
         }
     }
 
-    // Find variable and return its index, if not found, return None
-    pub fn get_index(&self, var: &Option<Variable>) -> Option<usize> {
-        if var.is_none() {
-            Some(0)
-        } else {
-            self.variables
-                .iter()
-                .enumerate()
-                .find(|(_, element)| *element == var.as_ref().unwrap())
-                .map(|(index, _)| index + 1)
-        }
+    // Find variable and return its id, if not found, return None
+    pub fn get_id(&self, var: &Variable) -> Option<VariableID> {
+        self.variables
+            .iter()
+            .enumerate()
+            .find(|(_, element)| *element == var)
+            .map(|(index, _)| index + 1)
     }
 
     pub fn iter(&self) -> VariableIterator {
@@ -119,11 +119,11 @@ mod tests {
             #[test]
             fn non_empty() {
                 let mut varmap = VariableMap::default();
-                varmap.get_or_push(&Some(Variable::new("test")));
-                varmap.get_or_push(&Some(Variable::new("apple")));
-                varmap.get_or_push(&Some(Variable::new("testington")));
-                varmap.get_or_push(&Some(Variable::new("apple")));
-                varmap.get_or_push(&Some(Variable::new("testington")));
+                varmap.get_or_push(&Variable::new("test"));
+                varmap.get_or_push(&Variable::new("apple"));
+                varmap.get_or_push(&Variable::new("testington"));
+                varmap.get_or_push(&Variable::new("apple"));
+                varmap.get_or_push(&Variable::new("testington"));
                 assert_eq!(varmap, mock_varmap!("test", "apple", "testington"));
             }
 
@@ -137,30 +137,30 @@ mod tests {
     #[test]
     fn out_of_bounds() {
         let mut map = VariableMap::default();
-        let a = Some(Variable::new("a"));
-        assert_eq!(map.get_index(&a), None);
-        assert_eq!(map.get_variable(0), Some(None));
+        let a = Variable::new("a");
+        assert_eq!(map.get_id(&a), None);
+        assert_eq!(map.get_variable(0), None);
         assert_eq!(map.get_variable(1), None);
-        map.get_or_push(&Some(Variable::new("b")));
-        assert_eq!(map.get_index(&a), None);
-        assert_eq!(map.get_variable(0), Some(None));
+        map.get_or_push(&Variable::new("b"));
+        assert_eq!(map.get_id(&a), None);
+        assert_eq!(map.get_variable(0), None);
         assert_eq!(map.get_variable(2), None);
     }
 
     #[test]
     fn basic() {
         let mut map = VariableMap::default();
-        let a = Some(Variable::new("a"));
+        let a = Variable::new("a");
         assert_eq!(map.get_or_push(&a), 1);
-        assert_eq!(map.get_variable(1), Some(a.as_ref()));
+        assert_eq!(map.get_variable(1), Some(&a));
         assert_eq!(map.get_or_push(&a), 1);
-        assert_eq!(map.get_variable(1), Some(a.as_ref()));
-        let b = Some(Variable::new("b"));
+        assert_eq!(map.get_variable(1), Some(&a));
+        let b = Variable::new("b");
         assert_eq!(map.get_or_push(&b), 2);
-        let c = Some(Variable::new("c"));
+        let c = Variable::new("c");
         assert_eq!(map.get_or_push(&c), 3);
-        assert_eq!(map.get_variable(1), Some(a.as_ref()));
-        assert_eq!(map.get_variable(2), Some(b.as_ref()));
-        assert_eq!(map.get_variable(3), Some(c.as_ref()));
+        assert_eq!(map.get_variable(1), Some(&a));
+        assert_eq!(map.get_variable(2), Some(&b));
+        assert_eq!(map.get_variable(3), Some(&c));
     }
 }

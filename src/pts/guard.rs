@@ -151,16 +151,16 @@ mod tests {
 
         mod guards {
             use crate::{
-                mock_relation,
+                mock_relation, mock_transition,
                 pts::{guard::Guards, linear_polynomial::constant::Constant},
-                system, transition,
+                system,
             };
             #[test]
             fn unguarded() {
                 assert_eq!(
-                    guards!(transition!(Some(23); "as", 2.4, 1.3; "df", 1.0, -1.0)),
+                    guards!(mock_transition!(Some(23); 1, 2.4, 1.3; 2, 1.0, -1.0)),
                     Guards::Unguarded(std::boxed::Box::new(
-                        transition!(Some(23); "as", 2.4, 1.3; "df", 1.0, -1.0)
+                        mock_transition!(Some(23); 1, 2.4, 1.3; 2, 1.0, -1.0)
                     ))
                 );
             }
@@ -169,14 +169,14 @@ mod tests {
             fn nondeterministic() {
                 assert_eq!(
                     guards!(
-                        transition!(Some(23); "as", 2.4, 1.3; "df", 1.0, -1.0),
-                        transition!(None; "fd", 1.3, 2.4; "pt", 13.0, -1.8),
-                        transition!(Some(21); "se", -20.4, 1.3; "xy", 0.0, 0.0)
+                        mock_transition!(Some(23); 1, 2.4, 1.3; 2, 1.0, -1.0),
+                        mock_transition!(None; 1, 1.3, 2.4; 2, 13.0, -1.8),
+                        mock_transition!(Some(21); 1, -20.4, 1.3; 2, 0.0, 0.0)
                     ),
                     Guards::Nondeterministic(vec![
-                        transition!(Some(23); "as", 2.4, 1.3; "df", 1.0, -1.0),
-                        transition!(None; "fd", 1.3, 2.4; "pt", 13.0, -1.8),
-                        transition!(Some(21); "se", -20.4, 1.3; "xy", 0.0, 0.0)
+                        mock_transition!(Some(23); 1, 2.4, 1.3; 2, 1.0, -1.0),
+                        mock_transition!(None; 1, 1.3, 2.4; 2, 13.0, -1.8),
+                        mock_transition!(Some(21); 1, -20.4, 1.3; 2, 0.0, 0.0)
                     ])
                 );
             }
@@ -186,36 +186,36 @@ mod tests {
                 assert_eq!(
                     guards!(L:
                         system!(mock_relation!(">", 0.1, -2.3)),
-                        transition!(Some(23); "as", 2.4, 1.3; "df", 1.0, -1.0),
+                        mock_transition!(Some(23); 1, 2.4, 1.3; 2, 1.0, -1.0),
                         system!(
                             mock_relation!("<=", -0.1, 2.3),
                             mock_relation!(">=", 0.0, 3.8),
                         ),
-                        transition!(None; "fd", 1.3, 2.4; "pt", 13.0, -1.8),
+                        mock_transition!(None; 1, 1.3, 2.4; 2, 13.0, -1.8),
                         system!(
                             mock_relation!("<=", -0.1, 2.3),
                             mock_relation!("<", 0.0, -3.8),
                         ),
-                        transition!(Some(21); "se", -20.4, 1.3; "xy", 0.0, 0.0)
+                        mock_transition!(Some(21); 1, -20.4, 1.3; 2, 0.0, 0.0)
                     ),
                     Guards::Logic(vec![
                         (
                             system!(mock_relation!(">", 0.1, -2.3)),
-                            transition!(Some(23); "as", 2.4, 1.3; "df", 1.0, -1.0)
+                            mock_transition!(Some(23); 1, 2.4, 1.3; 2, 1.0, -1.0)
                         ),
                         (
                             system!(
                                 mock_relation!("<=", -0.1, 2.3),
                                 mock_relation!(">=", 0.0, 3.8),
                             ),
-                            transition!(None; "fd", 1.3, 2.4; "pt", 13.0, -1.8)
+                            mock_transition!(None; 1, 1.3, 2.4; 2, 13.0, -1.8)
                         ),
                         (
                             system!(
                                 mock_relation!("<=", -0.1, 2.3),
                                 mock_relation!("<", 0.0, -3.8),
                             ),
-                            transition!(Some(21); "se", -20.4, 1.3; "xy", 0.0, 0.0)
+                            mock_transition!(Some(21); 1, -20.4, 1.3; 2, 0.0, 0.0)
                         )
                     ])
                 );
@@ -226,24 +226,24 @@ mod tests {
                 assert_eq!(
                     guards!(P:
                         0.0,
-                        transition!(Some(23); "as", 2.4, 1.3; "df", 1.0, -1.0),
+                        mock_transition!(Some(23); 1, 2.4, 1.3; 2, 1.0, -1.0),
                         0.3,
-                        transition!(None; "fd", 1.3, 2.4; "pt", 13.0, -1.8),
+                        mock_transition!(None; 1, 1.3, 2.4; 2, 13.0, -1.8),
                         0.7,
-                        transition!(Some(21); "se", -20.4, 1.3; "xy", 0.0, 0.0)
+                        mock_transition!(Some(21); 1, -20.4, 1.3; 2, 0.0, 0.0)
                     ),
                     Guards::Probabilistic(vec![
                         (
                             Constant(0.0),
-                            transition!(Some(23); "as", 2.4, 1.3; "df", 1.0, -1.0)
+                            mock_transition!(Some(23); 1, 2.4, 1.3; 2, 1.0, -1.0)
                         ),
                         (
                             Constant(0.3),
-                            transition!(None; "fd", 1.3, 2.4; "pt", 13.0, -1.8)
+                            mock_transition!(None; 1, 1.3, 2.4; 2, 13.0, -1.8)
                         ),
                         (
                             Constant(0.7),
-                            transition!(Some(21); "se", -20.4, 1.3; "xy", 0.0, 0.0)
+                            mock_transition!(Some(21); 1, -20.4, 1.3; 2, 0.0, 0.0)
                         )
                     ])
                 );
@@ -252,14 +252,14 @@ mod tests {
     }
     mod label {
         use crate::{
-            mock_relation, mock_varmap,
+            mock_relation, mock_transition, mock_varmap,
             pts::{guard::GuardedTransition, linear_polynomial::constant::Constant, DisplayLabel},
-            system, transition,
+            system,
         };
 
         #[test]
         fn logic() {
-            let data = (system![mock_relation!("<", 1.0)], transition!(None));
+            let data = (system![mock_relation!("<", 1.0)], mock_transition!(None));
             let guarded_transition = GuardedTransition::Logic(&data);
             let map = mock_varmap!();
             assert_eq!(guarded_transition.label(&map), "0 < -1");
@@ -269,7 +269,7 @@ mod tests {
                     mock_relation!("<=", 0.0, 1.0),
                     mock_relation!("<", 1.0, 2.0, 1.0)
                 ),
-                transition!(None; "a", 0.0),
+                mock_transition!(None; 1, 0.0),
             );
             let guarded_transition = GuardedTransition::Logic(&data);
             let map = mock_varmap!("a", "len");
@@ -283,10 +283,10 @@ mod tests {
         fn probabilistic() {
             let data = (
                 Constant(0.0),
-                transition!(None;
-                    "a", 0.0, 0.0;
-                    "b", 2.0, 1.0, 2.0, 0.0;
-                    "a", -4.0, 0.0, 0.0, 1.0
+                mock_transition!(None;
+                    1, 0.0, 0.0;
+                    2, 2.0, 1.0, 2.0, 0.0;
+                    1, -4.0, 0.0, 0.0, 1.0
                 ),
             );
             let guarded_transition = GuardedTransition::Probabilistic(&data);
@@ -296,7 +296,7 @@ mod tests {
                 "0\na = 0\nb = a + 2b + 2\na = c - 4"
             );
 
-            let data = (Constant(0.2222), transition!(None));
+            let data = (Constant(0.2222), mock_transition!(None));
             let guarded_transition = GuardedTransition::Probabilistic(&data);
             let map = mock_varmap!();
             assert_eq!(guarded_transition.label(&map), "0.2222");
@@ -304,7 +304,7 @@ mod tests {
 
         #[test]
         fn nondeterministic() {
-            let data = transition!(None);
+            let data = mock_transition!(None);
             let guarded_transition = GuardedTransition::Nondeterministic(&data);
             let map = mock_varmap!();
             assert_eq!(guarded_transition.label(&map), "");
@@ -312,7 +312,7 @@ mod tests {
 
         #[test]
         fn unguarded() {
-            let data = transition!(None);
+            let data = mock_transition!(None);
             let guarded_transition = GuardedTransition::Unguarded(&data);
             let map = mock_varmap!(Default::default());
             assert_eq!(guarded_transition.label(&map), "");

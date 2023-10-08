@@ -26,7 +26,7 @@ macro_rules! relation_type {
 macro_rules! mock_relation {
    [ $sign:literal, $( $x:expr ),* $(,)?] => {
         {
-            $crate::pts::relation::Relation::mock(crate::relation_type![$sign], $crate::mock_polynomial![$($x, )+])
+            $crate::pts::relation::Relation::mock($crate::relation_type![$sign], $crate::mock_polynomial![$($x, )+])
         }
     };
 }

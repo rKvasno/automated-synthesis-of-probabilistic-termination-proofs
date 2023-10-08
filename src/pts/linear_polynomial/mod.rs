@@ -9,7 +9,7 @@ use std::{
 };
 use term::Term;
 
-use super::DisplayLabel;
+use super::{variable_map::VariableID, DisplayLabel};
 
 // Rust Book 19.5 Macros: example vec! macro
 // test only, breaks interface
@@ -56,13 +56,17 @@ impl<'a> LinearPolynomial {
         }
     }
 
-    pub fn try_add_term(&mut self, map: &VariableMap, term: Term) -> Result<usize, VariableError> {
+    pub fn try_add_term(
+        &mut self,
+        map: &VariableMap,
+        term: Term,
+    ) -> Result<VariableID, VariableError> {
         self.resize_to_map(map);
-        if term.variable.is_none() {
+        if term.is_constant() {
             self.coefficients[0] += term.coefficient;
             Ok(0)
         } else {
-            let index = map.get_index(&term.variable);
+            let index = map.get_id(term.variable.as_ref().unwrap());
             // if variable is not in the map, its not a program variable
             if index.is_none() {
                 Err(VariableError::new(term.variable.as_ref().unwrap()))
@@ -74,12 +78,12 @@ impl<'a> LinearPolynomial {
     }
 
     pub fn add_term(&mut self, map: &mut VariableMap, term: Term) -> usize {
-        if term.variable.is_none() {
+        if term.is_constant() {
             self.coefficients[0] += term.coefficient;
             self.resize_to_map(map);
             0
         } else {
-            let index = map.get_or_push(&term.variable);
+            let index = map.get_or_push(&term.variable.unwrap());
             self.resize_to_map(map);
             self.coefficients[index] += term.coefficient;
             index
@@ -121,7 +125,7 @@ impl<'a> LinearPolynomial {
         for i in 0..std::cmp::min(self.len(), variables.len()) {
             if filter(&Term {
                 coefficient: self.coefficients[i],
-                variable: variables.get_variable(i).unwrap().cloned(),
+                variable: variables.get_variable(i).cloned(),
             }) {
                 unsafe {
                     // see min a few lines above
@@ -136,7 +140,7 @@ impl<'a> LinearPolynomial {
     }
 
     pub fn iter(&'a self, variable_map: &'a VariableMap) -> TermIterator<'a> {
-        TermIterator(self, variable_map, 0)
+        TermIterator(variable_map, self, 0)
     }
 
     #[cfg(test)]
@@ -146,17 +150,18 @@ impl<'a> LinearPolynomial {
     }
 }
 
-pub struct TermIterator<'a>(&'a LinearPolynomial, &'a VariableMap, usize);
+// assumes the polynomial fits the map
+pub struct TermIterator<'a>(&'a VariableMap, &'a LinearPolynomial, VariableID);
 
 impl<'a> Iterator for TermIterator<'a> {
     type Item = Term;
     fn next(&mut self) -> Option<Self::Item> {
-        let variable = self.1.get_variable(self.2);
-        let coefficient = self.0.get_coefficient(self.2);
+        let variable = self.0.get_variable(self.2);
+        let coefficient = self.1.get_coefficient(self.2);
         self.2 += 1;
-        match (variable, coefficient) {
-            (Some(v), Some(c)) => Some(Term {
-                variable: v.map(|x| x.clone()),
+        match coefficient {
+            Some(c) => Some(Term {
+                variable: variable.map(|x| x.clone()),
                 coefficient: c.clone(),
             }),
             _ => None,
@@ -282,7 +287,7 @@ mod tests {
             let mut pol = LinearPolynomial::default();
             assert_eq!(pol.len(), 1);
             let mut map = mock_varmap!("a", "b", "c");
-            let var = map.get_variable(1).unwrap().unwrap().clone();
+            let var = map.get_variable(1).unwrap().clone();
             pol.add_term(&mut map, term!(0.0, var.as_str()));
             assert_eq!(pol.len(), map.len() + 1);
             assert_eq!(pol, mock_polynomial!(0.0, 0.0, 0.0, 0.0));
@@ -337,7 +342,7 @@ mod tests {
             assert_eq!(
                 pol.try_add_term(
                     &map,
-                    term!(0.0, map.get_variable(1).unwrap().unwrap().clone().as_str())
+                    term!(0.0, map.get_variable(1).unwrap().clone().as_str())
                 ),
                 Ok(1)
             );

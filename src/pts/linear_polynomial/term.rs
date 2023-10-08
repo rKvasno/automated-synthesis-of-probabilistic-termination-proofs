@@ -21,8 +21,18 @@ macro_rules! term {
 // default: constant term 0
 #[derive(Debug, Default, PartialEq)]
 pub struct Term {
+    // no variable => constant term
     pub variable: Option<Variable>,
     pub coefficient: Constant,
+}
+
+impl Term {
+    pub fn is_constant(&self) -> bool {
+        self.variable.is_none()
+    }
+    pub fn is_variable(&self) -> bool {
+        self.variable.is_some()
+    }
 }
 
 impl Neg for Term {
