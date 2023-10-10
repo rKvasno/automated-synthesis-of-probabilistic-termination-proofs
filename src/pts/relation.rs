@@ -117,7 +117,7 @@ impl DisplayLabel for Relation {
         let mut label = String::default();
         let leading_linear_term = self
             .as_linear_polynomial()
-            .iter(variable_map)
+            .iter_terms(variable_map)
             .skip(1) // skip constant term
             .find(|x| x.coefficient != Constant(0.0));
 

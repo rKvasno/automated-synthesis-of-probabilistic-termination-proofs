@@ -90,12 +90,18 @@ impl<'a> LinearPolynomial {
         }
     }
 
-    pub fn get_coefficient(&self, index: usize) -> Option<&Constant> {
-        self.coefficients.get(index)
+    pub fn mul_by_constant(&mut self, n: Constant) {
+        for coeff in self.coefficients.iter_mut() {
+            *coeff *= n;
+        }
     }
 
-    pub fn get_mut_coefficient(&mut self, index: usize) -> Option<&mut Constant> {
-        self.coefficients.get_mut(index)
+    pub fn get_coefficient(&self, var: VariableID) -> Option<&Constant> {
+        self.coefficients.get(var)
+    }
+
+    pub fn get_mut_coefficient(&mut self, var: VariableID) -> Option<&mut Constant> {
+        self.coefficients.get_mut(var)
     }
 
     pub fn separate_constant_term(mut self) -> (LinearPolynomial, LinearPolynomial) {
@@ -139,7 +145,7 @@ impl<'a> LinearPolynomial {
         (self, new_pol)
     }
 
-    pub fn iter(&'a self, variable_map: &'a VariableMap) -> TermIterator<'a> {
+    pub fn iter_terms(&'a self, variable_map: &'a VariableMap) -> TermIterator<'a> {
         TermIterator(variable_map, self, 0)
     }
 
@@ -173,9 +179,9 @@ impl DisplayLabel for LinearPolynomial {
     fn label(&self, variable_map: &VariableMap) -> String {
         let mut label = String::default();
         let mut iter = self
-            .iter(variable_map)
+            .iter_terms(variable_map)
             .skip(1) // skip constant term
-            .chain(self.iter(variable_map).take(1))
+            .chain(self.iter_terms(variable_map).take(1))
             .filter(|x| x.coefficient != Constant(0.0));
 
         let first_term = iter.next();

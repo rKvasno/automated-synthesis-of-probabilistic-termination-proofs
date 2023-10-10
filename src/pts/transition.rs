@@ -30,7 +30,7 @@ macro_rules! mock_transition {
 #[cfg_attr(test, derive(PartialEq))]
 #[derive(Debug)]
 #[repr(align(32))] // 32 bytes
-pub struct Assignment(VariableID, LinearPolynomial);
+pub struct Assignment(pub VariableID, pub LinearPolynomial);
 
 #[cfg_attr(test, derive(PartialEq))]
 #[derive(Debug, Default)]
@@ -43,6 +43,15 @@ pub struct Transition {
 impl Assignment {
     pub fn new(variables: &mut VariableMap, name: &Variable, value: LinearPolynomial) -> Self {
         Assignment(variables.get_or_push(name), value)
+    }
+
+    pub fn apply(&self, mut pol: LinearPolynomial) -> LinearPolynomial {
+        // we assume valid variableID in the assignment
+        let mut substitution = self.1.clone();
+        substitution.mul_by_constant(pol.get_coefficient(self.0).unwrap().clone());
+        pol.get_mut_coefficient(self.0).unwrap().0 = 0.0;
+
+        pol + substitution
     }
 
     #[cfg(test)]
@@ -66,23 +75,35 @@ impl DisplayLabel for Assignment {
 mod tests {
 
     mod macros {
-        use crate::{
-            mock_polynomial, mock_varmap,
-            pts::{transition::Assignment, variable_map::Variable},
-        };
 
-        #[test]
-        fn assignment() {
-            let mut map = mock_varmap!("test");
-            assert_eq!(
-                Assignment::new(
-                    &mut map,
-                    &Variable::new("test"),
+        mod assignment {
+            use crate::{
+                mock_polynomial, mock_varmap,
+                pts::{transition::Assignment, variable_map::Variable},
+            };
+
+            #[test]
+            fn new() {
+                let mut map = mock_varmap!("test");
+                assert_eq!(
+                    Assignment::new(
+                        &mut map,
+                        &Variable::new("test"),
+                        mock_polynomial!(6.8, -0.0, -6.8, 134.689, 0.0)
+                    ),
+                    mock_assignment!(1, 6.8, -0.0, -6.8, 134.689, 0.0)
+                );
+                assert_eq!(map, mock_varmap!("test"))
+            }
+
+            #[test]
+            fn apply() {
+                assert_eq!(
+                    mock_assignment!(1, 6.8, -0.0, -6.8, 134.689, 0.0)
+                        .apply(mock_polynomial!(0.0, 1.0)),
                     mock_polynomial!(6.8, -0.0, -6.8, 134.689, 0.0)
-                ),
-                mock_assignment!(1, 6.8, -0.0, -6.8, 134.689, 0.0)
-            );
-            assert_eq!(map, mock_varmap!("test"))
+                )
+            }
         }
 
         mod transition {
