@@ -106,6 +106,18 @@ impl Relation {
         }
     }
 
+    pub fn split_constant(mut self) -> (LinearPolynomial, LinearPolynomial) {
+        let mut new_pol = LinearPolynomial::default();
+        // we assume all polynomials to have atleast the constant term
+        assert!(self.pol.len() > 0);
+        assert!(new_pol.len() > 0);
+        std::mem::swap(
+            self.pol.get_mut_coefficient(0).unwrap(),
+            new_pol.get_mut_coefficient(0).unwrap(),
+        );
+        (self.pol, -new_pol)
+    }
+
     #[cfg(test)]
     pub fn mock(relation_type: RelationType, pol: LinearPolynomial) -> Self {
         Relation { relation_type, pol }
@@ -122,7 +134,7 @@ impl DisplayLabel for Relation {
             .find(|x| x.coefficient != Constant(0.0));
 
         let sign;
-        let left_side;
+        let copy;
         match leading_linear_term {
             Some(t) if t.coefficient < Constant(0.0) => {
                 // the leading linear coefficient is negative =>
@@ -133,7 +145,7 @@ impl DisplayLabel for Relation {
                     RelationType::Inequation => " =/= ",
                     RelationType::Equation => " = ",
                 };
-                left_side = -self.pol.clone();
+                copy = !self.clone();
             }
             _ => {
                 sign = match self.relation_type {
@@ -142,14 +154,13 @@ impl DisplayLabel for Relation {
                     RelationType::Inequation => " =/= ",
                     RelationType::Equation => " = ",
                 };
-                left_side = self.pol.clone();
+                copy = self.clone();
             }
         }
-        let (left_side, right_side) = left_side.separate_constant_term();
+        let (left_side, right_side) = copy.split_constant();
         label.push_str(left_side.label(variable_map).as_str());
         label.push_str(sign);
-        // neg because its separated from left side
-        label.push_str((-right_side).label(variable_map).as_str());
+        label.push_str(right_side.label(variable_map).as_str());
         label
     }
 }
@@ -312,6 +323,18 @@ mod tests {
                 &mock_polynomial!(3.0, 0.0, -1.0, 0.0)
             );
             assert!(cond.is_inequation());
+        }
+    }
+
+    mod split {
+        use crate::mock_polynomial;
+
+        #[test]
+        fn constant() {
+            let lhs = mock_relation!("<=", 9.0, -3.0, 4.0, -5.0);
+            let (lhs, rhs) = lhs.split_constant();
+            assert_eq!(lhs, mock_polynomial!(0.0, -3.0, 4.0, -5.0));
+            assert_eq!(rhs, mock_polynomial!(-9.0));
         }
     }
 

@@ -9,7 +9,10 @@ use std::{
 };
 use term::Term;
 
-use super::{variable_map::VariableID, DisplayLabel};
+use super::{
+    variable_map::{VariableID, CONSTANT_ID},
+    DisplayLabel,
+};
 
 // Rust Book 19.5 Macros: example vec! macro
 // test only, breaks interface
@@ -27,6 +30,9 @@ macro_rules! mock_polynomial {
         }
     };
 }
+
+type CoefficientIterator<'a> = std::slice::Iter<'a, Constant>;
+type CoefficientIteratorMut<'a> = std::slice::IterMut<'a, Constant>;
 
 #[cfg_attr(test, derive(PartialEq))]
 #[derive(Debug, Clone)]
@@ -63,7 +69,7 @@ impl<'a> LinearPolynomial {
     ) -> Result<VariableID, VariableError> {
         self.resize_to_map(map);
         if term.is_constant() {
-            self.coefficients[0] += term.coefficient;
+            self.coefficients[CONSTANT_ID] += term.coefficient;
             Ok(0)
         } else {
             let index = map.get_id(term.variable.as_ref().unwrap());
@@ -104,45 +110,12 @@ impl<'a> LinearPolynomial {
         self.coefficients.get_mut(var)
     }
 
-    pub fn separate_constant_term(mut self) -> (LinearPolynomial, LinearPolynomial) {
-        let mut new_pol = LinearPolynomial::default();
-        unsafe {
-            // we assume all polynomials to have atleast the constant term
-            assert!(self.coefficients.len() > 0);
-            assert!(new_pol.coefficients.len() > 0);
-            std::mem::swap(
-                self.coefficients.get_unchecked_mut(0),
-                new_pol.coefficients.get_unchecked_mut(0),
-            );
-        }
-        (self, new_pol)
+    pub fn iter(&'a self) -> CoefficientIterator<'a> {
+        self.coefficients.iter()
     }
 
-    // only affects the smaller range of the map and polynomial
-    pub fn separate_with<F: FnMut(&Term) -> bool>(
-        mut self,
-        variables: &VariableMap,
-        mut filter: F,
-    ) -> (LinearPolynomial, LinearPolynomial) {
-        let mut new_pol = LinearPolynomial {
-            coefficients: Vec::with_capacity(self.len()),
-        };
-
-        for i in 0..std::cmp::min(self.len(), variables.len()) {
-            if filter(&Term {
-                coefficient: self.coefficients[i],
-                variable: variables.get_variable(i).cloned(),
-            }) {
-                unsafe {
-                    // see min a few lines above
-                    std::mem::swap(
-                        self.coefficients.get_unchecked_mut(i),
-                        new_pol.coefficients.get_unchecked_mut(i),
-                    );
-                }
-            }
-        }
-        (self, new_pol)
+    pub fn iter_mut(&'a mut self) -> CoefficientIteratorMut<'a> {
+        self.coefficients.iter_mut()
     }
 
     pub fn iter_terms(&'a self, variable_map: &'a VariableMap) -> TermIterator<'a> {
@@ -422,14 +395,6 @@ mod tests {
             let lhs = -lhs;
             assert_eq!(lhs, mock_polynomial!(0.0, 3.0, -4.0, 5.0));
         }
-    }
-
-    #[test]
-    fn separate_constant_term() {
-        let lhs = mock_polynomial!(9.0, -3.0, 4.0, -5.0);
-        let (lhs, rhs) = lhs.separate_constant_term();
-        assert_eq!(lhs, mock_polynomial!(0.0, -3.0, 4.0, -5.0));
-        assert_eq!(rhs, mock_polynomial!(9.0));
     }
 
     mod label {

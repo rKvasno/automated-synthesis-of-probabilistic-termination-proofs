@@ -3,6 +3,8 @@ use std::fmt;
 // LinearPolynomial index
 pub type VariableID = usize;
 
+pub const CONSTANT_ID: VariableID = 0;
+
 // test only, breaks interface
 #[cfg(test)]
 #[macro_export]
