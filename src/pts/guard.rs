@@ -1,11 +1,6 @@
-use std::fmt;
-
-use crate::pts::{linear_polynomial, system, transition};
-use linear_polynomial::constant::Constant;
-use system::System;
-use transition::Transition;
-
-use super::{variable_map::VariableMap, DisplayLabel};
+use super::{
+    linear_polynomial::coefficient::Constant, system::StateSystem, transition::Transition,
+};
 
 #[macro_export]
 macro_rules! guards {
@@ -16,7 +11,7 @@ macro_rules! guards {
     };
     [ P: $( $p:expr, $t:expr ), + $(,)?] => {
         {
-            $crate::pts::guard::Guards::Probabilistic(std::vec![$(($crate::pts::linear_polynomial::constant::Constant($p), $t),)*])
+            $crate::pts::guard::Guards::Probabilistic(std::vec![$(($crate::pts::linear_polynomial::coefficient::Constant($p), $t),)*])
         }
     };
     [ L: $( $c:expr, $t:expr ), + $(,)?] => {
@@ -33,12 +28,13 @@ macro_rules! guards {
 
 pub type Probability = Constant;
 
-// 32 bytes
 #[cfg_attr(test, derive(PartialEq))]
 #[derive(Debug)]
 pub enum Guards {
-    Logic(Vec<(System, Transition)>),
+    // it is the programmers responsibility to make sure probabilities are non-negative and their
+    // sum is 1.0 (as close to 1.0 as f64 allows)
     Probabilistic(Vec<(Probability, Transition)>),
+    Logic(Vec<(StateSystem, Transition)>),
     Nondeterministic(Vec<Transition>),
     Unguarded(Box<Transition>),
 }
@@ -46,8 +42,8 @@ pub enum Guards {
 impl Guards {
     pub fn is_empty(&self) -> bool {
         match self {
-            Guards::Logic(data) => data.is_empty(),
             Guards::Probabilistic(data) => data.is_empty(),
+            Guards::Logic(data) => data.is_empty(),
             Guards::Nondeterministic(data) => data.is_empty(),
             Guards::Unguarded(_) => false,
         }
@@ -64,26 +60,50 @@ impl Default for Guards {
     }
 }
 
+impl From<Vec<(Probability, Transition)>> for Guards {
+    fn from(value: Vec<(Probability, Transition)>) -> Self {
+        Self::Probabilistic(value)
+    }
+}
+
+impl From<Vec<(StateSystem, Transition)>> for Guards {
+    fn from(value: Vec<(StateSystem, Transition)>) -> Self {
+        Self::Logic(value)
+    }
+}
+
+impl From<Vec<Transition>> for Guards {
+    fn from(value: Vec<Transition>) -> Self {
+        Self::Nondeterministic(value)
+    }
+}
+
+impl From<Transition> for Guards {
+    fn from(value: Transition) -> Self {
+        Self::Unguarded(Box::new(value))
+    }
+}
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum GuardsError {
-    TerminatingLocation,
+    StateTerminatingLocation,
     Empty,
 }
 
-impl fmt::Display for GuardsError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl std::fmt::Display for GuardsError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            GuardsError::Empty => write!(f, "Guards can't be empty!"),
-            GuardsError::TerminatingLocation => write!(
-                f,
-                "The terminating location can't have outgoing transitions!"
-            ),
+            GuardsError::Empty => write!(f, "guards can't be empty"),
+            GuardsError::StateTerminatingLocation => {
+                write!(f, "terminating location can't have outgoing transitions")
+            }
         }
     }
 }
 
+#[cfg_attr(test, derive(PartialEq))]
+#[derive(Debug)]
 pub enum GuardedTransition<'a> {
-    Logic(&'a (System, Transition)),
+    Logic(&'a (StateSystem, Transition)),
     Probabilistic(&'a (Probability, Transition)),
     Nondeterministic(&'a Transition),
     Unguarded(&'a Transition),
@@ -100,19 +120,17 @@ impl<'a> GuardedTransition<'a> {
     }
 }
 
-impl<'a> DisplayLabel for GuardedTransition<'a> {
-    fn label(&self, variable_map: &VariableMap) -> String {
-        let mut label = match self {
-            Self::Logic((condition, _)) => condition.label(variable_map),
-            Self::Probabilistic((probability, _)) => format!("{}", probability),
-            Self::Nondeterministic(_) => String::default(),
-            Self::Unguarded(_) => String::default(),
+impl<'a> std::fmt::Display for GuardedTransition<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Logic((condition, _)) => write!(f, "{}", condition)?,
+            Self::Probabilistic((probability, _)) => write!(f, "{}", probability)?,
+            _ => (),
         };
         for assign in self.as_transition().assignments.iter() {
-            label.push_str("\n");
-            label.push_str(assign.label(variable_map).as_str());
+            write!(f, "\n{}", assign)?;
         }
-        label
+        Ok(())
     }
 }
 
@@ -151,71 +169,69 @@ mod tests {
 
         mod guards {
             use crate::{
-                mock_relation, mock_transition,
-                pts::{guard::Guards, linear_polynomial::constant::Constant},
-                system,
+                pts::{guard::Guards, linear_polynomial::coefficient::Constant},
+                state_system, transition, variables,
             };
             #[test]
             fn unguarded() {
+                let mut variables = variables!();
                 assert_eq!(
-                    guards!(mock_transition!(Some(23); 1, 2.4, 1.3; 2, 1.0, -1.0)),
+                    guards!(
+                        transition!(Some(23), &mut variables; "a", 2.4, 1.3, "a"; "b", 1.0, -1.0, "a")
+                    ),
                     Guards::Unguarded(std::boxed::Box::new(
-                        mock_transition!(Some(23); 1, 2.4, 1.3; 2, 1.0, -1.0)
+                        transition!(Some(23), &mut variables; "a", 2.4, 1.3, "a"; "b", 1.0, -1.0, "a")
                     ))
                 );
             }
 
             #[test]
             fn nondeterministic() {
+                let mut variables = variables!();
                 assert_eq!(
                     guards!(
-                        mock_transition!(Some(23); 1, 2.4, 1.3; 2, 1.0, -1.0),
-                        mock_transition!(None; 1, 1.3, 2.4; 2, 13.0, -1.8),
-                        mock_transition!(Some(21); 1, -20.4, 1.3; 2, 0.0, 0.0)
+                        transition!(Some(23), &mut variables; "a", 2.4, 1.3, "a"; "b", 1.0, -1.0, "a"),
+                        transition!(None, &mut variables; "a", 1.3, 2.4, "a"; "b", 13.0, -1.8, "a"),
+                        transition!(Some(21), &mut variables; "a", -20.4, 1.3, "a"; "b", 0.0, 0.0, "a")
                     ),
                     Guards::Nondeterministic(vec![
-                        mock_transition!(Some(23); 1, 2.4, 1.3; 2, 1.0, -1.0),
-                        mock_transition!(None; 1, 1.3, 2.4; 2, 13.0, -1.8),
-                        mock_transition!(Some(21); 1, -20.4, 1.3; 2, 0.0, 0.0)
+                        transition!(Some(23), &mut variables; "a", 2.4, 1.3, "a"; "b", 1.0, -1.0, "a"),
+                        transition!(None, &mut variables; "a", 1.3, 2.4, "a"; "b", 13.0, -1.8, "a"),
+                        transition!(Some(21), &mut variables; "a", -20.4, 1.3, "a"; "b", 0.0, 0.0, "a")
                     ])
                 );
             }
 
             #[test]
             fn logic() {
+                let mut variables = variables!();
                 assert_eq!(
                     guards!(L:
-                        system!(mock_relation!(">", 0.1, -2.3)),
-                        mock_transition!(Some(23); 1, 2.4, 1.3; 2, 1.0, -1.0),
-                        system!(
-                            mock_relation!("<=", -0.1, 2.3),
-                            mock_relation!(">=", 0.0, 3.8),
+                        state_system!(&mut variables; ">", 0.1, -2.3, "a"),
+                        transition!(Some(23), &mut variables; "a", 2.4, 1.3, "a"; "b", 1.0, -1.0, "a"),
+                        state_system!(&mut variables;
+                            "<=", -0.1, 2.3, "a";
+                            ">=", 0.0, 3.8, "a"
                         ),
-                        mock_transition!(None; 1, 1.3, 2.4; 2, 13.0, -1.8),
-                        system!(
-                            mock_relation!("<=", -0.1, 2.3),
-                            mock_relation!("<", 0.0, -3.8),
+                        transition!(None, &mut variables; "a", 1.3, 2.4, "a"; "b", 13.0, -1.8, "a"),
+                        state_system!(&mut variables;
+                            "<=", -0.1, 2.3, "a";
+                            "<", 0.0, -3.8, "a"
                         ),
-                        mock_transition!(Some(21); 1, -20.4, 1.3; 2, 0.0, 0.0)
+                        transition!(Some(21), &mut variables; "a", -20.4, 1.3, "a"; "b", 0.0, 0.0, "a")
                     ),
                     Guards::Logic(vec![
                         (
-                            system!(mock_relation!(">", 0.1, -2.3)),
-                            mock_transition!(Some(23); 1, 2.4, 1.3; 2, 1.0, -1.0)
+                            state_system!(&mut variables;">", 0.1, -2.3, "a"),
+                            transition!(Some(23), &mut variables; "a", 2.4, 1.3, "a"; "b", 1.0, -1.0, "a")
                         ),
                         (
-                            system!(
-                                mock_relation!("<=", -0.1, 2.3),
-                                mock_relation!(">=", 0.0, 3.8),
-                            ),
-                            mock_transition!(None; 1, 1.3, 2.4; 2, 13.0, -1.8)
+                            state_system!(&mut variables;"<=", -0.1, 2.3, "a"; ">=", 0.0, 3.8, "a"),
+                            transition!(None, &mut variables; "a", 1.3, 2.4, "a"; "b", 13.0, -1.8, "a")
                         ),
                         (
-                            system!(
-                                mock_relation!("<=", -0.1, 2.3),
-                                mock_relation!("<", 0.0, -3.8),
-                            ),
-                            mock_transition!(Some(21); 1, -20.4, 1.3; 2, 0.0, 0.0)
+                            state_system!(&mut variables;"<=", -0.1, 2.3, "a"; "<", 0.0, -3.8, "a"),
+                            transition!(Some(21), &mut variables; "a", -20.4, 1.3, "a"; "b", 0.0, 0.0, "a")
                         )
                     ])
                 );
@@ -223,27 +239,28 @@ mod tests {
 
             #[test]
             fn probabilistic() {
+                let mut variables = variables!();
                 assert_eq!(
                     guards!(P:
                         0.0,
-                        mock_transition!(Some(23); 1, 2.4, 1.3; 2, 1.0, -1.0),
+                        transition!(Some(23), &mut variables; "a", 2.4, 1.3, "a"; "b", 1.0, -1.0, "a"),
                         0.3,
-                        mock_transition!(None; 1, 1.3, 2.4; 2, 13.0, -1.8),
+                        transition!(None, &mut variables; "a", 1.3, 2.4, "a"; "b", 13.0, -1.8, "a"),
                         0.7,
-                        mock_transition!(Some(21); 1, -20.4, 1.3; 2, 0.0, 0.0)
+                        transition!(Some(21), &mut variables; "a", -20.4, 1.3, "a"; "b", 0.0, 0.0, "a")
                     ),
                     Guards::Probabilistic(vec![
                         (
                             Constant(0.0),
-                            mock_transition!(Some(23); 1, 2.4, 1.3; 2, 1.0, -1.0)
+                            transition!(Some(23), &mut variables; "a", 2.4, 1.3, "a"; "b", 1.0, -1.0, "a")
                         ),
                         (
                             Constant(0.3),
-                            mock_transition!(None; 1, 1.3, 2.4; 2, 13.0, -1.8)
+                            transition!(None, &mut variables; "a", 1.3, 2.4, "a"; "b", 13.0, -1.8, "a")
                         ),
                         (
                             Constant(0.7),
-                            mock_transition!(Some(21); 1, -20.4, 1.3; 2, 0.0, 0.0)
+                            transition!(Some(21), &mut variables; "a", -20.4, 1.3, "a"; "b", 0.0, 0.0, "a")
                         )
                     ])
                 );
@@ -251,71 +268,68 @@ mod tests {
         }
     }
     mod label {
+
         use crate::{
-            mock_relation, mock_transition, mock_varmap,
-            pts::{guard::GuardedTransition, linear_polynomial::constant::Constant, DisplayLabel},
-            system,
+            pts::{guard::GuardedTransition, linear_polynomial::coefficient::Constant},
+            relation, state_system, system, transition, variables,
         };
 
         #[test]
         fn logic() {
-            let data = (system![mock_relation!("<", 1.0)], mock_transition!(None));
+            let data = (system![relation!("<", 1.0)], transition!(None));
             let guarded_transition = GuardedTransition::Logic(&data);
-            let map = mock_varmap!();
-            assert_eq!(guarded_transition.label(&map), "0 < -1");
+            assert_eq!(guarded_transition.to_string(), "0 < -1");
+
+            let mut variables = variables!();
 
             let data = (
-                system!(
-                    mock_relation!("<=", 0.0, 1.0),
-                    mock_relation!("<", 1.0, 2.0, 1.0)
+                state_system!(&mut variables;
+                    "<=", 0.0, 1.0, "a";
+                    "<", 1.0, 2.0, "a", 1.0, "len"
                 ),
-                mock_transition!(None; 1, 0.0),
+                transition!(None, &mut variables; "a", 0.0),
             );
             let guarded_transition = GuardedTransition::Logic(&data);
-            let map = mock_varmap!("a", "len");
             assert_eq!(
-                guarded_transition.label(&map),
+                guarded_transition.to_string(),
                 "a <= 0\n2a + len < -1\na = 0"
             );
         }
 
         #[test]
         fn probabilistic() {
+            let mut variables = variables!("a", "b", "c",);
             let data = (
                 Constant(0.0),
-                mock_transition!(None;
-                    1, 0.0, 0.0;
-                    2, 2.0, 1.0, 2.0, 0.0;
-                    1, -4.0, 0.0, 0.0, 1.0
+                transition!(None, &mut variables;
+                    "a", 0.0, 0.0, "a";
+                    "b", 2.0, 1.0, "a", 2.0, "b", 0.0, "c";
+                    "a", -4.0, 0.0, "a", 0.0, "b", 1.0, "c"
                 ),
             );
             let guarded_transition = GuardedTransition::Probabilistic(&data);
-            let map = mock_varmap!("a", "b", "c",);
             assert_eq!(
-                guarded_transition.label(&map),
+                guarded_transition.to_string(),
                 "0\na = 0\nb = a + 2b + 2\na = c - 4"
             );
 
-            let data = (Constant(0.2222), mock_transition!(None));
+            let data = (Constant(0.2222), transition!(None));
             let guarded_transition = GuardedTransition::Probabilistic(&data);
-            let map = mock_varmap!();
-            assert_eq!(guarded_transition.label(&map), "0.2222");
+            assert_eq!(guarded_transition.to_string(), "0.2222");
         }
 
         #[test]
         fn nondeterministic() {
-            let data = mock_transition!(None);
+            let data = transition!(None);
             let guarded_transition = GuardedTransition::Nondeterministic(&data);
-            let map = mock_varmap!();
-            assert_eq!(guarded_transition.label(&map), "");
+            assert_eq!(guarded_transition.to_string(), "");
         }
 
         #[test]
         fn unguarded() {
-            let data = mock_transition!(None);
+            let data = transition!(None);
             let guarded_transition = GuardedTransition::Unguarded(&data);
-            let map = mock_varmap!(Default::default());
-            assert_eq!(guarded_transition.label(&map), "");
+            assert_eq!(guarded_transition.to_string(), "");
         }
     }
 }

@@ -1,20 +1,19 @@
-use std::ops::Not;
-use std::slice::Iter;
+use std::{
+    borrow::{Borrow, BorrowMut},
+    ops::Not,
+};
 
-use super::relation::Relation;
-use super::variable_map::VariableMap;
-use super::DisplayLabel;
+use super::{
+    linear_polynomial::coefficient::{Coefficient, Constant},
+    relation::Relation,
+    variable::{program_variable::ProgramVariable, Variable},
+};
 
-// Rust Book 19.5 Macros: example vec! macro
 #[macro_export]
 macro_rules! system {
     [ $( $x:expr ), * $(,)?] => {
         {
-            let mut temp_system: $crate::pts::system::System = $crate::pts::system::System::default();
-            $(
-                temp_system.push($x);
-            )*
-            temp_system
+            $crate::pts::system::System::from(std::vec![$($x, )*])
         }
     };
 }
@@ -23,7 +22,7 @@ macro_rules! system {
 macro_rules! system_append {
     [ $( $x:expr ), * $(,)?] => {
         {
-            let mut temp_system: $crate::pts::system::System = $crate::pts::system::System::default();
+            let mut temp_system = $crate::pts::system::System::default();
             $(
                 temp_system.append($x);
             )*
@@ -32,62 +31,155 @@ macro_rules! system_append {
     };
 }
 
-pub type RelationIter<'a> = Iter<'a, Relation>;
+#[macro_export]
+macro_rules! state_system {
+    [
+        $(
+            $varset:expr; $(
+                $sign:literal, $constant: expr $(
+                    , $coeff:expr, $var:expr
+                )*
+            );* $(;)?
+        )?] => {
+        {
+            let temp: $crate::pts::system::StateSystem = $crate::system!(
+                $(
+                    $(
+                        $crate::relation!(
+                            $sign,
+                            $constant,
+$varset
+                            $(
+                                ,
+                                $coeff,
+                                $var
+                            )*
 
-#[cfg_attr(test, derive(PartialEq))]
-#[derive(Debug, Default, Clone)]
-pub struct System {
-    relations: Vec<Relation>,
+
+
+                        ),
+                    )*
+                )?
+
+            );
+            temp
+        }
+    };
 }
 
-impl System {
-    pub fn push(&mut self, inequality: Relation) {
-        self.relations.push(inequality);
+pub type RelationIter<'a, V, C> = std::slice::Iter<'a, Relation<V, C>>;
+pub type StateSystem = System<ProgramVariable, Constant>;
+
+#[cfg_attr(test, derive(PartialEq))]
+#[derive(Debug, Clone)]
+pub struct System<V: Variable, C: Coefficient> {
+    data: Vec<Relation<V, C>>,
+}
+
+impl<V: Variable, C: Coefficient> System<V, C> {
+    pub fn push(&mut self, inequality: Relation<V, C>) {
+        self.data.push(inequality);
     }
 
-    pub fn append(&mut self, system: &mut System) {
-        self.relations.append(&mut system.relations);
+    pub fn append(&mut self, system: &mut System<V, C>) {
+        self.data.append(&mut system.data);
     }
 
     pub fn len(&self) -> usize {
-        self.relations.len()
+        self.data.len()
     }
 
-    pub fn get(&self, index: usize) -> Option<&Relation> {
-        self.relations.get(index)
+    pub fn get(&self, index: usize) -> Option<&Relation<V, C>> {
+        self.data.get(index)
     }
 
-    pub fn get_mut(&mut self, index: usize) -> Option<&mut Relation> {
-        self.relations.get_mut(index)
+    pub fn get_mut(&mut self, index: usize) -> Option<&mut Relation<V, C>> {
+        self.data.get_mut(index)
     }
 
-    pub fn iter<'a>(&'a self) -> RelationIter<'a> {
-        self.relations.iter()
+    pub fn iter(&self) -> RelationIter<V, C> {
+        self.data.iter()
     }
 }
 
-impl DisplayLabel for System {
-    fn label(&self, variable_map: &VariableMap) -> String {
+impl<V: Variable, C: Coefficient> Borrow<Vec<Relation<V, C>>> for System<V, C> {
+    fn borrow(&self) -> &Vec<Relation<V, C>> {
+        &self.data
+    }
+}
+
+impl<V: Variable, C: Coefficient> BorrowMut<Vec<Relation<V, C>>> for System<V, C> {
+    fn borrow_mut(&mut self) -> &mut Vec<Relation<V, C>> {
+        &mut self.data
+    }
+}
+
+impl<V: Variable, C: Coefficient> From<Vec<Relation<V, C>>> for System<V, C> {
+    fn from(value: Vec<Relation<V, C>>) -> Self {
+        Self { data: value }
+    }
+}
+
+impl<V: Variable, C: Coefficient> FromIterator<Relation<V, C>> for System<V, C> {
+    fn from_iter<T: IntoIterator<Item = Relation<V, C>>>(iter: T) -> Self {
+        Self {
+            data: Vec::<Relation<V, C>>::from_iter(iter),
+        }
+    }
+}
+
+impl<V: Variable, C: Coefficient> IntoIterator for System<V, C> {
+    type IntoIter = std::vec::IntoIter<Self::Item>;
+    type Item = Relation<V, C>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.data.into_iter()
+    }
+}
+
+impl<'a, V: Variable, C: Coefficient> IntoIterator for &'a System<V, C> {
+    type IntoIter = std::slice::Iter<'a, Relation<V, C>>;
+    type Item = &'a Relation<V, C>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.data.iter()
+    }
+}
+
+impl<'a, V: Variable, C: Coefficient> IntoIterator for &'a mut System<V, C> {
+    type IntoIter = std::slice::IterMut<'a, Relation<V, C>>;
+    type Item = &'a mut Relation<V, C>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.data.iter_mut()
+    }
+}
+
+impl<V: Variable, C: Coefficient> Default for System<V, C> {
+    fn default() -> Self {
+        Self {
+            data: Default::default(),
+        }
+    }
+}
+
+impl<V: Variable, C: Coefficient> std::fmt::Display for System<V, C> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         //ineq (\n ineq)*
-        let mut label = String::default();
-        let mut iter = self.relations.iter().map(|x| x.label(variable_map));
+        let mut iter = self.data.iter();
         match iter.next() {
-            Some(line) => label.push_str(line.as_str()),
+            Some(line) => write!(f, "{}", line)?,
             _ => (),
         }
         for line in iter {
-            label.push_str("\n");
-            label.push_str(line.as_str());
+            write!(f, "\n{}", line)?
         }
-        label
+        Ok(())
     }
 }
 
-impl Not for System {
+impl<V: Variable, C: Coefficient> Not for System<V, C> {
     type Output = Self;
     fn not(self) -> Self::Output {
         System {
-            relations: self.relations.into_iter().map(|x| !x).collect(),
+            data: self.data.into_iter().map(|x| !x).collect(),
         }
     }
 }
@@ -96,75 +188,176 @@ impl Not for System {
 mod tests {
 
     mod macros {
-        use crate::{mock_relation, pts::system::System};
+        use crate::{pts::system::StateSystem, relation, variables};
 
         #[test]
         fn system() {
-            let mut system = System::default();
-            system.push(mock_relation!(">", 0.0, 12.4, -3.5, 2.4, -0.0));
+            let mut variables = variables!();
 
-            system.push(mock_relation!("<=", -1.0, -2.4));
+            let mut system = StateSystem::default();
+            system.push(relation!(
+                ">",
+                0.0,
+                &mut variables,
+                12.4,
+                "a",
+                -3.5,
+                "b",
+                2.4,
+                "c",
+                -0.0,
+                "d",
+            ));
 
-            system.push(mock_relation!("=", 0.0, 0.0, 0.0, 0.0));
+            system.push(relation!("<=", -1.0, &mut variables, -2.4, "a"));
 
-            system.push(mock_relation!("!=", 111.111));
+            system.push(relation!(
+                "=",
+                0.0,
+                &mut variables,
+                0.0,
+                "a",
+                0.0,
+                "b",
+                0.0,
+                "c"
+            ));
+
+            system.push(relation!("!=", 111.111));
 
             assert_eq!(
                 system,
                 system!(
-                    mock_relation!(">", 0.0, 12.4, -3.5, 2.4, -0.0),
-                    mock_relation!("<=", -1.0, -2.4),
-                    mock_relation!("=", 0.0, 0.0, 0.0, 0.0),
-                    mock_relation!("!=", 111.111)
+                    relation!(
+                        ">",
+                        0.0,
+                        &mut variables,
+                        12.4,
+                        "a",
+                        -3.5,
+                        "b",
+                        2.4,
+                        "c",
+                        -0.0,
+                        "d"
+                    ),
+                    relation!("<=", -1.0, &mut variables, -2.4, "a"),
+                    relation!("=", 0.0, &mut variables, 0.0, "a", 0.0, "b", 0.0, "c"),
+                    relation!("!=", 111.111)
                 ),
             );
         }
 
         #[test]
         fn system_append() {
-            assert_eq!(
-                system!(
-                    mock_relation!(">", 0.0, 12.4, -3.5, 2.4, -0.0),
-                    mock_relation!("<=", -1.0, -2.4),
-                    mock_relation!("=", 0.0, 0.0, 0.0, 0.0),
-                    mock_relation!("!=", 111.111)
+            let mut variables = variables!();
+            let a: StateSystem = system!(
+                relation!(
+                    ">",
+                    0.0,
+                    &mut variables,
+                    12.4,
+                    "a",
+                    -3.5,
+                    "b",
+                    2.4,
+                    "c",
+                    -0.0,
+                    "d"
                 ),
-                system_append!(
-                    &mut system!(mock_relation!(">", 0.0, 12.4, -3.5, 2.4, -0.0),),
-                    &mut system!(
-                        mock_relation!("<=", -1.0, -2.4),
-                        mock_relation!("=", 0.0, 0.0, 0.0, 0.0),
+                relation!("<=", -1.0, &mut variables, -2.4, "a"),
+                relation!("=", 0.0, &mut variables, 0.0, "a", 0.0, "b", 0.0, "c"),
+                relation!("!=", 111.111)
+            );
+            let b = system_append!(
+                &mut system!(relation!(
+                    ">",
+                    0.0,
+                    &mut variables,
+                    12.4,
+                    "a",
+                    -3.5,
+                    "b",
+                    2.4,
+                    "c",
+                    0.0,
+                    "d"
+                ),),
+                &mut system!(
+                    relation!("<=", -1.0, &mut variables, -2.4, "a"),
+                    relation!("=", 0.0, &mut variables, 0.0, "a", 0.0, "b", 0.0, "c"),
+                ),
+                &mut system!(),
+                &mut system!(relation!("!=", 111.111))
+            );
+            assert_eq!(a, b);
+        }
+
+        #[test]
+        fn state_system() {
+            let mut variables = variables!();
+            assert_eq!(
+                state_system!(
+                    &mut variables;
+                    ">", 0.0, 12.4, "a", -3.5, "b", 2.4, "c", -0.0, "d";
+                    "<=", -1.0, -2.4, "a";
+                    "=", 0.0, 0.0, "a", 0.0, "b", 0.0, "c";
+                    "!=", 111.111
+                ),
+                system!(
+                    relation!(
+                        ">",
+                        0.0,
+                        &mut variables,
+                        12.4,
+                        "a",
+                        -3.5,
+                        "b",
+                        2.4,
+                        "c",
+                        -0.0,
+                        "d"
                     ),
-                    &mut system!(),
-                    &mut system!(mock_relation!("!=", 111.111))
-                )
+                    relation!("<=", -1.0, &mut variables, -2.4, "a"),
+                    relation!("=", 0.0, &mut variables, 0.0, "a", 0.0, "b", 0.0, "c"),
+                    relation!("!=", 111.111)
+                ),
             );
         }
     }
 
     mod label {
-        use crate::{mock_relation, mock_varmap, pts::DisplayLabel};
+        use crate::{pts::system::StateSystem, relation, variables};
 
         #[test]
         fn zeroes() {
-            let system = system!(mock_relation!("<=", 0.0), mock_relation!("<=", 0.0),);
-            let map = mock_varmap!();
-            assert_eq!(system.label(&map), "0 <= 0\n0 <= 0");
+            let system: StateSystem = system!(relation!("<=", 0.0), relation!("<=", 0.0),);
+            assert_eq!(system.to_string(), "0 <= 0\n0 <= 0");
         }
         #[test]
         fn vars() {
-            let system = system!(
-                mock_relation!("<=", 0.0, 1.0),
-                mock_relation!("<=", 0.0, -1.0),
+            let mut variables = variables!("a");
+            let system = state_system!(&mut variables;
+                "<=", 0.0, 1.0, "a";
+                "<=", 0.0, -1.0, "a";
             );
-            let map = mock_varmap!("a", "b");
-            assert_eq!(system.label(&map), "a <= 0\na >= 0");
+            assert_eq!(system.to_string(), "a <= 0\na >= 0");
         }
         #[test]
         fn neg() {
-            let system = system!(mock_relation!("<", 0.0, -1.0, 0.0, 0.0));
-            let map = mock_varmap!("test1", "test2", "test3",);
-            assert_eq!(system.label(&map), "test1 > 0");
+            let mut variables = variables!("test1", "test2", "test3",);
+            let system = state_system!(
+                &mut variables;
+                "<",
+                0.0,
+                -1.0,
+                "test1",
+                0.0,
+                "test2",
+                0.0,
+                "test3"
+            );
+            assert_eq!(system.to_string(), "test1 > 0");
         }
     }
 }

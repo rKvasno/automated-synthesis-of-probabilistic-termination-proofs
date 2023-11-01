@@ -2,14 +2,14 @@ use pest_derive::Parser;
 
 #[derive(Parser)]
 #[grammar = "parsers/grammars/linear_polynomial.pest"]
-pub struct LinearPolynomialTestParser;
+pub struct PolynomialTestParser;
 
 #[cfg(test)]
 mod tests {
 
     use pest_test_gen::pest_tests;
     #[pest_tests(
-        crate::parsers::grammars::linear_polynomial::LinearPolynomialTestParser,
+        crate::parsers::grammars::linear_polynomial::PolynomialTestParser,
         crate::parsers::grammars::linear_polynomial::Rule,
         "linear_polynomial",
         dir = "tests/parsers/grammars/linear_polynomial",
@@ -18,14 +18,14 @@ mod tests {
     #[cfg(test)]
     mod pest_test {}
 
-    use super::LinearPolynomialTestParser;
+    use super::PolynomialTestParser;
     use super::Rule;
     use pest::{consumes_to, fails_with, parses_to};
 
     #[test]
     fn invalid_polynomials() {
         parses_to! {
-            parser: LinearPolynomialTestParser,
+            parser: PolynomialTestParser,
             input: "a * b",
             rule: Rule::linear_polynomial,
             tokens: [
@@ -38,7 +38,7 @@ mod tests {
         };
 
         parses_to! {
-            parser: LinearPolynomialTestParser,
+            parser: PolynomialTestParser,
             input: "a + + b",
             rule: Rule::linear_polynomial,
             tokens: [
@@ -51,7 +51,7 @@ mod tests {
         };
 
         parses_to! {
-            parser: LinearPolynomialTestParser,
+            parser: PolynomialTestParser,
             input: "a b",
             rule: Rule::linear_polynomial,
             tokens: [
@@ -64,7 +64,7 @@ mod tests {
         };
 
         parses_to! {
-            parser: LinearPolynomialTestParser,
+            parser: PolynomialTestParser,
             input: "5 a",
             rule: Rule::linear_polynomial,
             tokens: [
@@ -79,7 +79,7 @@ mod tests {
         };
 
         parses_to! {
-            parser: LinearPolynomialTestParser,
+            parser: PolynomialTestParser,
             input: "1 2",
             rule: Rule::linear_polynomial,
             tokens: [
@@ -94,7 +94,7 @@ mod tests {
         };
 
         fails_with! {
-        parser: LinearPolynomialTestParser,
+        parser: PolynomialTestParser,
         input: "* 5",
         rule: Rule::linear_polynomial,
         positives: vec![Rule::linear_polynomial],
@@ -103,7 +103,7 @@ mod tests {
         };
 
         fails_with! {
-        parser: LinearPolynomialTestParser,
+        parser: PolynomialTestParser,
         input: "",
         rule: Rule::linear_polynomial,
         positives: vec![Rule::linear_polynomial],
@@ -115,7 +115,7 @@ mod tests {
     #[test]
     fn invalid_constant_expr() {
         fails_with! {
-            parser: LinearPolynomialTestParser,
+            parser: PolynomialTestParser,
             input: "-1",
             rule: Rule::constant_expr,
             positives: vec![Rule::constant],
@@ -124,7 +124,7 @@ mod tests {
         };
 
         fails_with! {
-            parser: LinearPolynomialTestParser,
+            parser: PolynomialTestParser,
             input: "(-1)",
             rule: Rule::constant_expr,
             positives: vec![Rule::constant],
@@ -133,7 +133,7 @@ mod tests {
         }
 
         parses_to! {
-            parser: LinearPolynomialTestParser,
+            parser: PolynomialTestParser,
             input: "2 - 2",
             rule: Rule::constant_expr,
             tokens: [
@@ -144,7 +144,7 @@ mod tests {
         };
 
         parses_to! {
-            parser: LinearPolynomialTestParser,
+            parser: PolynomialTestParser,
             input: "(3 + 4)(3 * 0)",
             rule: Rule::constant_expr,
             tokens: [

@@ -1,207 +1,298 @@
-pub mod constant;
-pub mod term;
-use crate::pts::variable_map::{VariableError, VariableMap};
-
-use constant::Constant;
 use std::{
-    iter::zip,
+    borrow::Borrow,
+    fmt::{Debug, Display},
+    hash::Hash,
     ops::{Add, AddAssign, Neg, Sub, SubAssign},
 };
-use term::Term;
 
-use super::{
-    variable_map::{VariableID, CONSTANT_ID},
-    DisplayLabel,
-};
+use indexmap::IndexMap;
 
-// Rust Book 19.5 Macros: example vec! macro
-// test only, breaks interface
-#[cfg(test)]
+use self::coefficient::{Coefficient, Constant};
+
+use super::variable::{program_variable::ProgramVariable, Variable};
+
+pub mod coefficient;
+
 #[macro_export]
-macro_rules! mock_polynomial {
-    [ $( $x:expr ), + $(,)?] => {
+macro_rules! polynomial {
+    [
+        $constant:expr
+        $(
+            ,
+            $varset:expr
+            $(
+                ,
+                $coeff:expr,
+                $var:expr
+            )*
+        )?
+        $(,)?
+    ] => {
         {
-            $crate::pts::linear_polynomial::LinearPolynomial::mock(std::vec![$($crate::pts::linear_polynomial::constant::Constant($x), )+])
+            let mut temp = $crate::pts::linear_polynomial::Polynomial::default();
+            $(
+                $(
+                    temp.add_term($coeff, Some($crate::pts::variable::Variable::new($varset, $var)));
+                )*
+            )?
+            temp.add_term( $constant, None);
+            temp
         }
     };
     [] => {
+        $crate::pts::linear_polynomial::Polynomial::default()
+    };
+}
+
+#[macro_export]
+macro_rules! state {
+    [ $($constant:expr $(, $varset:expr, $( $coeff:expr, $var:expr),+)? $(,)?)? ] => {
         {
-            $crate::pts::linear_polynomial::LinearPolynomial::default()
+            let tmp: $crate::pts::linear_polynomial::State = $crate::polynomial![
+                $(
+                    $crate::pts::linear_polynomial::coefficient::Constant::from(
+                        $constant
+                    )
+                    $(,
+                        $varset,
+                        $(
+                            $crate::pts::linear_polynomial::coefficient::Constant::from(
+                                $coeff
+                            ),
+                            $var
+                        ), +
+                    )?
+                )?
+            ];
+            tmp
+
         }
     };
 }
 
-type CoefficientIterator<'a> = std::slice::Iter<'a, Constant>;
-type CoefficientIteratorMut<'a> = std::slice::IterMut<'a, Constant>;
+pub type Term<V, C> = (Option<V>, C);
+pub type StateTerm = (ProgramVariable, Constant);
+pub type State = Polynomial<ProgramVariable, Constant>;
 
-#[cfg_attr(test, derive(PartialEq))]
 #[derive(Debug, Clone)]
-pub struct LinearPolynomial {
-    coefficients: Vec<Constant>,
+pub struct Polynomial<V: Variable, C: Coefficient> {
+    data: IndexMap<Option<V>, C>,
 }
 
-impl<'a> LinearPolynomial {
-    pub fn len(&self) -> usize {
-        self.coefficients.len()
+impl<V: Variable, C: Coefficient> Polynomial<V, C> {
+    pub fn iter(&self) -> TermIter<V, C> {
+        self.data
+            .iter()
+            .filter(|(_, coeff): &(&Option<V>, &C)| !coeff.is_zero())
     }
 
-    fn resize_to_map(&mut self, map: &VariableMap) {
-        if self.len() < map.len() + 1 {
-            // +1 for constant term
-            self.coefficients.resize(map.len() + 1, Constant(0.0));
-        }
-    }
-
-    fn resize_to_polynomial(&mut self, other: &mut Self) {
-        if self.len() < other.len() {
-            self.coefficients.resize(other.len(), Constant(0.0));
-        } else if self.len() > other.len() {
-            other
-                .coefficients
-                .resize(self.coefficients.len(), Constant(0.0));
-        }
-    }
-
-    pub fn try_add_term(
-        &mut self,
-        map: &VariableMap,
-        term: Term,
-    ) -> Result<VariableID, VariableError> {
-        self.resize_to_map(map);
-        if term.is_constant() {
-            self.coefficients[CONSTANT_ID] += term.coefficient;
-            Ok(0)
-        } else {
-            let index = map.get_id(term.variable.as_ref().unwrap());
-            // if variable is not in the map, its not a program variable
-            if index.is_none() {
-                Err(VariableError::new(term.variable.as_ref().unwrap()))
-            } else {
-                self.coefficients[index.unwrap()] += term.coefficient;
-                Ok(index.unwrap())
-            }
-        }
-    }
-
-    pub fn add_term(&mut self, map: &mut VariableMap, term: Term) -> usize {
-        if term.is_constant() {
-            self.coefficients[0] += term.coefficient;
-            self.resize_to_map(map);
-            0
-        } else {
-            let index = map.get_or_push(&term.variable.unwrap());
-            self.resize_to_map(map);
-            self.coefficients[index] += term.coefficient;
-            index
-        }
-    }
-
-    pub fn mul_by_constant(&mut self, n: Constant) {
-        for coeff in self.coefficients.iter_mut() {
-            *coeff *= n;
-        }
-    }
-
-    pub fn get_coefficient(&self, var: VariableID) -> Option<&Constant> {
-        self.coefficients.get(var)
-    }
-
-    pub fn get_mut_coefficient(&mut self, var: VariableID) -> Option<&mut Constant> {
-        self.coefficients.get_mut(var)
-    }
-
-    pub fn iter(&'a self) -> CoefficientIterator<'a> {
-        self.coefficients.iter()
-    }
-
-    pub fn iter_mut(&'a mut self) -> CoefficientIteratorMut<'a> {
-        self.coefficients.iter_mut()
-    }
-
-    pub fn iter_terms(&'a self, variable_map: &'a VariableMap) -> TermIterator<'a> {
-        TermIterator(variable_map, self, 0)
-    }
-
-    #[cfg(test)]
-    pub fn mock(coefficients: Vec<Constant>) -> Self {
-        assert!(coefficients.len() > 0);
-        LinearPolynomial { coefficients }
+    pub fn iter_mut(&mut self) -> TermIterMut<V, C> {
+        self.data
+            .iter_mut()
+            .filter(|(_, coeff): &(&Option<V>, &mut C)| !coeff.is_zero())
     }
 }
 
-// assumes the polynomial fits the map
-pub struct TermIterator<'a>(&'a VariableMap, &'a LinearPolynomial, VariableID);
-
-impl<'a> Iterator for TermIterator<'a> {
-    type Item = Term;
-    fn next(&mut self) -> Option<Self::Item> {
-        let variable = self.0.get_variable(self.2);
-        let coefficient = self.1.get_coefficient(self.2);
-        self.2 += 1;
-        match coefficient {
-            Some(c) => Some(Term {
-                variable: variable.map(|x| x.clone()),
-                coefficient: c.clone(),
-            }),
-            _ => None,
+impl<V: Variable, C: Coefficient> Polynomial<V, C> {
+    pub fn with_capacity(n: usize) -> Self {
+        Self {
+            data: IndexMap::with_capacity(n),
         }
     }
 }
 
-impl DisplayLabel for LinearPolynomial {
-    fn label(&self, variable_map: &VariableMap) -> String {
-        let mut label = String::default();
-        let mut iter = self
-            .iter_terms(variable_map)
-            .skip(1) // skip constant term
-            .chain(self.iter_terms(variable_map).take(1))
-            .filter(|x| x.coefficient != Constant(0.0));
+impl<V: Variable, C: Coefficient> Polynomial<V, C> {
+    pub fn shrink_to_fit(&mut self) {
+        self.data.shrink_to_fit()
+    }
 
-        let first_term = iter.next();
-        if first_term.is_some() {
-            label.push_str(first_term.unwrap().to_string().as_str());
-        }
+    pub fn add_term<K, T>(&mut self, coefficient: T, variable: K)
+    where
+        T: Into<C>,
+        K: Into<Option<V>>,
+    {
+        let c = coefficient.into();
+        self.data
+            .entry(variable.into())
+            .and_modify(|x| *x += c.clone())
+            .or_insert(c);
+    }
 
-        for term in iter {
-            // is_negative_sign returns true on -0.0, so I dont use it
-            // xor, cause double negative is positive
-            if term.coefficient < Constant(0.0) {
-                label.push_str(" - ");
-                label.push_str((-term).to_string().as_str());
-            } else {
-                label.push_str(" + ");
-                label.push_str(term.to_string().as_str());
-            }
-        }
+    pub fn remove_term<K>(&mut self, variable: &K) -> Option<(Option<V>, C)>
+    where
+        Option<V>: Borrow<K>,
+        K: Hash + Eq,
+    {
+        self.data.remove_entry(variable)
+    }
 
-        // theres no non-zero coefficients
-        if label.is_empty() {
-            label.push_str("0");
-        }
+    pub fn get_coefficient<K>(&self, variable: &K) -> Option<&C>
+    where
+        Option<V>: Borrow<K>,
+        K: Hash + Eq,
+    {
+        self.data.get(variable)
+    }
 
-        label
+    pub fn get_coefficient_mut<K>(&mut self, variable: K) -> &mut C
+    where
+        Option<V>: Borrow<K>,
+        K: Hash + Eq + Into<Option<V>>,
+    {
+        self.data.entry(Into::into(variable)).or_insert(C::ZERO)
+    }
+
+    pub fn get_coefficient_mut_owned<K>(&mut self, variable: &K) -> &mut C
+    where
+        Option<V>: Borrow<K>,
+        K: Hash + Eq + ToOwned<Owned = Option<V>>,
+    {
+        self.data.entry(variable.to_owned()).or_insert(C::ZERO)
+    }
+
+    pub fn get_term<K>(&self, variable: &K) -> Option<(&Option<V>, &C)>
+    where
+        Option<V>: Borrow<K>,
+        K: Hash + Eq,
+    {
+        self.data.get_key_value(variable)
+    }
+
+    pub fn get_variable<K>(&self, variable: &K) -> Option<&Option<V>>
+    where
+        Option<V>: Borrow<K>,
+        K: Hash + Eq,
+    {
+        self.data.get_key_value(variable).map(|(k, _)| k)
     }
 }
 
-impl Default for LinearPolynomial {
+type TermIter<'a, V, C> =
+    std::iter::Filter<indexmap::map::Iter<'a, Option<V>, C>, fn(&(&'a Option<V>, &'a C)) -> bool>;
+
+type TermIterMut<'a, V, C> = std::iter::Filter<
+    indexmap::map::IterMut<'a, Option<V>, C>,
+    fn(&(&'a Option<V>, &'a mut C)) -> bool,
+>;
+
+impl<V: Variable, C: Coefficient> Eq for Polynomial<V, C> {}
+impl<V: Variable, C: Coefficient> PartialEq for Polynomial<V, C> {
+    // is twice as slow as regular eq on HashMaps
+    fn eq(&self, other: &Self) -> bool {
+        self.iter()
+            .all(|(var, coeff)| other.data.get(var).map_or(false, |c| *coeff == *c))
+            && other
+                .iter()
+                .all(|(var, coeff)| self.data.get(var).map_or(false, |c| *coeff == *c))
+    }
+}
+
+impl<V: Variable, C: Coefficient> IntoIterator for Polynomial<V, C> {
+    type Item = (Option<V>, C);
+    type IntoIter = indexmap::map::IntoIter<Option<V>, C>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.data.into_iter()
+    }
+}
+
+impl<'a, V: Variable, C: Coefficient> IntoIterator for &'a Polynomial<V, C> {
+    type Item = (&'a Option<V>, &'a C);
+    type IntoIter = indexmap::map::Iter<'a, Option<V>, C>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.data.iter()
+    }
+}
+
+impl<V: Variable, C: Coefficient> Borrow<IndexMap<Option<V>, C>> for Polynomial<V, C> {
+    fn borrow(&self) -> &IndexMap<Option<V>, C> {
+        &self.data
+    }
+}
+
+impl<V: Variable, C: Coefficient> FromIterator<(Option<V>, C)> for Polynomial<V, C> {
+    fn from_iter<T: IntoIterator<Item = (Option<V>, C)>>(iter: T) -> Self {
+        let mut pol = Self::default();
+        for (var, coeff) in iter {
+            pol.add_term(coeff, var);
+        }
+        pol
+    }
+}
+
+impl<V: Variable, C: Coefficient> Default for Polynomial<V, C> {
     fn default() -> Self {
-        LinearPolynomial {
-            coefficients: vec![Constant(0.0)],
+        Self {
+            data: IndexMap::default(),
         }
     }
 }
 
-impl AddAssign for LinearPolynomial {
-    fn add_assign(&mut self, mut other: Self) {
-        self.resize_to_polynomial(&mut other);
-        let iter = zip(self.coefficients.iter_mut(), other.coefficients.into_iter());
-        for (lhs, rhs) in iter {
-            *lhs += rhs;
+fn fmt_term<V: Variable, C: Coefficient>(
+    f: &mut std::fmt::Formatter<'_>,
+    variable: &Option<V>,
+    coefficient: &C,
+) -> std::fmt::Result {
+    if variable.is_none() {
+        // Constant term
+        write!(f, "{}", coefficient.to_string(),)
+    } else {
+        // Linear term
+        if coefficient.is_one() {
+            write!(f, "{}", variable.as_ref().unwrap())
+        } else if coefficient.is_neg_one() {
+            write!(f, "-{}", variable.as_ref().unwrap(),)
+        } else if coefficient.is_zero() {
+            write!(f, "",)
+        } else {
+            write!(
+                f,
+                "{}{}",
+                coefficient.to_string(),
+                variable.as_ref().unwrap(),
+            )
         }
     }
 }
 
-impl Add for LinearPolynomial {
+impl<V: Variable, C: Coefficient> Display for Polynomial<V, C> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut iter = self
+            .data
+            .iter()
+            .filter(|(var, _)| var.is_some())
+            .chain(self.get_term(&None))
+            .filter(|(_, var)| !var.is_zero());
+
+        //let mut iter = self.data.iter();
+        let first = iter.next();
+        if first.is_none() {
+            write!(f, "{}", C::ZERO)?;
+        } else {
+            let first = first.unwrap();
+            fmt_term(f, first.0, first.1)?;
+            for (v, c) in iter {
+                if c.is_negative() {
+                    write!(f, " - ")?;
+                    fmt_term(f, v, &-c.to_owned())?;
+                } else {
+                    write!(f, " + ")?;
+                    fmt_term(f, v, c)?;
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+impl<V: Variable, C: Coefficient> AddAssign for Polynomial<V, C> {
+    fn add_assign(&mut self, other: Self) {
+        for (var, coeff) in other.data {
+            *self.data.entry(var).or_insert(C::ZERO) += coeff;
+        }
+    }
+}
+
+impl<V: Variable, C: Coefficient> Add for Polynomial<V, C> {
     type Output = Self;
 
     fn add(mut self, other: Self) -> Self::Output {
@@ -210,17 +301,15 @@ impl Add for LinearPolynomial {
     }
 }
 
-impl SubAssign for LinearPolynomial {
-    fn sub_assign(&mut self, mut other: Self) {
-        self.resize_to_polynomial(&mut other);
-        let iter = zip(self.coefficients.iter_mut(), other.coefficients.into_iter());
-        for (lhs, rhs) in iter {
-            *lhs -= rhs;
+impl<V: Variable, C: Coefficient> SubAssign for Polynomial<V, C> {
+    fn sub_assign(&mut self, other: Self) {
+        for (var, coeff) in other.data {
+            *self.data.entry(var).or_insert(C::ZERO) -= coeff;
         }
     }
 }
 
-impl Sub for LinearPolynomial {
+impl<V: Variable, C: Coefficient> Sub for Polynomial<V, C> {
     type Output = Self;
 
     fn sub(mut self, other: Self) -> Self::Output {
@@ -229,12 +318,16 @@ impl Sub for LinearPolynomial {
     }
 }
 
-impl Neg for LinearPolynomial {
+impl<V: Variable, C: Coefficient> Neg for Polynomial<V, C> {
     type Output = Self;
 
     fn neg(self) -> Self::Output {
-        LinearPolynomial {
-            coefficients: self.coefficients.into_iter().map(|x| -x).collect(),
+        Self {
+            data: self
+                .data
+                .into_iter()
+                .map(|(var, coeff)| (var, -coeff))
+                .collect(),
         }
     }
 }
@@ -242,213 +335,314 @@ impl Neg for LinearPolynomial {
 #[cfg(test)]
 mod tests {
     mod macros {
-        use crate::{mock_varmap, pts::linear_polynomial::LinearPolynomial, term};
+        use crate::{
+            pts::{
+                linear_polynomial::{coefficient::Constant, State},
+                variable::{program_variable::ProgramVariable, Variable},
+            },
+            variables,
+        };
 
         #[test]
-        fn mock_polynomial() {
-            let mut pol = LinearPolynomial::default();
-            let map = mock_varmap!("a", "e", "i");
-            pol.try_add_term(&map, term!(-5.0)).unwrap();
-            pol.try_add_term(&map, term!(1.0, "i")).unwrap();
-            pol.try_add_term(&map, term!(0.0, "a")).unwrap();
-            pol.try_add_term(&map, term!(90.0, "e")).unwrap();
+        fn state() {
+            let mut variables = variables!("a", "e", "i");
+            let data = vec![
+                (None, Constant(-5.0)),
+                (
+                    Some(ProgramVariable::new(&mut variables, "i")),
+                    Constant(1.0),
+                ),
+                (
+                    Some(ProgramVariable::new(&mut variables, "a")),
+                    Constant(0.0),
+                ),
+                (
+                    Some(ProgramVariable::new(&mut variables, "e")),
+                    Constant(90.0),
+                ),
+            ];
 
-            assert_eq!(mock_polynomial!(-5.0, 0.0, 90.0, 1.0), pol);
-            assert_eq!(mock_polynomial!(), LinearPolynomial::default())
+            assert_eq!(variables, variables!("a", "e", "i"));
+            assert_eq!(
+                state!(-5.0, &mut variables, 0.0, "a", 90.0, "e", 1.0, "i"),
+                State::from_iter(data)
+            );
+
+            let data = vec![(None, Constant(-5.0))];
+
+            assert_eq!(state!(-5.0), State::from_iter(data));
+
+            assert_eq!(state!(), State::default());
         }
     }
 
     mod add {
-        use crate::{mock_varmap, pts::linear_polynomial::LinearPolynomial, term};
 
-        #[test]
-        fn resizing() {
-            let mut pol = LinearPolynomial::default();
-            assert_eq!(pol.len(), 1);
-            let mut map = mock_varmap!("a", "b", "c");
-            let var = map.get_variable(1).unwrap().clone();
-            pol.add_term(&mut map, term!(0.0, var.as_str()));
-            assert_eq!(pol.len(), map.len() + 1);
-            assert_eq!(pol, mock_polynomial!(0.0, 0.0, 0.0, 0.0));
-        }
+        use crate::{
+            pts::{
+                linear_polynomial::State,
+                variable::{
+                    program_variable::{ProgramVariable, ProgramVariables},
+                    Variable,
+                },
+            },
+            variables,
+        };
 
         #[test]
         fn variable() {
-            let mut pol = LinearPolynomial::default();
-            let mut map = mock_varmap!("a", "b", "c");
-            let b = "b";
-            pol.add_term(&mut map, term!(1.0, b));
-            assert_eq!(pol, mock_polynomial!(0.0, 0.0, 1.0, 0.0));
-            pol.add_term(&mut map, term!(1.0, b));
-            assert_eq!(pol, mock_polynomial!(0.0, 0.0, 2.0, 0.0));
-            pol.add_term(&mut map, term!(-2.0, b));
-            assert_eq!(pol, mock_polynomial!(0.0, 0.0, 0.0, 0.0));
+            let mut pol = State::default();
+            let mut variables: ProgramVariables = variables!("a", "b", "c");
+            let var = variables.get("b").unwrap().clone();
+            pol.add_term(1.0, var.clone());
+            assert_eq!(
+                pol,
+                state!(0.0, &mut variables, 0.0, "a", 1.0, "b", 0.0, "c")
+            );
+            pol.add_term(1.0, var.clone());
+            assert_eq!(
+                pol,
+                state!(0.0, &mut variables, 0.0, "a", 2.0, "b", 0.0, "c")
+            );
+            pol.add_term(-2.0, var);
+            assert_eq!(
+                pol,
+                state!(0.0, &mut variables, 0.0, "a", 0.0, "b", 0.0, "c")
+            );
         }
 
         #[test]
         fn constant() {
-            let mut pol = LinearPolynomial::default();
-            let mut map = mock_varmap!("a", "b", "c");
-            pol.add_term(&mut map, term!(1.0));
-            assert_eq!(pol, mock_polynomial!(1.0, 0.0, 0.0, 0.0));
-            pol.add_term(&mut map, term!(1.0));
-            assert_eq!(pol, mock_polynomial!(2.0, 0.0, 0.0, 0.0));
+            let mut pol = State::default();
+            let mut variables = variables!("a", "b", "c");
+            pol.add_term(1.0, None);
+            assert_eq!(
+                pol,
+                state!(1.0, &mut variables, 0.0, "a", 0.0, "b", 0.0, "c")
+            );
+            pol.add_term(1.0, None);
+            assert_eq!(
+                pol,
+                state!(2.0, &mut variables, 0.0, "a", 0.0, "b", 0.0, "c")
+            );
         }
 
         #[test]
         fn out_of_bounds() {
-            let mut pol = LinearPolynomial::default();
-            let mut map = mock_varmap!("a", "b", "c");
-            pol.add_term(&mut map, term!(1.0, "e"));
-            assert_eq!(pol, mock_polynomial!(0.0, 0.0, 0.0, 0.0, 1.0));
-        }
-    }
-    mod try_add {
-        use crate::{
-            mock_varmap,
-            pts::{
-                linear_polynomial::{constant::Constant, term::Term, LinearPolynomial},
-                variable_map::{Variable, VariableError},
-            },
-            term,
-        };
-
-        #[test]
-        fn try_add_resizing() {
-            let mut pol = LinearPolynomial::default();
-            assert_eq!(pol.len(), 1);
-            let map = mock_varmap!("a", "b", "c");
-            assert_eq!(
-                pol.try_add_term(
-                    &map,
-                    term!(0.0, map.get_variable(1).unwrap().clone().as_str())
-                ),
-                Ok(1)
-            );
-            assert_eq!(pol.len(), map.len() + 1);
-            assert_eq!(pol, mock_polynomial!(0.0, 0.0, 0.0, 0.0,));
-        }
-
-        #[test]
-        fn try_add_variable() {
-            let mut pol = LinearPolynomial::default();
-            let map = mock_varmap!("a", "b", "c");
-            pol.try_add_term(&map, term!(1.0, "b")).unwrap();
-            assert_eq!(pol, mock_polynomial!(0.0, 0.0, 1.0, 0.0));
-            pol.try_add_term(&map, term!(1.0, "b")).unwrap();
-            assert_eq!(pol, mock_polynomial!(0.0, 0.0, 2.0, 0.0));
-        }
-
-        #[test]
-        fn try_add_constant() {
-            let mut pol = LinearPolynomial::default();
-            let map = mock_varmap!("a", "b", "c");
-            pol.try_add_term(&map, term!(1.0)).unwrap();
-            assert_eq!(pol, mock_polynomial!(1.0, 0.0, 0.0, 0.0));
-            pol.try_add_term(&map, term!(1.0)).unwrap();
-            assert_eq!(pol, mock_polynomial!(2.0, 0.0, 0.0, 0.0));
-        }
-
-        #[test]
-        fn try_add_out_of_bounds() {
-            let mut pol = LinearPolynomial::default();
-            let map = mock_varmap!("a", "b", "c");
-            let e = Variable::new("e");
-            assert_eq!(
-                pol.try_add_term(
-                    &map,
-                    Term {
-                        variable: Some(e.clone()),
-                        coefficient: Constant(1.0)
-                    }
-                ),
-                Err(VariableError::new(&e))
-            );
-            assert_eq!(pol, mock_polynomial!(0.0, 0.0, 0.0, 0.0));
+            let mut pol = State::default();
+            let mut variables = variables!("a", "b", "c");
+            pol.add_term(1.0, ProgramVariable::new(&mut variables, "e"));
+            assert_eq!(pol, state!(0.0, &mut variables, 1.0, "e"));
         }
     }
 
     mod ops {
+        use crate::{pts::variable::program_variable::ProgramVariables, variables};
+
         #[test]
         fn add() {
-            let mut lhs = mock_polynomial!(1.0, 2.0, 3.0, 4.0);
-            let rhs = mock_polynomial!(4.0, 3.0, 2.0, 1.0);
-            let sum = lhs.clone() + rhs.clone();
-            assert_eq!(sum, mock_polynomial!(5.0, 5.0, 5.0, 5.0));
+            let mut variables: ProgramVariables = variables!();
+            let mut lhs = state!(1.0, &mut variables, 2.0, "a", 3.0, "b", 4.0, "c");
+            let rhs = state!(4.0, &mut variables, 3.0, "a", 2.0, "b", 1.0, "c");
+            let sum = lhs.to_owned() + rhs.to_owned();
+            assert_eq!(
+                sum,
+                state!(5.0, &mut variables, 5.0, "a", 5.0, "b", 5.0, "c")
+            );
             lhs += rhs;
-            assert_eq!(lhs, mock_polynomial!(5.0, 5.0, 5.0, 5.0));
+            assert_eq!(
+                lhs,
+                state!(5.0, &mut variables, 5.0, "a", 5.0, "b", 5.0, "c")
+            );
         }
 
         #[test]
         fn sub() {
-            let mut lhs = mock_polynomial!(2.0, 3.0, 4.0, 5.0);
-            let rhs = mock_polynomial!(1.0, 1.0, 1.0, 1.0);
-            let diff = lhs.clone() - rhs.clone();
-            assert_eq!(diff, mock_polynomial!(1.0, 2.0, 3.0, 4.0));
+            let mut variables = variables!();
+            let mut lhs = state!(2.0, &mut variables, 3.0, "a", 4.0, "b", 5.0, "c");
+            let rhs = state!(1.0, &mut variables, 1.0, "a", 1.0, "b", 1.0, "c");
+            let diff = lhs.to_owned() - rhs.to_owned();
+            assert_eq!(
+                diff,
+                state!(1.0, &mut variables, 2.0, "a", 3.0, "b", 4.0, "c")
+            );
             lhs -= rhs;
-            assert_eq!(lhs, mock_polynomial!(1.0, 2.0, 3.0, 4.0));
+            assert_eq!(
+                lhs,
+                state!(1.0, &mut variables, 2.0, "a", 3.0, "b", 4.0, "c")
+            );
         }
 
         #[test]
         fn neg() {
-            let lhs = mock_polynomial!(0.0, -3.0, 4.0, -5.0);
+            let mut variables = variables!();
+            let lhs = state!(0.0, &mut variables, -3.0, "a", 4.0, "b", -5.0, "c");
             let lhs = -lhs;
-            assert_eq!(lhs, mock_polynomial!(0.0, 3.0, -4.0, 5.0));
+            assert_eq!(
+                lhs,
+                state!(0.0, &mut variables, 3.0, "a", -4.0, "b", 5.0, "c")
+            );
         }
     }
 
-    mod label {
+    mod fmt {
+
         use crate::{
-            mock_varmap,
-            pts::{
-                linear_polynomial::{constant::Constant, LinearPolynomial},
-                DisplayLabel,
-            },
+            pts::{linear_polynomial::State, variable::program_variable::ProgramVariables},
+            variables,
         };
+
+        mod term {
+            use crate::{
+                pts::{
+                    linear_polynomial::{coefficient::Constant, fmt_term},
+                    variable::{program_variable::ProgramVariable, Variable},
+                },
+                variables,
+            };
+
+            struct TestTermDisplay(Constant, Option<ProgramVariable>);
+
+            impl TestTermDisplay {
+                pub fn new<C, V>(coeff: C, var: V) -> Self
+                where
+                    C: Into<Constant>,
+                    V: Into<Option<ProgramVariable>>,
+                {
+                    Self(coeff.into(), var.into())
+                }
+            }
+
+            impl std::fmt::Display for TestTermDisplay {
+                fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                    fmt_term(f, &self.1, &self.0)
+                }
+            }
+
+            #[test]
+            fn coeff_var() {
+                let mut variables = variables!();
+                assert_eq!(
+                    TestTermDisplay::new(50.0, ProgramVariable::new(&mut variables, "Test"))
+                        .to_string(),
+                    "50Test"
+                );
+            }
+
+            #[test]
+            fn neg_coeff_var() {
+                let mut variables = variables!();
+                assert_eq!(
+                    TestTermDisplay::new(-0.5, ProgramVariable::new(&mut variables, "a"))
+                        .to_string(),
+                    "-0.5a"
+                );
+            }
+
+            #[test]
+            fn neg_var() {
+                let mut variables = variables!();
+                assert_eq!(
+                    TestTermDisplay::new(-1.0, ProgramVariable::new(&mut variables, "a"))
+                        .to_string(),
+                    "-a"
+                );
+            }
+
+            #[test]
+            fn pos_var() {
+                let mut variables = variables!();
+                assert_eq!(
+                    TestTermDisplay::new(1.0, ProgramVariable::new(&mut variables, "a"))
+                        .to_string(),
+                    "a"
+                );
+            }
+
+            #[test]
+            fn zero_coeff() {
+                let mut variables = variables!();
+                assert_eq!(
+                    TestTermDisplay::new(0.0, ProgramVariable::new(&mut variables, "test"))
+                        .to_string(),
+                    ""
+                );
+            }
+
+            #[test]
+            fn neg_zero_coeff() {
+                let mut variables = variables!();
+                assert_eq!(
+                    TestTermDisplay::new(0.0, ProgramVariable::new(&mut variables, "test"))
+                        .to_string(),
+                    ""
+                );
+            }
+
+            #[test]
+            fn zero() {
+                assert_eq!(TestTermDisplay::new(0.0, None).to_string(), "0");
+            }
+
+            #[test]
+            fn neg_zero() {
+                assert_eq!(TestTermDisplay::new(0.0, None).to_string(), "0");
+            }
+
+            #[test]
+            fn neg_const() {
+                assert_eq!(TestTermDisplay::new(-5.0, None).to_string(), "-5");
+            }
+
+            #[test]
+            fn neg_one() {
+                assert_eq!(TestTermDisplay::new(-1.0, None).to_string(), "-1");
+            }
+
+            #[test]
+            fn one() {
+                assert_eq!(TestTermDisplay::new(1.0, None).to_string(), "1");
+            }
+        }
 
         #[test]
         fn zero() {
-            let pol = LinearPolynomial {
-                coefficients: vec![Constant(0.0)],
-            };
-            let map = mock_varmap!();
-            assert_eq!(pol.label(&map), "0");
+            let pol = state!();
+            assert_eq!(pol.to_string(), "0");
         }
 
         #[test]
         fn negative() {
-            let pol = LinearPolynomial {
-                coefficients: vec![Constant(-5.0)],
-            };
-            let map = mock_varmap!();
-            assert_eq!(pol.label(&map), "-5");
+            let pol = state!(-5.0);
+            assert_eq!(pol.to_string(), "-5");
         }
 
         #[test]
         fn variable() {
-            let pol = LinearPolynomial {
-                coefficients: vec![Constant(0.0), Constant(1.0)],
-            };
-            let map = mock_varmap!("test");
-            assert_eq!(pol.label(&map), "test");
+            let mut variables = variables!("test");
+            let pol = state![0.0, &mut variables, 1.0, "test"];
+            assert_eq!(pol.to_string(), "test");
         }
 
         #[test]
         fn starts_negative() {
-            let pol = LinearPolynomial {
-                coefficients: vec![Constant(-5.0), Constant(-1.0), Constant(0.0), Constant(2.0)],
-            };
+            let variables: ProgramVariables = variables!("a", "b", "c",);
+            let mut pol = State::default();
 
-            let map = mock_varmap!("a", "b", "c",);
-            assert_eq!(pol.label(&map), "-a + 2c - 5");
+            pol.add_term(-5.0, None);
+            pol.add_term(-1.0, variables.get("a").unwrap().clone());
+            pol.add_term(0.0, variables.get("b").unwrap().clone());
+            pol.add_term(2.0, variables.get("c").unwrap().clone());
+
+            assert_eq!(pol.to_string(), "-a + 2c - 5");
         }
 
         #[test]
         fn only_constant() {
-            let pol = mock_polynomial!(-5.0, 0.0, 0.0, 0.0);
+            let mut variables = variables!("a", "b", "c",);
+            let pol = state!(-5.0, &mut variables, 0.0, "a", 0.0, "b", 0.0, "c");
 
-            let map = mock_varmap!("a", "b", "c",);
-            assert_eq!(pol.label(&map), "-5");
+            assert_eq!(pol.to_string(), "-5");
         }
     }
 }

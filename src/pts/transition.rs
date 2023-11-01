@@ -1,73 +1,120 @@
-use crate::pts::{linear_polynomial, location};
-use linear_polynomial::LinearPolynomial;
-use location::LocationHandle;
-
 use super::{
-    variable_map::{Variable, VariableID, VariableMap},
-    DisplayLabel,
+    linear_polynomial::{
+        coefficient::{Coefficient, Constant},
+        Polynomial,
+    },
+    location::LocationHandle,
+    variable::{program_variable::ProgramVariable, Variable},
 };
 
-#[cfg(test)]
 #[macro_export]
-macro_rules! mock_assignment {
-    [ $id:expr, $( $x:expr ),* $(,)?] => {
+macro_rules! assignment {
+    [
+        $varset:expr,
+        $assign_var:expr,
+        $constant:expr
+        $(
+            ,
+            $coeff:expr,
+            $var:expr
+        )*
+        $(,)?
+    ] => {
         {
-            $crate::pts::transition::Assignment::mock($id, $crate::mock_polynomial![$($x, )*])
+            $crate::pts::transition::Assignment::new(
+                $crate::pts::variable::Variable::new($varset, $assign_var),
+                $crate::polynomial![
+                    $constant,
+                    $varset
+                    $(
+                        ,
+                        $coeff,
+                        $var
+                    )*
+                ]
+            )
         }
     };
 }
 
-#[cfg(test)]
 #[macro_export]
-macro_rules! mock_transition {
-    [ $tar:expr $(; $( $id:expr, $($x:expr),* );*)? ] => {
+macro_rules! transition {
+    [
+        $tar:expr
+        $(
+            ,
+            $varset:expr
+            $(
+                ;
+                $assign_var:expr,
+                $constant:expr
+                $(
+                    ,
+                    $coeff:expr,
+                    $var:expr
+                )*
+            )*
+            $(;)?
+        )?
+    ] => {
         {
-            $crate::pts::transition::Transition{ target: $tar, assignments: std::vec![$($($crate::mock_assignment![$id, $($x, )*], )*)? ] }
+            $crate::pts::transition::Transition{
+                target: $tar,
+                assignments: std::vec!
+                [
+                    $(
+                        $(
+                            $crate::assignment![
+                                $varset,
+                                $assign_var,
+                                $constant
+                                $(
+                                    ,
+                                    $coeff,
+                                    $var
+                                )*
+                            ],
+                        )*
+                    )?
+                ]
+            }
         }
     };
 }
-
-#[cfg_attr(test, derive(PartialEq))]
-#[derive(Debug)]
-#[repr(align(32))] // 32 bytes
-pub struct Assignment(pub VariableID, pub LinearPolynomial);
-
 #[cfg_attr(test, derive(PartialEq))]
 #[derive(Debug, Default)]
-#[repr(align(32))] // 32 bytes
 pub struct Transition {
-    pub assignments: Vec<Assignment>,
     pub target: LocationHandle,
+    pub assignments: Vec<StateAssignment>,
 }
 
-impl Assignment {
-    pub fn new(variables: &mut VariableMap, name: &Variable, value: LinearPolynomial) -> Self {
-        Assignment(variables.get_or_push(name), value)
+#[derive(Debug, PartialEq)]
+pub struct Assignment<V: Variable>(V, Polynomial<V, Constant>);
+pub type StateAssignment = Assignment<ProgramVariable>;
+
+impl<V: Variable> Assignment<V> {
+    pub fn new(var: V, value: Polynomial<V, Constant>) -> Self {
+        Assignment(var.into(), value)
     }
 
-    pub fn apply(&self, mut pol: LinearPolynomial) -> LinearPolynomial {
-        // we assume valid variableID in the assignment
-        let mut substitution = self.1.clone();
-        substitution.mul_by_constant(pol.get_coefficient(self.0).unwrap().clone());
-        pol.get_mut_coefficient(self.0).unwrap().0 = 0.0;
+    pub fn apply<'pol, C: Coefficient>(&self, mut pol: Polynomial<V, C>) -> Polynomial<V, C> {
+        let multiplier = pol.remove_term(&Some(self.0.to_owned()));
+        if multiplier.is_some() {
+            let multiplier = multiplier.unwrap().1;
+            for (var, coeff) in self.1.iter() {
+                let mut c = multiplier.to_owned();
+                c.mul_by_constant(coeff.to_owned());
+                pol.add_term(c, var.to_owned());
+            }
+        }
 
-        pol + substitution
-    }
-
-    #[cfg(test)]
-    pub fn mock(id: VariableID, value: LinearPolynomial) -> Self {
-        Assignment(id, value)
+        pol
     }
 }
 
-impl DisplayLabel for Assignment {
-    fn label(&self, variable_map: &VariableMap) -> String {
-        // LHS of assignment should be a valid VariableID => unwrap
-        let mut label = variable_map.get_variable(self.0).unwrap().to_string();
-        label.push_str(" = ");
-        label.push_str(self.1.label(variable_map).as_str());
-
-        label
+impl<V: Variable> std::fmt::Display for Assignment<V> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} = {}", self.0, self.1)
     }
 }
 
@@ -76,82 +123,141 @@ mod tests {
 
     mod macros {
 
-        mod assignment {
-            use crate::{
-                mock_polynomial, mock_varmap,
-                pts::{transition::Assignment, variable_map::Variable},
-            };
+        use crate::{
+            pts::{
+                transition::Assignment,
+                variable::{
+                    program_variable::{ProgramVariable, ProgramVariables},
+                    Variable,
+                },
+            },
+            state, variables,
+        };
 
-            #[test]
-            fn new() {
-                let mut map = mock_varmap!("test");
-                assert_eq!(
-                    Assignment::new(
-                        &mut map,
-                        &Variable::new("test"),
-                        mock_polynomial!(6.8, -0.0, -6.8, 134.689, 0.0)
-                    ),
-                    mock_assignment!(1, 6.8, -0.0, -6.8, 134.689, 0.0)
-                );
-                assert_eq!(map, mock_varmap!("test"))
-            }
-
-            #[test]
-            fn apply() {
-                assert_eq!(
-                    mock_assignment!(1, 6.8, -0.0, -6.8, 134.689, 0.0)
-                        .apply(mock_polynomial!(0.0, 1.0)),
-                    mock_polynomial!(6.8, -0.0, -6.8, 134.689, 0.0)
+        #[test]
+        fn assignment() {
+            let mut variables: ProgramVariables = variables!("test");
+            assert_eq!(
+                Assignment::new(
+                    ProgramVariable::new(&mut variables, "test"),
+                    state!(
+                        6.8,
+                        &mut variables,
+                        -0.0,
+                        "a",
+                        -6.8,
+                        "b",
+                        134.689,
+                        "c",
+                        0.0,
+                        "d"
+                    )
+                ),
+                assignment!(
+                    &mut variables,
+                    "test",
+                    6.8,
+                    -0.0,
+                    "a",
+                    -6.8,
+                    "b",
+                    134.689,
+                    "c",
+                    0.0,
+                    "d"
                 )
-            }
+            );
+            assert_eq!(variables, variables!("test", "a", "b", "c", "d"))
+        }
+    }
+
+    mod assignment {
+        use crate::{state, variables};
+
+        #[test]
+        fn apply() {
+            let mut variables = variables!();
+            assert_eq!(
+                assignment!(
+                    &mut variables,
+                    "a",
+                    6.8,
+                    -0.0,
+                    "a",
+                    -6.8,
+                    "b",
+                    134.689,
+                    "c",
+                    0.0,
+                    "d"
+                )
+                .apply(state!(0.0, &mut variables, 1.0, "a")),
+                state!(
+                    6.8,
+                    &mut variables,
+                    -0.0,
+                    "a",
+                    -6.8,
+                    "b",
+                    134.689,
+                    "c",
+                    0.0,
+                    "d"
+                )
+            )
         }
 
         mod transition {
-            use crate::pts::transition::Transition;
+            use crate::{pts::transition::Transition, variables};
 
             #[test]
             fn some() {
+                let mut variables = variables!();
                 assert_eq!(
                     Transition {
-                        target: Some(1999),
+                        target: Some(1234),
                         assignments: vec![
-                            mock_assignment!(2, -0.3, 5.0, -0.0, 0.0),
-                            mock_assignment!(1, 1234.5, 1111.0, 15.151515)
+                            assignment!(&mut variables, "b", -0.3, 5.0, "a", -0.0, "b", 0.0, "c"),
+                            assignment!(&mut variables, "a", 1234.5, 1111.0, "a", 15.151515, "b")
                         ]
                     },
-                    mock_transition!(Some(1999); 2, -0.3, 5.0, -0.0, 0.0; 1, 1234.5, 1111.0, 15.151515)
+                    transition!(Some(1234), &mut variables; "b", -0.3, 5.0, "a", -0.0, "b", 0.0, "c"; "a", 1234.5, 1111.0, "a", 15.151515, "b")
                 );
             }
 
             #[test]
             fn none() {
+                let mut variables = variables!();
                 assert_eq!(
                     Transition {
                         target: None,
                         assignments: vec![
-                            mock_assignment!(2, 0.3, -5.0, 0.0, 0.0),
-                            mock_assignment!(1, 0.0, -1.0, 15.15)
+                            assignment!(&mut variables, "b", 0.3, -5.0, "a", 0.0, "b", 0.0, "c"),
+                            assignment!(&mut variables, "a", 0.0, -1.0, "a", 15.15, "b")
                         ]
                     },
-                    mock_transition!(None; 2, 0.3, -5.0, 0.0, 0.0; 1, 0.0, -1.0, 15.15)
+                    transition!(None, &mut variables; "b", 0.3, -5.0, "a", 0.0, "b", 0.0, "c"; "a", 0.0, -1.0, "a", 15.15, "b")
                 );
             }
         }
     }
     mod label {
-        use crate::{mock_varmap, pts::DisplayLabel};
+        use crate::{pts::variable::program_variable::ProgramVariables, variables};
 
         #[test]
         fn one_var() {
-            let map = mock_varmap!("test");
-            assert_eq!(mock_assignment!(1, 0.0).label(&map), "test = 0");
+            let mut variables: ProgramVariables = variables!("test");
+            assert_eq!(
+                assignment!(&mut variables, "test", 0.0).to_string(),
+                "test = 0"
+            );
         }
 
         #[test]
         fn many_vars() {
-            let map = mock_varmap!("a", "b");
+            let mut variables: ProgramVariables = variables!();
             assert_eq!(
-                mock_assignment!(2, -5.0, -2.0, 1.0).label(&map),
+                assignment!(&mut variables, "b", -5.0, -2.0, "a", 1.0, "b").to_string(),
                 "b = -2a + b - 5"
             );
         }

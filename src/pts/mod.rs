@@ -1,29 +1,32 @@
+use std::borrow::Cow;
+
+use self::{
+    location::{LocationHandle, Locations},
+    variable::program_variable::ProgramVariables,
+};
+
 pub mod guard;
+pub mod invariant;
 pub mod linear_polynomial;
 pub mod location;
 pub mod relation;
 pub mod system;
 pub mod transition;
-pub mod variable_map;
-
-use location::Locations;
-use variable_map::VariableMap;
-
-use dot;
-use std::borrow::Cow;
-
-use self::location::LocationHandle;
+pub mod variable;
 
 #[cfg_attr(test, derive(PartialEq))]
 #[derive(Debug, Default)]
-#[repr(align(32))] // 32 bytes
 pub struct PTS {
+    // the implementation assumes that every variable is in variables
     pub locations: Locations,
-    pub variables: VariableMap,
+    pub variables: ProgramVariables,
 }
 
-trait DisplayLabel {
-    fn label(&self, _: &VariableMap) -> String;
+impl PTS {
+    // Optimizes the structure
+    pub fn finalize(&mut self) {
+        self.variables.shrink_to_fit();
+    }
 }
 
 type Edge = (LocationHandle, LocationHandle);
@@ -73,9 +76,9 @@ impl<'a> dot::Labeller<'a, LocationHandle, Edge> for PTS {
         // invariant
         dot::LabelText::LabelStr(Cow::Owned(
             self.locations
-                .get_invariant(n.clone())
+                .get_invariant(n.to_owned())
                 .unwrap()
-                .label(&self.variables),
+                .to_string(),
         ))
     }
 
@@ -90,7 +93,7 @@ impl<'a> dot::Labeller<'a, LocationHandle, Edge> for PTS {
 
         dot::LabelText::LabelStr(Cow::Owned(
             transition
-                .map(|x| x.label(&self.variables))
+                .map(|x| x.to_string())
                 .unwrap_or(String::default()),
         ))
     }
@@ -119,15 +122,14 @@ impl<'a> dot::Labeller<'a, LocationHandle, Edge> for PTS {
 mod tests {
     mod dot {
         use crate::{
-            guards,
+            guards, invariant,
             misc::tests::pts::{
                 DEFAULT, SIMPLE_IF_PROGRAM, SIMPLE_NONDET_PROGRAM, SIMPLE_ODDS_PROGRAM,
                 SIMPLE_PROGRAM, TRIVIAL_IF_PROGRAM, TRIVIAL_NONDET_PROGRAM, TRIVIAL_ODDS_PROGRAM,
                 TRIVIAL_PROGRAM, WHILE_LOGIC_PROGRAM, WHILE_NONDET_PROGRAM, WHILE_PROB_PROGRAM,
             },
-            mock_invariant, mock_relation, mock_transition, mock_varmap,
-            pts::{location::Locations, variable_map::VariableMap, PTS},
-            system,
+            pts::{location::Locations, PTS},
+            state_system, transition, variables,
         };
 
         #[test]
@@ -135,7 +137,7 @@ mod tests {
             let mut string = Vec::<u8>::default();
             let pts = PTS {
                 locations: Locations::default(),
-                variables: VariableMap::default(),
+                variables: variables!(),
             };
             dot::render(&pts, &mut string).unwrap();
             let string = std::str::from_utf8(string.as_slice()).unwrap().to_string();
@@ -148,23 +150,23 @@ mod tests {
             let handle = locations.new_location();
             locations.initial = handle;
 
+            let mut variables = variables!("a");
+
             // line #
             // 1
-            locations.set_invariant(handle, mock_invariant!(["<", -1.0]));
+            locations.set_invariant(handle, invariant!(&mut variables, ["<", -1.0]));
             // 2
             locations
                 .set_outgoing(
                     handle,
-                    guards!(mock_transition!(locations.get_terminating_location(); 1, 1.0, 0.0)),
+                    guards!(transition!(locations.get_terminating_location(), &mut variables; "a", 1.0, 0.0, "a")),
                 )
                 .unwrap();
             // 3
             locations.set_invariant(
                 locations.get_terminating_location(),
-                mock_invariant!(["<", 1.0, 0.0]),
+                invariant!(&mut variables, ["<", 1.0, 0.0, "a"]),
             );
-
-            let variables = mock_varmap!("a");
 
             let pts = PTS {
                 locations,
@@ -181,20 +183,23 @@ mod tests {
         fn dot_simple_program() {
             let mut locations = Locations::default();
             let mut locations_iter = locations.new_n_locations(3);
+            let mut variables = variables!("a");
 
             let handle = locations_iter.next().unwrap();
             locations.initial = handle;
 
             // line #
             // 1
-            locations.set_invariant(handle, mock_invariant!(["<", 0.0, -1.0]));
+            locations.set_invariant(handle, invariant!(&mut variables, ["<", 0.0, -1.0, "a"]));
 
             // 2
             let next_location = locations_iter.next().unwrap();
             locations
                 .set_outgoing(
                     handle,
-                    guards!(mock_transition!(next_location; 2, 1.0, 0.0, 0.0)),
+                    guards!(
+                        transition!(next_location, &mut variables; "b", 1.0, 0.0, "a", 0.0, "b")
+                    ),
                 )
                 .unwrap();
 
@@ -202,10 +207,9 @@ mod tests {
             let handle = next_location;
             locations.set_invariant(
                 handle,
-                mock_invariant!(
-                [
-                    "<=", 1.0, 0.0, -1.0;
-                    "<", 0.0, -1.0, 0.0
+                invariant!(&mut variables, [
+                    "<=", 1.0, 0.0, "a", -1.0, "b";
+                    "<", 0.0, -1.0, "a", 0.0, "b"
                 ]),
             );
 
@@ -214,7 +218,7 @@ mod tests {
             locations
                 .set_outgoing(
                     handle,
-                    guards!(mock_transition!(next_location; 3, 0.0, 1.0, 1.0, 0.0)),
+                    guards!(transition!(next_location, &mut variables; "c", 0.0, 1.0, "a", 1.0, "b", 0.0, "c")),
                 )
                 .unwrap();
 
@@ -222,11 +226,10 @@ mod tests {
             let handle = next_location;
             locations.set_invariant(
                 handle,
-                mock_invariant!(
-                [
-                    "<=", 1.0, 0.0, -1.0, 0.0;
-                    "<", 0.0, -1.0, 0.0, 0.0;
-                    "<", 1.0, 0.0, 0.0, -1.0
+                invariant!(&mut variables, [
+                    "<=", 1.0, 0.0, "a", -1.0, "b", 0.0, "c";
+                    "<", 0.0, -1.0, "a", 0.0, "b", 0.0, "c";
+                    "<", 1.0, 0.0, "a", 0.0, "b", -1.0, "c"
                 ]),
             );
 
@@ -235,7 +238,9 @@ mod tests {
             locations
                 .set_outgoing(
                     handle,
-                    guards!(mock_transition!(next_location; 2, 0.0, 2.0, 0.0, 1.0)),
+                    guards!(
+                        transition!(next_location, &mut variables; "b", 0.0, 2.0, "a", 0.0, "b", 1.0, "c")
+                    ),
                 )
                 .unwrap();
 
@@ -243,15 +248,12 @@ mod tests {
             let handle = next_location;
             locations.set_invariant(
                 handle,
-                mock_invariant!(
-                [
-                    "<", 1.0, 0.0, -1.0, 0.0;
-                    "<", 0.0, -1.0, 0.0, 0.0;
-                    "<", 1.0, 0.0, 0.0, -1.0
+                invariant!(&mut variables, [
+                    "<", 1.0, 0.0, "a", -1.0, "b", 0.0, "c";
+                    "<", 0.0, -1.0, "a", 0.0, "b", 0.0, "c";
+                    "<", 1.0, 0.0, "a", 0.0, "b", -1.0, "c"
                 ]),
             );
-
-            let variables = mock_varmap!("a", "b", "c");
 
             let pts = PTS {
                 locations,
@@ -269,13 +271,14 @@ mod tests {
         fn dot_simple_if_program() {
             let mut locations = Locations::default();
             let mut locations_iter = locations.new_n_locations(5);
+            let mut variables = variables!("a", "b", "c");
 
             let start = locations_iter.next().unwrap();
             locations.initial = start;
 
             // line #
             // 1
-            locations.set_invariant(start, mock_invariant!(["<", 0.0]));
+            locations.set_invariant(start, invariant!(&mut variables, ["<", 0.0]));
 
             let junction = locations_iter.next().unwrap();
             let branch_1 = locations_iter.next().unwrap();
@@ -286,66 +289,82 @@ mod tests {
                     start,
                     guards!(L:
                         // 2
-                        system!(mock_relation!("<=", 0.0, -1.0, 1.0)),
-                        mock_transition!(branch_1),
+                        state_system!(&mut variables;"<=", 0.0, -1.0, "a", 1.0, "b"),
+                        transition!(branch_1),
                         // 6
-                        system!(
-                            mock_relation!(">", 0.0, 1.0, -1.0),
-                            mock_relation!("<=", 0.0, 0.0, 1.0, -1.0)
+                        state_system!(&mut variables;
+                            ">", 0.0, -1.0, "a", 1.0, "b";
+                            "<=", 0.0, 0.0, "a", 1.0, "b", -1.0, "c"
                         ),
-                        mock_transition!(branch_2),
+                        transition!(branch_2),
                         // 10
-                        system!(
-                            mock_relation!(">", 0.0, 1.0, -1.0),
-                            mock_relation!(">", 0.0, 0.0, -1.0, 1.0)
+                        state_system!(&mut variables;
+                            ">", 0.0, -1.0, "a", 1.0, "b";
+                            ">", 0.0, 0.0, "a", 1.0, "b", -1.0, "c"
                         ),
-                        mock_transition!(branch_3)
+                        transition!(branch_3)
                     ),
                 )
                 .unwrap();
 
             // 3
-            locations.set_invariant(branch_1, mock_invariant!(["<", 0.0, 0.0, 0.0]));
+            locations.set_invariant(
+                branch_1,
+                invariant!(&mut variables, ["<", 0.0, 0.0, "a", 0.0, "b"]),
+            );
 
             // 4
             locations
                 .set_outgoing(
                     branch_1,
-                    guards!(mock_transition!(junction; 1, 0.0, 1.0, 0.0)),
+                    guards!(transition!(junction, &mut variables; "a", 0.0, 1.0, "a", 0.0, "b")),
                 )
                 .unwrap();
 
             // 7
-            locations.set_invariant(branch_2, mock_invariant!(["<", 0.0, 0.0, 0.0, 0.0]));
+            locations.set_invariant(
+                branch_2,
+                invariant!(&mut variables, ["<", 0.0, 0.0, "a", 0.0, "b", 0.0, "c"]),
+            );
 
             // 8
             locations
                 .set_outgoing(
                     branch_2,
-                    guards!(mock_transition!(junction; 1, 0.0, 1.0, 0.0, 0.0)),
+                    guards!(
+                        transition!(junction, &mut variables; "a", 0.0, 1.0, "a", 0.0, "b", 0.0, "c")
+                    ),
                 )
                 .unwrap();
 
             // 11
-            locations.set_invariant(branch_3, mock_invariant!(["<", 0.0, 0.0, 0.0, 0.0]));
+            locations.set_invariant(
+                branch_3,
+                invariant!(&mut variables, ["<", 0.0, 0.0, "a", 0.0, "b", 0.0, "c"]),
+            );
 
             // 12
             locations
                 .set_outgoing(
                     branch_3,
-                    guards!(mock_transition!(junction; 1, 0.0, 1.0, 0.0, 0.0)),
+                    guards!(
+                        transition!(junction, &mut variables; "a", 0.0, 1.0, "a", 0.0, "b", 0.0, "c")
+                    ),
                 )
                 .unwrap();
 
             // 14
-            locations.set_invariant(junction, mock_invariant!(["<", 0.0, 0.0, 0.0, 0.0]));
+            locations.set_invariant(
+                junction,
+                invariant!(&mut variables, ["<", 0.0, 0.0, "a", 0.0, "b", 0.0, "c"]),
+            );
 
             // 15
             locations
                 .set_outgoing(
                     junction,
                     guards!(
-                        mock_transition!(locations.get_terminating_location(); 1, 0.0, 1.0, 0.0, 0.0)
+                        transition!(locations.get_terminating_location(), &mut variables; "a", 0.0, 1.0, "a", 0.0, "b", 0.0, "c")
                     ),
                 )
                 .unwrap();
@@ -353,10 +372,8 @@ mod tests {
             // 16
             locations.set_invariant(
                 locations.get_terminating_location(),
-                mock_invariant!(["<", 0.0, 0.0, 0.0, 0.0]),
+                invariant!(&mut variables, ["<", 0.0, 0.0, "a", 0.0, "b", 0.0, "c"]),
             );
-
-            let variables = mock_varmap!("a", "b", "c");
 
             let pts = PTS {
                 locations,
@@ -374,51 +391,58 @@ mod tests {
         fn dot_trivial_if_program() {
             let mut locations = Locations::default();
             let mut locations_iter = locations.new_n_locations(3);
+            let mut variables = variables!("a");
 
             let start = locations_iter.next().unwrap();
             locations.initial = start;
 
             // line #
             // 1
-            locations.set_invariant(start, mock_invariant!(["<", 0.0]));
+            locations.set_invariant(start, invariant!(&mut variables, ["<", 0.0]));
             let junction = locations_iter.next().unwrap();
             let branch_1 = locations_iter.next().unwrap();
             locations
                 .set_outgoing(
                     start,
                     guards!(L:
-                        // 22
-                        system!(mock_relation!("<=", 0.0, -1.0, 1.0)),
-                        mock_transition!(branch_1),
+                        // 2
+                        state_system!(&mut variables; "<=", 0.0, -1.0, "a", 1.0, "b"),
+                        transition!(branch_1),
 
                         // 5
-                        system!(mock_relation!("<", 0.0, 1.0, -1.0)),
-                        mock_transition!(junction),
+                        state_system!(&mut variables; "<", 0.0, 1.0, "a", -1.0, "b"),
+                        transition!(junction),
 
                     ),
                 )
                 .unwrap();
 
             // 3
-            locations.set_invariant(branch_1, mock_invariant!(["<", 0.0, 0.0, 0.0]));
+            locations.set_invariant(
+                branch_1,
+                invariant!(&mut variables, ["<", 0.0, 0.0, "a", 0.0, "b"]),
+            );
 
             // 4
             locations
                 .set_outgoing(
                     branch_1,
-                    guards!(mock_transition!(junction; 1, 0.0, 1.0, 0.0)),
+                    guards!(transition!(junction, &mut variables; "a", 0.0, 1.0, "a", 0.0, "b")),
                 )
                 .unwrap();
 
             // 6
-            locations.set_invariant(junction, mock_invariant!(["<", 0.0, 0.0, 0.0]));
+            locations.set_invariant(
+                junction,
+                invariant!(&mut variables, ["<", 0.0, 0.0, "a", 0.0, "b"]),
+            );
 
             // 7
             locations
                 .set_outgoing(
                     junction,
                     guards!(
-                        mock_transition!(locations.get_terminating_location(); 1, 0.0, 1.0, 0.0)
+                        transition!(locations.get_terminating_location(), &mut variables; "a", 0.0, 1.0, "a", 0.0, "b")
                     ),
                 )
                 .unwrap();
@@ -426,10 +450,8 @@ mod tests {
             // 8
             locations.set_invariant(
                 locations.get_terminating_location(),
-                mock_invariant!(["<", 0.0, 0.0, 0.0]),
+                invariant!(&mut variables, ["<", 0.0, 0.0, "a", 0.0, "b"]),
             );
-
-            let variables = mock_varmap!("a", "b");
 
             let pts = PTS {
                 locations,
@@ -447,13 +469,14 @@ mod tests {
         fn dot_simple_odds_program() {
             let mut locations = Locations::default();
             let mut locations_iter = locations.new_n_locations(4);
+            let mut variables = variables!("a");
 
             let start = locations_iter.next().unwrap();
             locations.initial = start;
 
             // line #
             // 1
-            locations.set_invariant(start, mock_invariant!(["<", 0.0]));
+            locations.set_invariant(start, invariant!(&mut variables, ["<", 0.0]));
 
             let junction = locations_iter.next().unwrap();
             let branch_1 = locations_iter.next().unwrap();
@@ -464,45 +487,54 @@ mod tests {
                     guards!(P:
                         // 2
                         0.0,
-                        mock_transition!(branch_1),
+                        transition!(branch_1),
                         // 6
                         1.0,
-                        mock_transition!(branch_2),
+                        transition!(branch_2),
                         // 9
                         0.0,
-                        mock_transition!(junction),
+                        transition!(junction),
                     ),
                 )
                 .unwrap();
 
             // 3
-            locations.set_invariant(branch_1, mock_invariant!(["<", 0.0, 0.0]));
+            locations.set_invariant(branch_1, invariant!(&mut variables, ["<", 0.0, 0.0, "a"]));
 
             // 4
             locations
-                .set_outgoing(branch_1, guards!(mock_transition!(junction; 1, 0.0, 1.0)))
+                .set_outgoing(
+                    branch_1,
+                    guards!(transition!(junction, &mut variables; "a", 0.0, 1.0, "a")),
+                )
                 .unwrap();
 
             // 7
-            locations.set_invariant(branch_2, mock_invariant!(["<=", 0.0, 1.0, -1.0]));
+            locations.set_invariant(
+                branch_2,
+                invariant!(&mut variables, ["<=", 0.0, 1.0, "a", -1.0, "b"]),
+            );
 
             // 8
             locations
                 .set_outgoing(
                     branch_2,
-                    guards!(mock_transition!(junction; 2, 0.0, 1.0, 0.0)),
+                    guards!(transition!(junction, &mut variables; "b", 0.0, 1.0, "a", 0.0, "b")),
                 )
                 .unwrap();
 
             // 10
-            locations.set_invariant(junction, mock_invariant!(["<", 0.0, 0.0, 0.0]));
+            locations.set_invariant(
+                junction,
+                invariant!(&mut variables, ["<", 0.0, 0.0, "a", 0.0, "b"]),
+            );
 
             // 11
             locations
                 .set_outgoing(
                     junction,
                     guards!(
-                        mock_transition!(locations.get_terminating_location(); 1, 0.0, 1.0, 0.0)
+                        transition!(locations.get_terminating_location(), &mut variables; "a", 0.0, 1.0, "a", 0.0, "b")
                     ),
                 )
                 .unwrap();
@@ -510,10 +542,8 @@ mod tests {
             // 12
             locations.set_invariant(
                 locations.get_terminating_location(),
-                mock_invariant!(["<", 0.0, 0.0, 0.0]),
+                invariant!(&mut variables, ["<", 0.0, 0.0, "a", 0.0, "b"]),
             );
-
-            let variables = mock_varmap!("a", "b");
 
             let pts = PTS {
                 locations,
@@ -531,13 +561,14 @@ mod tests {
         fn dot_trivial_odds_program() {
             let mut locations = Locations::default();
             let mut locations_iter = locations.new_n_locations(3);
+            let mut variables = variables!("a");
 
             let start = locations_iter.next().unwrap();
             locations.initial = start;
 
             // line #
             // 1
-            locations.set_invariant(start, mock_invariant!(["<", 0.0]));
+            locations.set_invariant(start, invariant!(&mut variables, ["<", 0.0]));
 
             let junction = locations_iter.next().unwrap();
             let branch_1 = locations_iter.next().unwrap();
@@ -546,39 +577,40 @@ mod tests {
                     start,
                     guards!(P:
                         0.5,
-                        mock_transition!(branch_1),
+                        transition!(branch_1),
                         0.5,
-                        mock_transition!(junction),
+                        transition!(junction),
                     ),
                 )
                 .unwrap();
 
             // 3
-            locations.set_invariant(branch_1, mock_invariant!(["<", 0.0, 0.0]));
+            locations.set_invariant(branch_1, invariant!(&mut variables, ["<", 0.0, 0.0, "a"]));
 
             // 4
             locations
-                .set_outgoing(branch_1, guards!(mock_transition!(junction; 1, 0.0, 1.0)))
+                .set_outgoing(
+                    branch_1,
+                    guards!(transition!(junction, &mut variables; "a", 0.0, 1.0, "a")),
+                )
                 .unwrap();
 
             // 6
-            locations.set_invariant(junction, mock_invariant!(["<", 0.0, 0.0]));
+            locations.set_invariant(junction, invariant!(&mut variables, ["<", 0.0, 0.0, "a"]));
 
             // 7
             locations
                 .set_outgoing(
                     junction,
-                    guards!(mock_transition!(locations.get_terminating_location(); 1, 0.0, 1.0)),
+                    guards!(transition!(locations.get_terminating_location(), &mut variables; "a", 0.0, 1.0, "a")),
                 )
                 .unwrap();
 
             // 8
             locations.set_invariant(
                 locations.get_terminating_location(),
-                mock_invariant!(["<", 0.0, 0.0]),
+                invariant!(&mut variables, ["<", 0.0, 0.0, "a"]),
             );
-
-            let variables = mock_varmap!("a");
 
             let pts = PTS {
                 locations,
@@ -596,13 +628,14 @@ mod tests {
         fn dot_simple_nondet_program() {
             let mut locations = Locations::default();
             let mut locations_iter = locations.new_n_locations(5);
+            let mut variables = variables!("a");
 
             let start = locations_iter.next().unwrap();
             locations.initial = start;
 
             // line #
             // 1
-            locations.set_invariant(start, mock_invariant!(["<", 0.0]));
+            locations.set_invariant(start, invariant!(&mut variables, ["<", 0.0]));
 
             let junction = locations_iter.next().unwrap();
             let branch_1 = locations_iter.next().unwrap();
@@ -613,57 +646,64 @@ mod tests {
                     start,
                     guards!(
                         // 2
-                        mock_transition!(branch_1),
+                        transition!(branch_1),
                         // 6
-                        mock_transition!(branch_2),
+                        transition!(branch_2),
                         // 10
-                        mock_transition!(branch_3),
+                        transition!(branch_3),
                     ),
                 )
                 .unwrap();
 
             // 3
-            locations.set_invariant(branch_1, mock_invariant!(["<", 0.0, 0.0]));
+            locations.set_invariant(branch_1, invariant!(&mut variables, ["<", 0.0, 0.0, "a"]));
 
             // 4
             locations
-                .set_outgoing(branch_1, guards!(mock_transition!(junction; 1, 0.0, 1.0)))
+                .set_outgoing(
+                    branch_1,
+                    guards!(transition!(junction, &mut variables; "a", 0.0, 1.0, "a")),
+                )
                 .unwrap();
 
             // 7
-            locations.set_invariant(branch_2, mock_invariant!(["<", 0.0, 0.0]));
+            locations.set_invariant(branch_2, invariant!(&mut variables, ["<", 0.0, 0.0, "a"]));
 
             // 8
             locations
-                .set_outgoing(branch_2, guards!(mock_transition!(junction; 1, 0.0, 1.0)))
+                .set_outgoing(
+                    branch_2,
+                    guards!(transition!(junction, &mut variables; "a", 0.0, 1.0, "a")),
+                )
                 .unwrap();
 
             // 11
-            locations.set_invariant(branch_3, mock_invariant!(["<", 0.0, 0.0]));
+            locations.set_invariant(branch_3, invariant!(&mut variables, ["<", 0.0, 0.0, "a"]));
 
             // 12
             locations
-                .set_outgoing(branch_3, guards!(mock_transition!(junction; 1, 0.0, 1.0)))
+                .set_outgoing(
+                    branch_3,
+                    guards!(transition!(junction, &mut variables; "a", 0.0, 1.0, "a")),
+                )
                 .unwrap();
 
             // 14
-            locations.set_invariant(junction, mock_invariant!(["<", 0.0, 0.0]));
+            locations.set_invariant(junction, invariant!(&mut variables, ["<", 0.0, 0.0, "a"]));
 
             // 15
             locations
                 .set_outgoing(
                     junction,
-                    guards!(mock_transition!(locations.get_terminating_location(); 1, 0.0, 1.0)),
+                    guards!(transition!(locations.get_terminating_location(), &mut variables; "a", 0.0, 1.0, "a")),
                 )
                 .unwrap();
 
             // 16
             locations.set_invariant(
                 locations.get_terminating_location(),
-                mock_invariant!(["<", 0.0, 0.0]),
+                invariant!(&mut variables, ["<", 0.0, 0.0, "a"]),
             );
-
-            let variables = mock_varmap!("a");
 
             let pts = PTS {
                 locations,
@@ -681,13 +721,14 @@ mod tests {
         fn dot_trivial_nondet_program() {
             let mut locations = Locations::default();
             let mut locations_iter = locations.new_n_locations(3);
+            let mut variables = variables!("a");
 
             let start = locations_iter.next().unwrap();
             locations.initial = start;
 
             // line #
             // 1
-            locations.set_invariant(start, mock_invariant!(["<", 0.0]));
+            locations.set_invariant(start, invariant!(&mut variables, ["<", 0.0]));
 
             let junction = locations_iter.next().unwrap();
             let branch_1 = locations_iter.next().unwrap();
@@ -696,38 +737,39 @@ mod tests {
                     start,
                     guards!(
                         // 2
-                        mock_transition!(branch_1),
+                        transition!(branch_1),
                         // 5
-                        mock_transition!(junction),
+                        transition!(junction),
                     ),
                 )
                 .unwrap();
 
             // 3
-            locations.set_invariant(branch_1, mock_invariant!(["<", 0.0, 0.0]));
+            locations.set_invariant(branch_1, invariant!(&mut variables, ["<", 0.0, 0.0, "a"]));
 
             // 4
             locations
-                .set_outgoing(branch_1, guards!(mock_transition!(junction; 1, 0.0, 1.0)))
+                .set_outgoing(
+                    branch_1,
+                    guards!(transition!(junction, &mut variables; "a", 0.0, 1.0, "a")),
+                )
                 .unwrap();
             // 6
-            locations.set_invariant(junction, mock_invariant!(["<", 0.0, 0.0]));
+            locations.set_invariant(junction, invariant!(&mut variables, ["<", 0.0, 0.0, "a"]));
 
             // 7
             locations
                 .set_outgoing(
                     junction,
-                    guards!(mock_transition!(locations.get_terminating_location(); 1, 0.0, 1.0)),
+                    guards!(transition!(locations.get_terminating_location(), &mut variables; "a", 0.0, 1.0, "a")),
                 )
                 .unwrap();
 
             // 8
             locations.set_invariant(
                 locations.get_terminating_location(),
-                mock_invariant!(["<", 0.0, 0.0]),
+                invariant!(&mut variables, ["<", 0.0, 0.0, "a"]),
             );
-
-            let variables = mock_varmap!("a");
 
             let pts = PTS {
                 locations,
@@ -745,13 +787,14 @@ mod tests {
         fn dot_logic_while_program() {
             let mut locations = Locations::default();
             let mut locations_iter = locations.new_n_locations(3);
+            let mut variables = variables!("a");
 
             let start = locations_iter.next().unwrap();
             locations.initial = start;
 
             // line #
             // 1
-            locations.set_invariant(start, mock_invariant!(["<", 0.0]));
+            locations.set_invariant(start, invariant!(&mut variables, ["<", 0.0]));
 
             let junction = locations_iter.next().unwrap();
             let branch_1 = locations_iter.next().unwrap();
@@ -760,46 +803,46 @@ mod tests {
                     start,
                     guards!(L:
                         // 2
-                        system!(
-                            mock_relation!(
-                                "<", 0.0, 0.0
-                            ),
-                            mock_relation!(
-                                "<", 0.0, 0.0
-                            )
+                        state_system!(&mut variables;
+                                "<", 0.0, 0.0, "a"
+                                ;
+                                "<", 0.0, 0.0, "a"
                         ),
-                        mock_transition!(branch_1),
+                        transition!(branch_1),
                         // 5
-                        system!(
-                            mock_relation!(
-                                "<=", 0.0, 0.0
-                            ),
-                            mock_relation!(
-                                "<=", 0.0, 0.0
-                            )
+                        state_system!(&mut variables;
+                                "<=", 0.0, 0.0, "a"
+                            ;
+                                "<=", 0.0, 0.0, "a"
                         ),
-                        mock_transition!(junction)
+                        transition!(junction)
                     ),
                 )
                 .unwrap();
 
             // 3
-            locations.set_invariant(branch_1, mock_invariant!(["<", 0.0, 0.0]));
+            locations.set_invariant(branch_1, invariant!(&mut variables, ["<", 0.0, 0.0, "a"]));
 
             // 4
             locations
-                .set_outgoing(branch_1, guards!(mock_transition!(start; 1, 0.0, 0.0, 1.0)))
+                .set_outgoing(
+                    branch_1,
+                    guards!(transition!(start, &mut variables; "a", 0.0, 0.0, "a", 1.0, "b")),
+                )
                 .unwrap();
 
             // 6
-            locations.set_invariant(junction, mock_invariant!(["<", 0.0, 0.0, 0.0]));
+            locations.set_invariant(
+                junction,
+                invariant!(&mut variables, ["<", 0.0, 0.0, "a", 0.0, "b"]),
+            );
 
             // 7
             locations
                 .set_outgoing(
                     junction,
                     guards!(
-                        mock_transition!(locations.get_terminating_location(); 1, 0.0, 0.0, 1.0)
+                        transition!(locations.get_terminating_location(), &mut variables; "a", 0.0, 0.0, "a", 1.0, "b")
                     ),
                 )
                 .unwrap();
@@ -807,10 +850,8 @@ mod tests {
             // 8
             locations.set_invariant(
                 locations.get_terminating_location(),
-                mock_invariant!(["<", 0.0, 0.0, 0.0]),
+                invariant!(&mut variables, ["<", 0.0, 0.0, "a", 0.0, "b"]),
             );
-
-            let variables = mock_varmap!("a", "b");
 
             let pts = PTS {
                 locations,
@@ -828,13 +869,14 @@ mod tests {
         fn dot_prob_while_program() {
             let mut locations = Locations::default();
             let mut locations_iter = locations.new_n_locations(3);
+            let mut variables = variables!("a");
 
             let start = locations_iter.next().unwrap();
             locations.initial = start;
 
             // line #
             // 1
-            locations.set_invariant(start, mock_invariant!(["<", 0.0]));
+            locations.set_invariant(start, invariant!(&mut variables, ["<", 0.0]));
 
             let junction = locations_iter.next().unwrap();
             let branch_1 = locations_iter.next().unwrap();
@@ -844,31 +886,37 @@ mod tests {
                     guards!(P:
                             // 2
                             1.0,
-                            mock_transition!(branch_1),
+                            transition!(branch_1),
                             // 5
                             0.0,
-                            mock_transition!(junction),
+                            transition!(junction),
                     ),
                 )
                 .unwrap();
 
             // 3
-            locations.set_invariant(branch_1, mock_invariant!(["<", 0.0, 0.0]));
+            locations.set_invariant(branch_1, invariant!(&mut variables, ["<", 0.0, 0.0, "a"]));
 
             // 4
             locations
-                .set_outgoing(branch_1, guards!(mock_transition!(start; 1, 0.0, 0.0, 1.0)))
+                .set_outgoing(
+                    branch_1,
+                    guards!(transition!(start, &mut variables; "a", 0.0, 0.0, "a", 1.0, "b")),
+                )
                 .unwrap();
 
             // 6
-            locations.set_invariant(junction, mock_invariant!(["<", 0.0, 0.0, 0.0]));
+            locations.set_invariant(
+                junction,
+                invariant!(&mut variables, ["<", 0.0, 0.0, "a", 0.0, "b"]),
+            );
 
             // 7
             locations
                 .set_outgoing(
                     junction,
                     guards!(
-                        mock_transition!(locations.get_terminating_location(); 1, 0.0, 0.0, 1.0)
+                        transition!(locations.get_terminating_location(), &mut variables; "a", 0.0, 0.0, "a", 1.0, "b")
                     ),
                 )
                 .unwrap();
@@ -876,10 +924,8 @@ mod tests {
             // 8
             locations.set_invariant(
                 locations.get_terminating_location(),
-                mock_invariant!(["<", 0.0, 0.0, 0.0]),
+                invariant!(&mut variables, ["<", 0.0, 0.0, "a", 0.0, "b"]),
             );
-
-            let variables = mock_varmap!("a", "b");
 
             let pts = PTS {
                 locations,
@@ -897,13 +943,14 @@ mod tests {
         fn dot_nondet_while_program() {
             let mut locations = Locations::default();
             let mut locations_iter = locations.new_n_locations(3);
+            let mut variables = variables!("a");
 
             let start = locations_iter.next().unwrap();
             locations.initial = start;
 
             // line #
             // 1
-            locations.set_invariant(start, mock_invariant!(["<", 0.0]));
+            locations.set_invariant(start, invariant!(&mut variables, ["<", 0.0]));
 
             let junction = locations_iter.next().unwrap();
             let branch_1 = locations_iter.next().unwrap();
@@ -912,29 +959,35 @@ mod tests {
                     start,
                     guards!(
                         // 2
-                        mock_transition!(branch_1),
+                        transition!(branch_1),
                         // 5
-                        mock_transition!(junction),
+                        transition!(junction),
                     ),
                 )
                 .unwrap();
 
             // 3
-            locations.set_invariant(branch_1, mock_invariant!(["<", 0.0, 0.0]));
+            locations.set_invariant(branch_1, invariant!(&mut variables, ["<", 0.0, 0.0, "a"]));
 
             // 4
             locations
-                .set_outgoing(branch_1, guards!(mock_transition!(start; 1, 0.0, 0.0, 1.0)))
+                .set_outgoing(
+                    branch_1,
+                    guards!(transition!(start, &mut variables; "a", 0.0, 0.0, "a", 1.0, "b")),
+                )
                 .unwrap();
             // 6
-            locations.set_invariant(junction, mock_invariant!(["<", 0.0, 0.0, 0.0]));
+            locations.set_invariant(
+                junction,
+                invariant!(&mut variables, ["<", 0.0, 0.0, "a", 0.0, "b"]),
+            );
 
             // 7
             locations
                 .set_outgoing(
                     junction,
                     guards!(
-                        mock_transition!(locations.get_terminating_location(); 1, 0.0, 0.0, 1.0)
+                        transition!(locations.get_terminating_location(), &mut variables; "a", 0.0, 0.0, "a", 1.0, "b")
                     ),
                 )
                 .unwrap();
@@ -942,10 +995,8 @@ mod tests {
             // 8
             locations.set_invariant(
                 locations.get_terminating_location(),
-                mock_invariant!(["<", 0.0, 0.0, 0.0]),
+                invariant!(&mut variables, ["<", 0.0, 0.0, "a", 0.0, "b"]),
             );
-
-            let variables = mock_varmap!("a", "b");
 
             let pts = PTS {
                 locations,
@@ -960,22 +1011,3 @@ mod tests {
         }
     }
 }
-// #[cfg(test)]
-// mod tests {
-//     use std::mem;
-//     use super::PTS;
-//
-//     #[test]
-//     fn align_pts() {
-//         if mem::size_of::<usize>() == 8{
-//             assert_eq!(mem::align_of::<PTS>(), 32);
-//         }
-//     }
-//
-//     #[test]
-//     fn size_pts() {
-//         if mem::size_of::<usize>() == 8{
-//             assert_eq!(mem::size_of::<PTS>(), 32);
-//         }
-//     }
-// }

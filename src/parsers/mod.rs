@@ -52,6 +52,7 @@ pub fn parse<'a>(parser: Parser, input: &str) -> Result<PTS, ParserError> {
     }
 }
 
+// TODO better error messeges
 pub fn handle_pest_error<R: RuleType>(error: PestError<R>) -> ParserError {
     let location: ErrorLocation = match error.line_col {
         LineColLocation::Pos(pair) => ErrorLocation::Position(pair),

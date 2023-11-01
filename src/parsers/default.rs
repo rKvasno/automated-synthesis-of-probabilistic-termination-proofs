@@ -1,23 +1,24 @@
-use crate::pts::guard::Guards;
-use crate::pts::location::Invariant;
-use crate::pts::relation::{Relation, RelationSign};
-use crate::pts::system::System;
-use crate::pts::transition::Transition;
-use crate::pts::variable_map::Variable;
-use crate::pts::PTS;
-use crate::{consume, parsers, pts};
-use parsers::grammars::default::{DefaultParser, Rule};
-use parsers::{handle_pest_error, ParserError};
-use pts::linear_polynomial::constant::Constant;
-use pts::linear_polynomial::term::Term;
-use pts::linear_polynomial::LinearPolynomial;
-use pts::location::LocationHandle;
-use pts::transition::Assignment;
-use pts::variable_map::VariableMap;
+use std::str::FromStr;
 
 use pest::iterators::Pair;
 use pest::Parser;
-use std::iter::{once, zip};
+
+// TODO use LinearPolynomial parser from DefaultParser
+use crate::consume;
+use crate::pts::guard::Guards;
+use crate::pts::invariant::Invariant;
+use crate::pts::linear_polynomial::coefficient::{Coefficient, Constant};
+use crate::pts::linear_polynomial::State;
+use crate::pts::location::LocationHandle;
+use crate::pts::relation::{RelationSign, StateRelation};
+use crate::pts::system::StateSystem;
+use crate::pts::transition::{Assignment, StateAssignment, Transition};
+use crate::pts::variable::program_variable::{ProgramVariable, ProgramVariables};
+use crate::pts::variable::Variable;
+use crate::pts::PTS;
+
+use super::grammars::default::{DefaultParser, Rule};
+use super::{handle_pest_error, ParserError};
 
 macro_rules! invariant_error {
     () => {
@@ -35,33 +36,40 @@ pub enum Operation {
 }
 
 fn odds_to_probabilities(odds: Vec<Constant>) -> Vec<Constant> {
-    // TODO handle division by zero
-    let sum: Constant = odds.clone().into_iter().sum();
+    // checks for negative probabilities
+    assert!(odds.iter().find(|x| x.is_negative()).is_none());
+    let sum: Constant = odds.to_owned().into_iter().sum();
+    // TODO since the user can input all 0.0, we need a ParserError
     // could probably return the iterator, but that poses some lifetime issues
     odds.into_iter().map(|x| x / sum).collect()
 }
 
-pub fn parse<'a>(input: &str) -> Result<pts::PTS, ParserError> {
+// TODO error propagation for division by zero
+pub fn parse(input: &str) -> Result<PTS, ParserError> {
     match DefaultParser::parse(Rule::program, input) {
         Err(error) => Err(handle_pest_error(error)),
         Ok(mut parse) => {
             let mut pts = Default::default();
             parse_program(&mut pts, parse.next().unwrap());
             assert_eq!(parse.next(), None);
+            pts.finalize();
             Ok(pts)
         }
     }
 }
 
 // assumes the parses rule is Rule::variable
-fn parse_variable<'a>(parse: Pair<'a, Rule>) -> Variable {
-    assert_eq!(parse.clone().as_rule(), Rule::variable);
-    Variable::new(parse.as_str())
+fn parse_variable<'parse>(
+    variables: &mut ProgramVariables,
+    parse: Pair<'parse, Rule>,
+) -> ProgramVariable {
+    assert_eq!(parse.to_owned().as_rule(), Rule::variable);
+    ProgramVariable::new(variables, &parse.as_str())
 }
 
 // assumes the parses rule is Rule::constant
-fn parse_constant<'a>(parse: Pair<'a, Rule>) -> Constant {
-    assert_eq!(parse.clone().as_rule(), Rule::constant);
+fn parse_constant<'parse>(parse: Pair<'parse, Rule>) -> Constant {
+    assert_eq!(parse.to_owned().as_rule(), Rule::constant);
     // all parses have to follow f64 grammar, no need to handle errors
     parse
         .as_str()
@@ -70,7 +78,7 @@ fn parse_constant<'a>(parse: Pair<'a, Rule>) -> Constant {
 }
 
 // assumes the parses rule is Rule::power_op, Rule::multiplicative_op or Rule::additive_op
-fn parse_operation<'a>(parse: Pair<'a, Rule>) -> Operation {
+fn parse_operation<'parse>(parse: Pair<'parse, Rule>) -> Operation {
     match parse.as_str() {
         "+" => Operation::Addition,
         "-" => Operation::Subtraction,
@@ -82,8 +90,8 @@ fn parse_operation<'a>(parse: Pair<'a, Rule>) -> Operation {
 }
 
 // assumes the parses rule is Rule::constant_expr
-fn parse_constant_expr<'a>(parse: Pair<'a, Rule>) -> Constant {
-    assert_eq!(parse.clone().as_rule(), Rule::constant_expr);
+fn parse_constant_expr<'parse>(parse: Pair<'parse, Rule>) -> Constant {
+    assert_eq!(parse.to_owned().as_rule(), Rule::constant_expr);
     let mut iter = parse.into_inner().into_iter();
     let first = iter.next().unwrap();
     let mut acc = match first.as_rule() {
@@ -109,38 +117,46 @@ fn parse_constant_expr<'a>(parse: Pair<'a, Rule>) -> Constant {
 }
 
 // assumes the parses rule is Rule::term
-fn parse_term<'a>(parse: Pair<'a, Rule>) -> Term {
-    assert_eq!(parse.clone().as_rule(), Rule::term);
+fn parse_term<'parse>(
+    variables: &mut ProgramVariables,
+    parse: Pair<'parse, Rule>,
+) -> (Constant, Option<ProgramVariable>) {
+    assert_eq!(parse.to_owned().as_rule(), Rule::term);
     let pairs = parse.into_inner();
-    let mut variable: Option<Variable> = None;
+    let mut variable: Option<ProgramVariable> = None;
     let mut coefficient = Constant(1.0);
     for pair in pairs {
         match pair.as_rule() {
-            Rule::variable => variable = Some(parse_variable(pair)),
+            Rule::variable => variable = Some(parse_variable(variables, pair)),
             Rule::constant_expr => coefficient = parse_constant_expr(pair),
             _ => panic!(invariant_error!()),
         }
     }
-    Term {
-        variable,
-        coefficient,
-    }
+    (coefficient, variable)
 }
 
 // assumes the parses rule is Rule::linear_polynomial
-fn parse_linear_polynomial<'a>(map: &mut VariableMap, parse: Pair<'a, Rule>) -> LinearPolynomial {
-    assert_eq!(parse.clone().as_rule(), Rule::linear_polynomial);
+fn parse_linear_polynomial<'parse>(
+    variables: &mut ProgramVariables,
+    parse: Pair<'parse, Rule>,
+) -> State {
+    assert_eq!(parse.to_owned().as_rule(), Rule::linear_polynomial);
     let mut op = Operation::Addition;
     let pairs = parse.into_inner();
-    let mut pol = LinearPolynomial::default();
+    // theres no guarantee that there wont be duplicit terms, but its probably better to use
+    // with_capacity than shrink_to_fit afterwards
+    let mut pol = State::with_capacity(pairs.len());
     for pair in pairs {
         match pair.as_rule() {
             Rule::additive_op => op = parse_operation(pair),
             Rule::term if op == Operation::Addition => {
-                consume!(pol.add_term(map, parse_term(pair)))
+                let (coeff, var) = parse_term(variables, pair);
+
+                consume!(pol.add_term(coeff, var))
             }
             Rule::term if op == Operation::Subtraction => {
-                consume!(pol.add_term(map, -parse_term(pair)))
+                let (coeff, var) = parse_term(variables, pair);
+                consume!(pol.add_term(-coeff, var))
             }
             //_ => panic!(invariant_error!()),
             rule => panic!("{:?}", rule),
@@ -150,62 +166,66 @@ fn parse_linear_polynomial<'a>(map: &mut VariableMap, parse: Pair<'a, Rule>) -> 
 }
 
 // assumes the parses rule is Rule::assign_inst
-fn parse_assignment<'a>(map: &mut VariableMap, parse: Pair<'a, Rule>) -> Assignment {
-    assert_eq!(parse.clone().as_rule(), Rule::assign_inst);
+fn parse_assignment<'parse>(
+    variables: &mut ProgramVariables,
+    parse: Pair<'parse, Rule>,
+) -> StateAssignment {
+    assert_eq!(parse.to_owned().as_rule(), Rule::assign_inst);
     let mut pairs = parse.into_inner();
-    let var = parse_variable(pairs.next().unwrap());
-    map.get_or_push(&var);
-    let pol: LinearPolynomial = parse_linear_polynomial(map, pairs.next().unwrap());
-    Assignment::new(map, &var, pol)
+    let var = parse_variable(variables, pairs.next().unwrap());
+    let pol: State = parse_linear_polynomial(variables, pairs.next().unwrap());
+    Assignment::new(var, pol)
 }
 
 // assumes the parses rule is Rule::comparison_op
-fn parse_comparison_op<'a>(parse: Pair<'a, Rule>) -> RelationSign {
-    match parse.as_str() {
-        ">" => RelationSign::GT,
-        ">=" => RelationSign::GE,
-        "<" => RelationSign::LT,
-        "<=" => RelationSign::LE,
-        _ => panic!(invariant_error!()),
-    }
+fn parse_comparison_op<'parse>(parse: Pair<'parse, Rule>) -> RelationSign {
+    RelationSign::from_str(parse.as_str()).unwrap()
 }
 
 // assumes the parses rule is Rule::inequality
-fn parse_inequality<'a>(map: &mut VariableMap, parse: Pair<'a, Rule>) -> Relation {
-    assert!(parse.clone().as_rule() == Rule::inequality);
+fn parse_inequality<'parse>(
+    variables: &mut ProgramVariables,
+    parse: Pair<'parse, Rule>,
+) -> StateRelation {
+    assert!(parse.to_owned().as_rule() == Rule::inequality);
     let mut pairs = parse.into_inner();
-    let lhs: LinearPolynomial = parse_linear_polynomial(map, pairs.next().unwrap());
+    let lhs: State = parse_linear_polynomial(variables, pairs.next().unwrap());
     let op = parse_comparison_op(pairs.next().unwrap());
-    let rhs: LinearPolynomial = parse_linear_polynomial(map, pairs.next().unwrap());
+    let rhs: State = parse_linear_polynomial(variables, pairs.next().unwrap());
     // assert!(pairs.next().is_none());
-    Relation::new(lhs, op, rhs)
+    StateRelation::new(lhs, op, rhs)
 }
 
 // assumes the parses rule is Rule::logic_condition
-fn parse_inequality_system<'a>(map: &mut VariableMap, parse: Pair<'a, Rule>) -> System {
-    assert!(parse.clone().as_rule() == Rule::logic_condition);
-    let mut system = System::default();
+fn parse_inequality_system<'parse>(
+    variables: &mut ProgramVariables,
+    parse: Pair<'parse, Rule>,
+) -> StateSystem {
+    assert!(parse.to_owned().as_rule() == Rule::logic_condition);
+    let mut system = StateSystem::default();
     for pair in parse.into_inner() {
-        system.push(parse_inequality(map, pair));
+        system.push(parse_inequality(variables, pair));
     }
     system
 }
 
 // assumes the parses rule is Rule::invariant
-fn parse_invariant<'a>(map: &mut VariableMap, parse: Pair<'a, Rule>) -> Invariant {
-    assert!(parse.clone().as_rule() == Rule::invariant);
-    let mut invariant = Invariant::default();
-    for pair in parse.into_inner() {
-        invariant
-            .assertions
-            .push(parse_inequality_system(map, pair));
+fn parse_invariant<'parse>(
+    variables: &mut ProgramVariables,
+    parse: Pair<'parse, Rule>,
+) -> Invariant {
+    assert!(parse.to_owned().as_rule() == Rule::invariant);
+    let iter = parse.into_inner();
+    let mut assertions = Vec::with_capacity(iter.len());
+    for pair in iter {
+        assertions.push(parse_inequality_system(variables, pair));
     }
-    invariant
+    Invariant::from(assertions)
 }
 
 // assumes the parses rule is Rule::program
-fn parse_program<'a>(pts: &mut PTS, parse: Pair<'a, Rule>) {
-    assert_eq!(parse.clone().as_rule(), Rule::program);
+fn parse_program<'parse>(pts: &mut PTS, parse: Pair<'parse, Rule>) {
+    assert_eq!(parse.to_owned().as_rule(), Rule::program);
     let mut transition = Transition::default();
     let mut iter = parse.into_inner();
     parse_locations(
@@ -222,13 +242,13 @@ fn parse_program<'a>(pts: &mut PTS, parse: Pair<'a, Rule>) {
 }
 
 // assumes the parses rule is Rule::locations
-fn parse_locations<'a>(
+fn parse_locations<'parse>(
     pts: &mut PTS,
-    parse: Pair<'a, Rule>,
+    parse: Pair<'parse, Rule>,
     start_transition: &mut Transition,
     end: LocationHandle,
 ) {
-    assert_eq!(parse.clone().as_rule(), Rule::locations);
+    assert_eq!(parse.to_owned().as_rule(), Rule::locations);
     let parse_locations = parse.into_inner();
     let mut pts_locations = pts
         .locations
@@ -236,12 +256,12 @@ fn parse_locations<'a>(
         .peekable();
 
     // locations nonterminal always has atleast one location
-    start_transition.target = pts_locations.peek().unwrap().clone();
+    start_transition.target = pts_locations.peek().unwrap().to_owned();
 
-    for ((local_start, local_end), pair) in zip(
-        zip(
-            pts_locations.clone(),
-            pts_locations.skip(1).chain(once(end)),
+    for ((local_start, local_end), pair) in std::iter::zip(
+        std::iter::zip(
+            pts_locations.to_owned(),
+            pts_locations.skip(1).chain(std::iter::once(end)),
         ),
         parse_locations,
     ) {
@@ -265,13 +285,13 @@ fn parse_locations<'a>(
 }
 
 // assumes the parses rule is Rule::assign_inst
-fn parse_assign<'a>(
+fn parse_assign<'parse>(
     pts: &mut PTS,
-    parse: Pair<'a, Rule>,
+    parse: Pair<'parse, Rule>,
     start: LocationHandle,
     end: LocationHandle,
 ) {
-    assert_eq!(parse.clone().as_rule(), Rule::assign_inst);
+    assert_eq!(parse.to_owned().as_rule(), Rule::assign_inst);
     pts.locations
         .set_outgoing(
             start,
@@ -284,12 +304,16 @@ fn parse_assign<'a>(
 }
 
 // assumes the parses rule is Rule::*_condition
-fn parse_condition<'a>(pts: &mut PTS, parse: Pair<'a, Rule>, end: LocationHandle) -> Guards {
-    match parse.clone().as_rule() {
+fn parse_condition<'parse>(
+    pts: &mut PTS,
+    parse: Pair<'parse, Rule>,
+    end: LocationHandle,
+) -> Guards {
+    match parse.to_owned().as_rule() {
         Rule::logic_condition => {
             let loop_condition = parse_inequality_system(&mut pts.variables, parse);
             Guards::Logic(vec![
-                (loop_condition.clone(), Default::default()),
+                (loop_condition.to_owned(), Default::default()),
                 (
                     !loop_condition,
                     Transition {
@@ -329,13 +353,13 @@ fn parse_condition<'a>(pts: &mut PTS, parse: Pair<'a, Rule>, end: LocationHandle
 }
 
 // assumes the parses rule is Rule::while_inst
-fn parse_while<'a>(
+fn parse_while<'parse>(
     pts: &mut PTS,
-    parse: Pair<'a, Rule>,
+    parse: Pair<'parse, Rule>,
     start: LocationHandle,
     end: LocationHandle,
 ) {
-    assert_eq!(parse.clone().as_rule(), Rule::while_inst);
+    assert_eq!(parse.to_owned().as_rule(), Rule::while_inst);
     // condition ~ locations
     let mut parse_iter = parse.into_inner();
     // save the condition parse for later
@@ -360,13 +384,13 @@ fn parse_while<'a>(
 }
 
 // assumes the parses rule is Rule::nondet_inst
-fn parse_nondet<'a>(
+fn parse_nondet<'parse>(
     pts: &mut PTS,
-    parse: Pair<'a, Rule>,
+    parse: Pair<'parse, Rule>,
     start: LocationHandle,
     end: LocationHandle,
 ) {
-    assert_eq!(parse.clone().as_rule(), Rule::nondet_inst);
+    assert_eq!(parse.to_owned().as_rule(), Rule::nondet_inst);
     let mut transitions = vec![];
     for locations_parse in parse.into_inner() {
         transitions.push(Default::default());
@@ -388,10 +412,15 @@ fn parse_nondet<'a>(
 }
 
 // assumes the parses rule is Rule::if_inst
-fn parse_if<'a>(pts: &mut PTS, parse: Pair<'a, Rule>, start: LocationHandle, end: LocationHandle) {
-    assert_eq!(parse.clone().as_rule(), Rule::if_inst);
-    let mut else_condition = System::default();
-    let mut conditions: Vec<System> = vec![];
+fn parse_if<'parse>(
+    pts: &mut PTS,
+    parse: Pair<'parse, Rule>,
+    start: LocationHandle,
+    end: LocationHandle,
+) {
+    assert_eq!(parse.to_owned().as_rule(), Rule::if_inst);
+    let mut else_condition = StateSystem::default();
+    let mut conditions: Vec<StateSystem> = vec![];
     let mut transitions: Vec<Transition> = vec![];
 
     for pair in parse.into_inner() {
@@ -418,33 +447,36 @@ fn parse_if<'a>(pts: &mut PTS, parse: Pair<'a, Rule>, start: LocationHandle, end
 
     // start cannot ever be None, see parse_locations, guard cannot be empty due to grammar
     pts.locations
-        .set_outgoing(start, Guards::Logic(zip(conditions, transitions).collect()))
+        .set_outgoing(
+            start,
+            Guards::Logic(std::iter::zip(conditions, transitions).collect()),
+        )
         .unwrap();
 }
 
 // assumes the parses rule is Rule::logic_condition
-fn parse_if_condition<'a>(
+fn parse_if_condition<'parse>(
     pts: &mut PTS,
-    parse: Pair<'a, Rule>,
-    conditions: &mut Vec<System>,
-    negation_acc: &mut System,
+    parse: Pair<'parse, Rule>,
+    conditions: &mut Vec<StateSystem>,
+    negation_acc: &mut StateSystem,
 ) {
-    assert_eq!(parse.clone().as_rule(), Rule::logic_condition);
+    assert_eq!(parse.to_owned().as_rule(), Rule::logic_condition);
     let mut new_cond = parse_inequality_system(&mut pts.variables, parse);
-    conditions.push(negation_acc.clone());
+    conditions.push(negation_acc.to_owned());
     let pushed_cond = conditions.last_mut().unwrap();
-    negation_acc.append(&mut !new_cond.clone());
+    negation_acc.append(&mut !new_cond.to_owned());
     pushed_cond.append(&mut new_cond);
 }
 
 // assumes the parses rule is Rule::prob_inst
-fn parse_odds<'a>(
+fn parse_odds<'parse>(
     pts: &mut PTS,
-    parse: Pair<'a, Rule>,
+    parse: Pair<'parse, Rule>,
     start: LocationHandle,
     end: LocationHandle,
 ) {
-    assert_eq!(parse.clone().as_rule(), Rule::prob_inst);
+    assert_eq!(parse.to_owned().as_rule(), Rule::prob_inst);
     // constant^n ~ block^(n-1)
 
     let mut odds: Vec<Constant> = vec![];
@@ -460,11 +492,10 @@ fn parse_odds<'a>(
     let mut prob_iter = probabilities.into_iter();
     let mut guards: Vec<(Constant, Transition)> = vec![];
     for locations_parse in parse_iter {
-        assert_eq!(locations_parse.clone().as_rule(), Rule::locations);
+        assert_eq!(locations_parse.to_owned().as_rule(), Rule::locations);
         // assert!(prob_iter.peek().is_some());
         guards.push((prob_iter.next().unwrap(), Default::default()));
 
-        //TODO test this properly, cause I am not sure if theres no sneaky moves happening
         parse_locations(pts, locations_parse, &mut guards.last_mut().unwrap().1, end)
     }
     // assert!(prob_iter.peek().is_some());
@@ -488,14 +519,12 @@ mod tests {
     use pest::Parser;
 
     use crate::{
-        guards,
+        assignment, guards, invariant,
         misc::tests::parsers::default::{
             INVARIANT_PROGRAM, SIMPLE_IF_PROGRAM, SIMPLE_NONDET_PROGRAM, SIMPLE_ODDS_PROGRAM,
             SIMPLE_PROGRAM, TRIVIAL_IF_PROGRAM, TRIVIAL_NONDET_PROGRAM, TRIVIAL_ODDS_PROGRAM,
             TRIVIAL_PROGRAM, WHILE_LOGIC_PROGRAM, WHILE_NONDET_PROGRAM, WHILE_PROB_PROGRAM,
         },
-        mock_assignment, mock_invariant, mock_polynomial, mock_relation, mock_transition,
-        mock_varmap,
         parsers::{
             default::{
                 parse, parse_assignment, parse_constant, parse_constant_expr, parse_inequality,
@@ -505,9 +534,12 @@ mod tests {
             grammars::default::{DefaultParser, Rule},
         },
         pts::{
-            linear_polynomial::constant::Constant, location::Locations, variable_map::Variable, PTS,
+            linear_polynomial::coefficient::Constant,
+            location::Locations,
+            variable::{program_variable::ProgramVariable, Variable},
+            PTS,
         },
-        system, term,
+        relation, state, state_system, transition, variables,
     };
 
     use super::Operation;
@@ -515,11 +547,13 @@ mod tests {
 
     #[test]
     fn variable_sanity() {
-        let variable = Variable::new("abc");
-        let mut parse = DefaultParser::parse(Rule::variable, variable.as_str()).unwrap();
-        let var = parse_variable(parse.next().unwrap());
+        let mut variables = variables!();
+        let variable = ProgramVariable::new(&mut variables, "abc");
+        let string = variable.to_string();
+        let mut parse = DefaultParser::parse(Rule::variable, string.as_str()).unwrap();
+        let var = parse_variable(&mut variables, parse.next().unwrap());
         assert!(parse.next().is_none());
-        assert_eq!(var.as_str(), variable.as_str());
+        assert_eq!(var.to_string(), variable.to_string());
     }
 
     #[test]
@@ -567,17 +601,30 @@ mod tests {
 
     #[test]
     fn term_sanity() {
+        let mut variables = variables!();
         let mut parse = DefaultParser::parse(Rule::term, "5a").unwrap();
-        assert_eq!(parse_term(parse.next().unwrap()), term![5.0, "a"]);
+        assert_eq!(
+            parse_term(&mut variables, parse.next().unwrap()),
+            (Constant(5.0), variables.get("a").cloned())
+        );
         assert!(parse.next().is_none());
         parse = DefaultParser::parse(Rule::term, "a * 5").unwrap();
-        assert_eq!(parse_term(parse.next().unwrap()), term![5.0, "a"]);
+        assert_eq!(
+            parse_term(&mut variables, parse.next().unwrap()),
+            (Constant(5.0), variables.get("a").cloned())
+        );
         assert!(parse.next().is_none());
         parse = DefaultParser::parse(Rule::term, "a").unwrap();
-        assert_eq!(parse_term(parse.next().unwrap()), term![1.0, "a"]);
+        assert_eq!(
+            parse_term(&mut variables, parse.next().unwrap()),
+            (Constant(1.0), variables.get("a").cloned())
+        );
         assert!(parse.next().is_none());
         parse = DefaultParser::parse(Rule::term, "5").unwrap();
-        assert_eq!(parse_term(parse.next().unwrap()), term![5.0]);
+        assert_eq!(
+            parse_term(&mut variables, parse.next().unwrap()),
+            (Constant(5.0), None)
+        );
         assert!(parse.next().is_none());
     }
 
@@ -585,47 +632,74 @@ mod tests {
     fn linear_polynomial_sanity() {
         let mut parse =
             DefaultParser::parse(Rule::linear_polynomial, "- a + 5 -(1/2) * b").unwrap();
-        let mut map = mock_varmap!();
-        let pol = parse_linear_polynomial(&mut map, parse.next().unwrap());
+        let mut variables = variables!();
+        let pol = parse_linear_polynomial(&mut variables, parse.next().unwrap());
         assert!(parse.next().is_none());
-        assert_eq!(&pol, &mock_polynomial!(5.0, -1.0, -0.5));
+        assert_eq!(&pol, &state!(5.0, &mut variables, -1.0, "a", -0.5, "b"));
     }
 
     #[test]
     fn assignment_sanity() {
+        let mut variables = variables!("x", "a", "b", "c");
         let mut parse = DefaultParser::parse(Rule::assign_inst, "x = -2a + 4b - 0c - 2").unwrap();
-        let mut map = mock_varmap!();
-        let assign = parse_assignment(&mut map, parse.next().unwrap());
+        let assign = parse_assignment(&mut variables, parse.next().unwrap());
         assert!(parse.next().is_none());
-        assert_eq!(assign, mock_assignment!(1, -2.0, 0.0, -2.0, 4.0, 0.0));
+        assert_eq!(
+            assign,
+            assignment!(
+                &mut variables,
+                "x",
+                -2.0,
+                0.0,
+                "x",
+                -2.0,
+                "a",
+                4.0,
+                "b",
+                0.0,
+                "c"
+            )
+        );
     }
 
     #[test]
     fn inequality_sanity() {
-        let mut map = mock_varmap!();
+        let mut variables = variables!();
         let mut parse = DefaultParser::parse(Rule::inequality, "3a - 4 + b < 0").unwrap();
         let pair = parse.next().unwrap();
         assert!(parse.next().is_none());
-        let cond = parse_inequality(&mut map, pair);
-        assert_eq!(cond, mock_relation!["<", -4.0, 3.0, 1.0]);
+        let cond = parse_inequality(&mut variables, pair);
+        assert_eq!(
+            cond,
+            relation!["<", -4.0, &mut variables, 3.0, "a", 1.0, "b"]
+        );
     }
 
     #[test]
     fn inequality_system_sanity() {
-        let mut map = mock_varmap!("a", "b", "c");
+        let mut variables = variables!("a", "b", "c");
         let mut parse = DefaultParser::parse(
             Rule::logic_condition,
             "- 2b - 4 < - a and 0 >= 0 and a >= 0",
         )
         .unwrap();
-        let system = parse_inequality_system(&mut map, parse.next().unwrap());
+        let system = parse_inequality_system(&mut variables, parse.next().unwrap());
         assert!(parse.next().is_none());
         let cond = system.get(0).unwrap();
-        assert_eq!(*cond, mock_relation!("<", -4.0, 1.0, -2.0, 0.0));
+        assert_eq!(
+            *cond,
+            relation!("<", -4.0, &mut variables, 1.0, "a", -2.0, "b", 0.0, "c")
+        );
         let cond = system.get(1).unwrap();
-        assert_eq!(*cond, mock_relation!(">=", 0.0, 0.0, 0.0, 0.0));
+        assert_eq!(
+            *cond,
+            relation!(">=", 0.0, &mut variables, 0.0, "a", 0.0, "b", 0.0, "c")
+        );
         let cond = system.get(2).unwrap();
-        assert_eq!(*cond, mock_relation!(">=", 0.0, -1.0, 0.0, 0.0));
+        assert_eq!(
+            *cond,
+            relation!(">=", 0.0, &mut variables, 1.0, "a", 0.0, "b", 0.0, "c")
+        );
         assert!(system.get(3).is_none());
     }
 
@@ -636,33 +710,38 @@ mod tests {
 
         let mut locations = Locations::default();
         let handle = locations.new_location();
+        let mut variables = variables!("a", "b", "c");
+
         locations.initial = handle;
 
         // line #
         // 1
         locations.set_invariant(
             handle,
-            mock_invariant!(
-                ["<=", 0.0, 0.0; "<", 0.0, -1.0, 1.0],
-                [">", 0.0, 1.0, -1.0; ">", 0.0, 0.0, 0.0],
-                ["<", 0.0, 1.0, -1.0; ">=", 0.0, 0.0, 0.0]
+            invariant!( &mut variables,
+                ["<=", 0.0, 0.0, "a"; "<", 0.0, -1.0, "a", 1.0, "b"],
+                [">", 0.0, -1.0, "a", 1.0, "b"; ">", 0.0, 0.0, "a", 0.0, "b"],
+                ["<", 0.0, 1.0, "a", -1.0, "b"; ">=", 0.0, 0.0, "a", 0.0, "b"]
             ),
         );
         // 2
         locations
-            .set_outgoing(handle, guards!(mock_transition![None; 1, 0.0, 1.0, 0.0]))
+            .set_outgoing(
+                handle,
+                guards!(transition![None, &mut variables; "a", 0.0, 1.0, "a", 0.0,"b"]),
+            )
             .unwrap();
         // 3
         locations.set_invariant(
             locations.get_terminating_location(),
-            mock_invariant!(
-                ["<=", 0.0, 0.0, 0.0; "<", 0.0, -1.0, 1.0],
-                [">", 0.0, 1.0, -1.0; ">", 0.0, 0.0, 0.0],
-                ["<", 0.0, 1.0, -1.0; ">=", 0.0, 0.0, 0.0]
+            invariant!( &mut variables,
+                ["<=", 0.0, 0.0, "a", 0.0, "b"; "<", 0.0, -1.0, "a", 1.0, "b"],
+                [">", 0.0, -1.0, "a", 1.0, "b"; ">", 0.0, 0.0, "a", 0.0, "b"],
+                ["<", 0.0, 1.0, "a", -1.0, "b"; ">=", 0.0, 0.0, "a", 0.0, "b"]
             ),
         );
 
-        let variables = mock_varmap!("a", "b");
+        let variables = variables!("a", "b");
 
         assert_eq!(
             parsed,
@@ -680,29 +759,30 @@ mod tests {
 
         let mut locations = Locations::default();
         let mut locations_iter = locations.new_n_locations(3);
+        let mut variables = variables!();
 
         let handle = locations_iter.next().unwrap();
         locations.initial = handle;
 
         // line #
         // 1
-        locations.set_invariant(handle, mock_invariant!([">", 0.0, -1.0]));
+        locations.set_invariant(handle, invariant!(&mut variables, [">", 0.0, 1.0, "a"]));
         // 2
         let next_location = locations_iter.next().unwrap();
         locations
             .set_outgoing(
                 handle,
-                guards!(mock_transition!(next_location; 2, 1.0, 0.0, 0.0)),
+                guards!(transition!(next_location, &mut variables; "b", 1.0, 0.0, "a", 0.0, "b")),
             )
             .unwrap();
         // 3
         let handle = next_location;
         locations.set_invariant(
             handle,
-            mock_invariant!(
+            invariant!( &mut variables,
             [
-                ">=", 1.0, 0.0, -1.0;
-                ">", 0.0, -1.0, 0.0
+                ">=", -1.0, 0.0, "a", 1.0, "b";
+                ">", 0.0, 1.0, "a", 0.0, "b"
             ]),
         );
 
@@ -711,7 +791,7 @@ mod tests {
         locations
             .set_outgoing(
                 handle,
-                guards!(mock_transition!(next_location; 3, 0.0, 1.0, 1.0, 0.0)),
+                guards!(transition!(next_location, &mut variables; "c", 0.0, 1.0, "a", 1.0, "b", 0.0, "c")),
             )
             .unwrap();
 
@@ -719,11 +799,11 @@ mod tests {
         let handle = next_location;
         locations.set_invariant(
             handle,
-            mock_invariant!(
+            invariant!(&mut variables,
             [
-                ">=", 1.0, 0.0, -1.0, 0.0;
-                ">", 0.0, -1.0, 0.0, 0.0;
-                ">", 1.0, 0.0, 0.0, -1.0
+                ">=", -1.0, 0.0, "a", 1.0, "b", 0.0, "c";
+                ">", 0.0, 1.0, "a", 0.0, "b", 0.0, "c";
+                ">", -1.0, 0.0, "a", 0.0, "b", 1.0, "c"
             ]),
         );
         // 6
@@ -731,22 +811,21 @@ mod tests {
         locations
             .set_outgoing(
                 handle,
-                guards!(mock_transition!(next_location; 2, 0.0, 2.0, 0.0, 1.0)),
+                guards!(transition!(next_location, &mut variables; "b", 0.0, 2.0, "a", 0.0, "b", 1.0, "c")),
             )
             .unwrap();
         // 7
         let handle = next_location;
         locations.set_invariant(
             handle,
-            mock_invariant!(
+            invariant!(&mut variables,
             [
-                ">", 1.0, 0.0, -1.0, 0.0;
-                ">", 0.0, -1.0, 0.0, 0.0;
-                ">", 1.0, 0.0, 0.0, -1.0
+                ">", -1.0, 0.0, "a", 1.0, "b", 0.0, "c";
+                ">", 0.0, 1.0, "a", 0.0, "b", 0.0, "c";
+                ">", -1.0, 0.0, "a", 0.0, "b", 1.0, "c"
             ]),
         );
 
-        let variables = mock_varmap!("a", "b", "c");
         assert_eq!(
             parsed,
             PTS {
@@ -760,6 +839,7 @@ mod tests {
     fn parse_program_trivial() {
         let input = TRIVIAL_PROGRAM;
         let parsed = parse(input).unwrap();
+        let mut variables = variables!("a", "b", "c",);
 
         let mut locations = Locations::default();
         let handle = locations.new_location();
@@ -767,18 +847,21 @@ mod tests {
 
         // line #
         // 1
-        locations.set_invariant(handle, mock_invariant!([">", -1.0]));
+        locations.set_invariant(handle, invariant!(&mut variables, [">", 1.0]));
         // 2
         locations
-            .set_outgoing(handle, guards!(mock_transition![None; 1, 1.0, 0.0]))
+            .set_outgoing(
+                handle,
+                guards!(transition![None,&mut variables; "a", 1.0, 0.0, "a"]),
+            )
             .unwrap();
         // 3
         locations.set_invariant(
             locations.get_terminating_location(),
-            mock_invariant!(["<", 1.0, 0.0]),
+            invariant!(&mut variables, ["<", 1.0, 0.0, "a"]),
         );
 
-        let variables = mock_varmap!("a");
+        let variables = variables!("a");
 
         assert_eq!(
             parsed,
@@ -796,13 +879,14 @@ mod tests {
 
         let mut locations = Locations::default();
         let mut locations_iter = locations.new_n_locations(5);
+        let mut variables = variables!();
 
         let start = locations_iter.next().unwrap();
         locations.initial = start;
 
         // line #
         // 1
-        locations.set_invariant(start, mock_invariant!(["<", 0.0]));
+        locations.set_invariant(start, invariant!(&mut variables, ["<", 0.0]));
         let junction = locations_iter.next().unwrap();
         let branch_1 = locations_iter.next().unwrap();
         let branch_2 = locations_iter.next().unwrap();
@@ -812,77 +896,90 @@ mod tests {
                 start,
                 guards!(L:
                     // 2
-                    system!(mock_relation!(">=", 0.0, -1.0, 1.0)),
-                    mock_transition!(branch_1),
+                    state_system!(&mut variables
+                                 ;">=", 0.0, 1.0, "a", -1.0, "b"),
+                    transition!(branch_1),
                     // 6
-                    system!(mock_relation!(
-                        "<", 0.0, 1.0, -1.0),
-                        mock_relation!("<=", 0.0, 0.0, 1.0, -1.0)
+                    state_system!(&mut variables;
+                        "<", 0.0, 1.0, "a", -1.0, "b";
+                        "<=", 0.0, 0.0, "a", 1.0, "b", -1.0, "c"
                     ),
-                    mock_transition!(branch_2),
+                    transition!(branch_2),
                     // 10
-                    system!(mock_relation!(
-                        "<", 0.0, 1.0, -1.0),
-                        mock_relation!(">", 0.0, 0.0, -1.0, 1.0)
+                    state_system!(&mut variables;
+                        "<", 0.0, 1.0, "a", -1.0, "b";
+                        ">", 0.0, 0.0, "a", 1.0, "b", -1.0, "c"
                     ),
-                    mock_transition!(branch_3),
+                    transition!(branch_3),
                 ),
             )
             .unwrap();
 
         // 3
-        locations.set_invariant(branch_1, mock_invariant!([">", 0.0, 0.0, 0.0]));
+        locations.set_invariant(
+            branch_1,
+            invariant!(&mut variables, [">", 0.0, 0.0, "a", 0.0, "b"]),
+        );
 
         // 4
         locations
             .set_outgoing(
                 branch_1,
-                guards!(mock_transition!(junction; 1, 0.0, 1.0, 0.0)),
+                guards!(transition!(junction, &mut variables; "a", 0.0, 1.0, "a", 0.0, "b")),
             )
             .unwrap();
 
         // 7
-        locations.set_invariant(branch_2, mock_invariant!(["<", 0.0, 0.0, 0.0, 0.0]));
+        locations.set_invariant(
+            branch_2,
+            invariant!(&mut variables, ["<", 0.0, 0.0, "a", 0.0, "b", 0.0, "c"]),
+        );
 
         // 8
         locations
             .set_outgoing(
                 branch_2,
-                guards!(mock_transition!(junction; 1, 0.0, 1.0, 0.0, 0.0)),
+                guards!(
+                    transition!(junction, &mut variables; "a", 0.0, 1.0, "a", 0.0, "b", 0.0, "c")
+                ),
             )
             .unwrap();
 
         // 11
-        locations.set_invariant(branch_3, mock_invariant!([">", 0.0, 0.0, 0.0, 0.0]));
+        locations.set_invariant(
+            branch_3,
+            invariant!(&mut variables, [">", 0.0, 0.0, "a", 0.0, "b", 0.0, "c"]),
+        );
 
         // 12
         locations
             .set_outgoing(
                 branch_3,
-                guards!(mock_transition!(junction; 1, 0.0, 1.0, 0.0, 0.0)),
+                guards!(
+                    transition!(junction, &mut variables; "a", 0.0, 1.0, "a", 0.0, "b", 0.0, "c")
+                ),
             )
             .unwrap();
 
         // 14
-        locations.set_invariant(junction, mock_invariant!([">", 0.0, 0.0, 0.0, 0.0]));
+        locations.set_invariant(
+            junction,
+            invariant!(&mut variables, [">", 0.0, 0.0, "a", 0.0, "b", 0.0, "c"]),
+        );
 
         // 15
         locations
             .set_outgoing(
                 junction,
-                guards!(
-                    mock_transition!(locations.get_terminating_location(); 1, 0.0, 1.0, 0.0, 0.0)
-                ),
+                guards!(transition!(locations.get_terminating_location(), &mut variables; "a", 0.0, 1.0, "a", 0.0, "b", 0.0, "c")),
             )
             .unwrap();
 
         // 16
         locations.set_invariant(
             locations.get_terminating_location(),
-            mock_invariant!(["<", 0.0, 0.0, 0.0, 0.0]),
+            invariant!(&mut variables, ["<", 0.0, 0.0, "a", 0.0, "b", 0.0, "c"]),
         );
-
-        let variables = mock_varmap!("a", "b", "c",);
 
         assert_eq!(
             parsed,
@@ -900,13 +997,14 @@ mod tests {
 
         let mut locations = Locations::default();
         let mut locations_iter = locations.new_n_locations(3);
+        let mut variables = variables!("a", "b");
 
         let start = locations_iter.next().unwrap();
         locations.initial = start;
 
         // line #
         // 1
-        locations.set_invariant(start, mock_invariant!(["<", 0.0]));
+        locations.set_invariant(start, invariant!(&mut variables, ["<", 0.0]));
         let junction = locations_iter.next().unwrap();
         let branch_1 = locations_iter.next().unwrap();
         locations
@@ -914,48 +1012,54 @@ mod tests {
                 start,
                 guards!(L:
                     // 2
-                    system!(mock_relation!(">=", 0.0, -1.0, 1.0)),
-                    mock_transition!(branch_1),
+                    state_system!(&mut variables; ">=", 0.0, 1.0, "a", -1.0, "b"),
+                    transition!(branch_1),
 
                     // 5
-                    system!(mock_relation!("<", 0.0, 1.0, -1.0))
+                    state_system!(&mut variables; "<", 0.0, 1.0, "a", -1.0, "b")
                     ,
-                    mock_transition!(junction)
+                    transition!(junction)
                 ),
             )
             .unwrap();
 
         // 3
-        locations.set_invariant(branch_1, mock_invariant!([">", 0.0, 0.0, 0.0]));
+        locations.set_invariant(
+            branch_1,
+            invariant!(&mut variables, [">", 0.0, 0.0, "a", 0.0, "b"]),
+        );
 
         // 4
         locations
             .set_outgoing(
                 branch_1,
-                guards!(mock_transition!(junction; 1, 0.0, 1.0, 0.0)),
+                guards!(transition!(junction, &mut variables; "a", 0.0, 1.0, "a", 0.0, "b")),
             )
             .unwrap();
 
         // 6
-        locations.set_invariant(junction, mock_invariant!([">", 0.0, 0.0, 0.0]));
+        locations.set_invariant(
+            junction,
+            invariant!(&mut variables, [">", 0.0, 0.0, "a", 0.0, "b"]),
+        );
 
         // 7
         locations
             .set_outgoing(
                 junction,
-                guards!(mock_transition!(
-                    locations.get_terminating_location();
-                    1, 0.0, 1.0, 0.0)),
+                guards!(transition!(
+                    locations.get_terminating_location(), &mut variables;
+                    "a", 0.0, 1.0, "a", 0.0, "b")),
             )
             .unwrap();
 
         // 8
         locations.set_invariant(
             locations.get_terminating_location(),
-            mock_invariant!(["<", 0.0, 0.0, 0.0]),
+            invariant!(&mut variables, ["<", 0.0, 0.0, "a", 0.0, "b"]),
         );
 
-        let variables = mock_varmap!("a", "b");
+        let variables = variables!("a", "b");
 
         assert_eq!(
             parsed,
@@ -973,13 +1077,14 @@ mod tests {
 
         let mut locations = Locations::default();
         let mut locations_iter = locations.new_n_locations(4);
+        let mut variables = variables!();
 
         let start = locations_iter.next().unwrap();
         locations.initial = start;
 
         // line #
         // 1
-        locations.set_invariant(start, mock_invariant!(["<", 0.0]));
+        locations.set_invariant(start, invariant!(&mut variables, ["<", 0.0]));
         let junction = locations_iter.next().unwrap();
         let branch_1 = locations_iter.next().unwrap();
         let branch_2 = locations_iter.next().unwrap();
@@ -989,54 +1094,61 @@ mod tests {
                 guards!(P:
                     // 2
                     0.0,
-                    mock_transition!(branch_1),
+                    transition!(branch_1),
                     // 5
                     1.0,
-                    mock_transition!(branch_2),
+                    transition!(branch_2),
                     // 9
                     0.0,
-                    mock_transition!(junction),
+                    transition!(junction),
                 ),
             )
             .unwrap();
 
         // 3
-        locations.set_invariant(branch_1, mock_invariant!(["<", 0.0, 0.0]));
+        locations.set_invariant(branch_1, invariant!(&mut variables, ["<", 0.0, 0.0, "a"]));
 
         // 4
         locations
-            .set_outgoing(branch_1, guards!(mock_transition!(junction; 1, 0.0, 1.0)))
+            .set_outgoing(
+                branch_1,
+                guards!(transition!(junction, &mut variables; "a", 0.0, 1.0, "a")),
+            )
             .unwrap();
 
         // 7
-        locations.set_invariant(branch_2, mock_invariant!([">=", 0.0, 1.0, -1.0]));
+        locations.set_invariant(
+            branch_2,
+            invariant!(&mut variables, [">=", 0.0, -1.0, "a", 1.0, "b"]),
+        );
 
         // 8
         locations
             .set_outgoing(
                 branch_2,
-                guards!(mock_transition!(junction; 2, 0.0, 1.0, 0.0)),
+                guards!(transition!(junction, &mut variables; "b", 0.0, 1.0, "a", 0.0, "b")),
             )
             .unwrap();
 
         // 10
-        locations.set_invariant(junction, mock_invariant!(["<", 0.0, 0.0, 0.0]));
+        locations.set_invariant(
+            junction,
+            invariant!(&mut variables, ["<", 0.0, 0.0, "a", 0.0, "b"]),
+        );
 
         // 11
         locations
             .set_outgoing(
                 junction,
-                guards!(mock_transition!(locations.get_terminating_location(); 1, 0.0, 1.0, 0.0)),
+                guards!(transition!(locations.get_terminating_location(), &mut variables; "a", 0.0, 1.0, "a", 0.0, "b")),
             )
             .unwrap();
 
         // 12
         locations.set_invariant(
             locations.get_terminating_location(),
-            mock_invariant!(["<", 0.0, 0.0, 0.0]),
+            invariant!(&mut variables, ["<", 0.0, 0.0, "a", 0.0, "b"]),
         );
-
-        let variables = mock_varmap!("a", "b");
 
         assert_eq!(
             parsed,
@@ -1054,13 +1166,14 @@ mod tests {
 
         let mut locations = Locations::default();
         let mut locations_iter = locations.new_n_locations(3);
+        let mut variables = variables!("a");
 
         let start = locations_iter.next().unwrap();
         locations.initial = start;
 
         // line #
         // 1
-        locations.set_invariant(start, mock_invariant!(["<", 0.0]));
+        locations.set_invariant(start, invariant!(&mut variables, ["<", 0.0]));
         let junction = locations_iter.next().unwrap();
         let branch_1 = locations_iter.next().unwrap();
         locations
@@ -1069,34 +1182,37 @@ mod tests {
                 guards!(P:
                     // 2
                     0.5,
-                    mock_transition!(branch_1),
+                    transition!(branch_1),
                     // 9
                     0.5,
-                    mock_transition!(junction)
+                    transition!(junction)
                 ),
             )
             .unwrap();
 
         // 3
-        locations.set_invariant(branch_1, mock_invariant!(["<", 0.0, 0.0]));
+        locations.set_invariant(branch_1, invariant!(&mut variables, ["<", 0.0, 0.0, "a"]));
 
         // 4
         locations
-            .set_outgoing(branch_1, guards!(mock_transition!(junction; 1, 0.0, 1.0)))
+            .set_outgoing(
+                branch_1,
+                guards!(transition!(junction, &mut variables; "a", 0.0, 1.0, "a")),
+            )
             .unwrap();
 
         // 6
-        locations.set_invariant(junction, mock_invariant!([">", 0.0, 0.0]));
+        locations.set_invariant(junction, invariant!(&mut variables, [">", 0.0, 0.0, "a"]));
 
         // 7
         locations
             .set_outgoing(
                 junction,
-                guards!(mock_transition!(
-                    locations.get_terminating_location();
-                    1,
+                guards!(transition!(
+                    locations.get_terminating_location(), &mut variables;
+                    "a",
                     0.0,
-                    1.0
+                    1.0, "a"
                 )),
             )
             .unwrap();
@@ -1104,10 +1220,8 @@ mod tests {
         // 8
         locations.set_invariant(
             locations.get_terminating_location(),
-            mock_invariant!(["<", 0.0, 0.0]),
+            invariant!(&mut variables, ["<", 0.0, 0.0, "a"]),
         );
-
-        let variables = mock_varmap!("a");
 
         assert_eq!(
             parsed,
@@ -1125,13 +1239,14 @@ mod tests {
 
         let mut locations = Locations::default();
         let mut locations_iter = locations.new_n_locations(5);
+        let mut variables = variables!("a");
 
         let start = locations_iter.next().unwrap();
         locations.initial = start;
 
         // line #
         // 1
-        locations.set_invariant(start, mock_invariant!(["<", 0.0]));
+        locations.set_invariant(start, invariant!(&mut variables, ["<", 0.0]));
         let junction = locations_iter.next().unwrap();
         let branch_1 = locations_iter.next().unwrap();
         let branch_2 = locations_iter.next().unwrap();
@@ -1141,58 +1256,67 @@ mod tests {
                 start,
                 guards!(
                     // 2
-                    mock_transition!(branch_1),
+                    transition!(branch_1),
                     // 6
-                    mock_transition!(branch_2),
+                    transition!(branch_2),
                     // 10
-                    mock_transition!(branch_3)
+                    transition!(branch_3)
                 ),
             )
             .unwrap();
 
         // 3
-        locations.set_invariant(branch_1, mock_invariant!([">", 0.0, 0.0]));
+        locations.set_invariant(branch_1, invariant!(&mut variables, [">", 0.0, 0.0, "a"]));
 
         // 4
         locations
-            .set_outgoing(branch_1, guards!(mock_transition!(junction; 1, 0.0, 1.0)))
+            .set_outgoing(
+                branch_1,
+                guards!(transition!(junction,&mut variables ; "a", 0.0, 1.0, "a")),
+            )
             .unwrap();
 
         // 7
-        locations.set_invariant(branch_2, mock_invariant!([">", 0.0, 0.0]));
+        locations.set_invariant(branch_2, invariant!(&mut variables, [">", 0.0, 0.0, "a"]));
 
         // 8
         locations
-            .set_outgoing(branch_2, guards!(mock_transition!(junction; 1, 0.0, 1.0)))
+            .set_outgoing(
+                branch_2,
+                guards!(transition!(junction, &mut variables; "a", 0.0, 1.0, "a")),
+            )
             .unwrap();
 
         // 11
-        locations.set_invariant(branch_3, mock_invariant!([">", 0.0, 0.0]));
+        locations.set_invariant(branch_3, invariant!(&mut variables, [">", 0.0, 0.0, "a"]));
 
         // 12
         locations
-            .set_outgoing(branch_3, guards!(mock_transition!(junction; 1, 0.0, 1.0)))
+            .set_outgoing(
+                branch_3,
+                guards!(transition!(junction, &mut variables; "a", 0.0, 1.0, "a")),
+            )
             .unwrap();
 
         // 14
-        locations.set_invariant(junction, mock_invariant!(["<", 0.0, 0.0]));
+        locations.set_invariant(junction, invariant!(&mut variables, ["<", 0.0, 0.0, "a"]));
 
         // 15
         locations
             .set_outgoing(
                 junction,
-                guards!(mock_transition!(locations.get_terminating_location();
-                    1, 0.0, 1.0)),
+                guards!(
+                    transition!(locations.get_terminating_location(), &mut variables;
+                    "a", 0.0, 1.0, "a")
+                ),
             )
             .unwrap();
 
         // 16
         locations.set_invariant(
             locations.get_terminating_location(),
-            mock_invariant!(["<", 0.0, 0.0]),
+            invariant!(&mut variables, ["<", 0.0, 0.0, "a"]),
         );
-
-        let variables = mock_varmap!("a");
 
         assert_eq!(
             parsed,
@@ -1210,13 +1334,14 @@ mod tests {
 
         let mut locations = Locations::default();
         let mut locations_iter = locations.new_n_locations(3);
+        let mut variables = variables!("a");
 
         let start = locations_iter.next().unwrap();
         locations.initial = start;
 
         // line #
         // 1
-        locations.set_invariant(start, mock_invariant!(["<", 0.0]));
+        locations.set_invariant(start, invariant!(&mut variables, ["<", 0.0]));
 
         let junction = locations_iter.next().unwrap();
         let branch_1 = locations_iter.next().unwrap();
@@ -1225,30 +1350,33 @@ mod tests {
                 start,
                 guards!(
                     // 2
-                    mock_transition!(branch_1),
+                    transition!(branch_1),
                     // 5
-                    mock_transition!(junction),
+                    transition!(junction),
                 ),
             )
             .unwrap();
 
         // 3
-        locations.set_invariant(branch_1, mock_invariant!([">", 0.0, 0.0]));
+        locations.set_invariant(branch_1, invariant!(&mut variables, [">", 0.0, 0.0, "a"]));
 
         // 4
         locations
-            .set_outgoing(branch_1, guards!(mock_transition!(junction; 1, 0.0, 1.0)))
+            .set_outgoing(
+                branch_1,
+                guards!(transition!(junction, &mut variables; "a", 0.0, 1.0, "a")),
+            )
             .unwrap();
         // 6
-        locations.set_invariant(junction, mock_invariant!([">", 0.0, 0.0]));
+        locations.set_invariant(junction, invariant!(&mut variables, [">", 0.0, 0.0, "a"]));
 
         // 7
         locations
             .set_outgoing(
                 junction,
-                guards!(mock_transition!(
-                    locations.get_terminating_location();
-                    1, 0.0, 1.0
+                guards!(transition!(locations.get_terminating_location(),
+                    &mut variables;
+                    "a", 0.0, 1.0, "a"
                 )),
             )
             .unwrap();
@@ -1256,10 +1384,8 @@ mod tests {
         // 8
         locations.set_invariant(
             locations.get_terminating_location(),
-            mock_invariant!(["<", 0.0, 0.0]),
+            invariant!(&mut variables, ["<", 0.0, 0.0, "a"]),
         );
-
-        let variables = mock_varmap!("a");
 
         assert_eq!(
             parsed,
@@ -1277,13 +1403,14 @@ mod tests {
 
         let mut locations = Locations::default();
         let mut locations_iter = locations.new_n_locations(3);
+        let mut variables = variables!("a", "b");
 
         let start = locations_iter.next().unwrap();
         locations.initial = start;
 
         // line #
         // 1
-        locations.set_invariant(start, mock_invariant!(["<", 0.0]));
+        locations.set_invariant(start, invariant!(&mut variables, ["<", 0.0]));
         let junction = locations_iter.next().unwrap();
         let branch_1 = locations_iter.next().unwrap();
         locations
@@ -1291,48 +1418,54 @@ mod tests {
                 start,
                 guards!(L:
                     // 2
-                    system!(
-                        mock_relation!(">", 0.0, 0.0),
-                        mock_relation!("<", 0.0, 0.0)
+                    state_system!(&mut variables;
+                        ">", 0.0, 0.0, "a";
+                        "<", 0.0, 0.0, "a"
                     ),
-                    mock_transition!(branch_1),
+                    transition!(branch_1),
                     // 5
-                    system!(
-                        mock_relation!("<=", 0.0, 0.0),
-                        mock_relation!(">=", 0.0, 0.0)
+                    state_system!(&mut variables;
+                        "<=", 0.0, 0.0, "a";
+                        ">=", 0.0, 0.0, "a"
                     ),
-                    mock_transition!(junction),
+                    transition!(junction),
                 ),
             )
             .unwrap();
 
         // 3
-        locations.set_invariant(branch_1, mock_invariant!([">", 0.0, 0.0]));
+        locations.set_invariant(branch_1, invariant!(&mut variables, [">", 0.0, 0.0, "a"]));
 
         // 4
         locations
-            .set_outgoing(branch_1, guards!(mock_transition!(start; 1, 0.0, 0.0, 1.0)))
+            .set_outgoing(
+                branch_1,
+                guards!(transition!(start, &mut variables; "a", 0.0, 0.0, "a", 1.0, "b")),
+            )
             .unwrap();
         // 6
-        locations.set_invariant(junction, mock_invariant!([">", 0.0, 0.0, 0.0]));
+        locations.set_invariant(
+            junction,
+            invariant!(&mut variables, [">", 0.0, 0.0, "a", 0.0, "b"]),
+        );
 
         // 7
         locations
             .set_outgoing(
                 junction,
-                guards!(mock_transition!(locations.get_terminating_location();
-                        1, 0.0, 0.0, 1.0
-                )),
+                guards!(
+                    transition!(locations.get_terminating_location(), &mut variables;
+                            "a", 0.0, 0.0, "a", 1.0, "b"
+                    )
+                ),
             )
             .unwrap();
 
         // 8
         locations.set_invariant(
             locations.get_terminating_location(),
-            mock_invariant!(["<", 0.0, 0.0, 0.0]),
+            invariant!(&mut variables, ["<", 0.0, 0.0, "a", 0.0, "b"]),
         );
-
-        let variables = mock_varmap!("a", "b");
 
         assert_eq!(
             parsed,
@@ -1350,13 +1483,14 @@ mod tests {
 
         let mut locations = Locations::default();
         let mut locations_iter = locations.new_n_locations(3);
+        let mut variables = variables!("a", "b");
 
         let start = locations_iter.next().unwrap();
         locations.initial = start;
 
         // line #
         // 1
-        locations.set_invariant(start, mock_invariant!(["<", 0.0]));
+        locations.set_invariant(start, invariant!(&mut variables, ["<", 0.0]));
 
         let junction = locations_iter.next().unwrap();
         let branch_1 = locations_iter.next().unwrap();
@@ -1366,32 +1500,38 @@ mod tests {
                 guards!(P:
                     // 2
                     1.0,
-                    mock_transition!(branch_1),
+                    transition!(branch_1),
                     // 5
                     0.0,
-                    mock_transition!(junction),
+                    transition!(junction),
                 ),
             )
             .unwrap();
 
         // 3
-        locations.set_invariant(branch_1, mock_invariant!([">", 0.0, 0.0]));
+        locations.set_invariant(branch_1, invariant!(&mut variables, [">", 0.0, 0.0, "a"]));
 
         // 4
         locations
-            .set_outgoing(branch_1, guards!(mock_transition!(start; 1, 0.0, 0.0, 1.0)))
+            .set_outgoing(
+                branch_1,
+                guards!(transition!(start, &mut variables; "a", 0.0, 0.0, "a", 1.0, "b")),
+            )
             .unwrap();
 
         // 6
-        locations.set_invariant(junction, mock_invariant!([">", 0.0, 0.0, 0.0]));
+        locations.set_invariant(
+            junction,
+            invariant!(&mut variables, [">", 0.0, 0.0, "a", 0.0, "b"]),
+        );
 
         // 7
         locations
             .set_outgoing(
                 junction,
-                guards!(mock_transition!(
-                    locations.get_terminating_location();
-                    1, 0.0, 0.0, 1.0
+                guards!(transition!(
+                    locations.get_terminating_location(), &mut variables;
+                    "a", 0.0, 0.0, "a", 1.0, "b"
                 )),
             )
             .unwrap();
@@ -1399,10 +1539,8 @@ mod tests {
         // 8
         locations.set_invariant(
             locations.get_terminating_location(),
-            mock_invariant!(["<", 0.0, 0.0, 0.0]),
+            invariant!(&mut variables, ["<", 0.0, 0.0, "a", 0.0, "b"]),
         );
-
-        let variables = mock_varmap!("a", "b");
 
         assert_eq!(
             parsed,
@@ -1420,40 +1558,47 @@ mod tests {
 
         let mut locations = Locations::default();
         let mut locations_iter = locations.new_n_locations(3);
+        let mut variables = variables!("a", "b");
 
         let start = locations_iter.next().unwrap();
         locations.initial = start;
 
         // line #
         // 1
-        locations.set_invariant(start, mock_invariant!(["<", 0.0]));
+        locations.set_invariant(start, invariant!(&mut variables, ["<", 0.0]));
 
         let junction = locations_iter.next().unwrap();
         let branch_1 = locations_iter.next().unwrap();
         locations
             .set_outgoing(
                 start,
-                guards!(mock_transition!(branch_1), mock_transition!(junction),),
+                guards!(transition!(branch_1), transition!(junction),),
             )
             .unwrap();
 
         // 3
-        locations.set_invariant(branch_1, mock_invariant!([">", 0.0, 0.0]));
+        locations.set_invariant(branch_1, invariant!(&mut variables, [">", 0.0, 0.0, "a"]));
 
         // 4
         locations
-            .set_outgoing(branch_1, guards!(mock_transition!(start; 1, 0.0, 0.0, 1.0)))
+            .set_outgoing(
+                branch_1,
+                guards!(transition!(start, &mut variables; "a", 0.0, 0.0, "a", 1.0, "b")),
+            )
             .unwrap();
         // 6
-        locations.set_invariant(junction, mock_invariant!([">", 0.0, 0.0, 0.0]));
+        locations.set_invariant(
+            junction,
+            invariant!(&mut variables, [">", 0.0, 0.0, "a", 0.0, "b"]),
+        );
 
         // 7
         locations
             .set_outgoing(
                 junction,
-                guards!(mock_transition!(
-                    locations.get_terminating_location();
-                    1, 0.0, 0.0, 1.0
+                guards!(transition!(
+                    locations.get_terminating_location(), &mut variables;
+                    "a", 0.0, 0.0, "a", 1.0, "b"
                 )),
             )
             .unwrap();
@@ -1461,10 +1606,8 @@ mod tests {
         // 8
         locations.set_invariant(
             locations.get_terminating_location(),
-            mock_invariant!(["<", 0.0, 0.0, 0.0]),
+            invariant!(&mut variables, ["<", 0.0, 0.0, "a", 0.0, "b"]),
         );
-
-        let variables = mock_varmap!("a", "b");
 
         assert_eq!(
             parsed,
