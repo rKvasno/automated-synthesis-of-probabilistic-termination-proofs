@@ -20,14 +20,8 @@ impl fmt::Display for ParserError {
     }
 }
 
-pub enum Parser {
-    Default,
-}
-
-pub fn parse<'a>(parser: Parser, input: &str) -> Result<PTS, ParserError> {
-    match parser {
-        Parser::Default => default::parse(input),
-    }
+pub trait Parser {
+    fn parse(input: &str) -> Result<PTS, ParserError>;
 }
 
 pub fn handle_pest_error<R: RuleType>(error: PestError<R>) -> ParserError {

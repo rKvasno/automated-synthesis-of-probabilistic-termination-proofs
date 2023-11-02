@@ -3,13 +3,13 @@ use pest_derive::Parser;
 #[derive(Parser)]
 #[grammar = "parsers/grammars/default.pest"]
 #[grammar = "parsers/grammars/linear_polynomial.pest"]
-pub struct DefaultParser;
+pub struct DefaultPestParser;
 
 #[cfg(test)]
 mod tests {
     use pest_test_gen::pest_tests;
     #[pest_tests(
-        crate::parsers::grammars::default::DefaultParser,
+        crate::parsers::grammars::default::DefaultPestParser,
         crate::parsers::grammars::default::Rule,
         "program",
         ext = "pest_test",

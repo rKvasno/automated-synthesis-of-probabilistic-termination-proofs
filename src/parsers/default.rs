@@ -1,7 +1,7 @@
 use std::str::FromStr;
 
 use pest::iterators::Pair;
-use pest::Parser;
+use pest::Parser as PestParser;
 
 // TODO use LinearPolynomial parser from DefaultParser
 use crate::consume;
@@ -17,8 +17,8 @@ use crate::pts::variable::program_variable::{ProgramVariable, ProgramVariables};
 use crate::pts::variable::Variable;
 use crate::pts::PTS;
 
-use super::grammars::default::{DefaultParser, Rule};
-use super::{handle_pest_error, ParserError};
+use super::grammars::default::{DefaultPestParser, Rule};
+use super::{handle_pest_error, Parser, ParserError};
 
 macro_rules! invariant_error {
     () => {
@@ -49,15 +49,18 @@ fn odds_to_probabilities(odds: Vec<Constant>) -> Result<Vec<Constant>, ParserErr
     }
 }
 
-pub fn parse(input: &str) -> Result<PTS, ParserError> {
-    match DefaultParser::parse(Rule::program, input) {
-        Err(error) => Err(handle_pest_error(error)),
-        Ok(mut parse) => {
-            let mut pts = Default::default();
-            parse_program(&mut pts, parse.next().unwrap())?;
-            assert_eq!(parse.next(), None);
-            pts.finalize();
-            Ok(pts)
+struct DefaultParser;
+impl Parser for DefaultParser {
+    fn parse(input: &str) -> Result<PTS, ParserError> {
+        match DefaultPestParser::parse(Rule::program, input) {
+            Err(error) => Err(handle_pest_error(error)),
+            Ok(mut parse) => {
+                let mut pts = Default::default();
+                parse_program(&mut pts, parse.next().unwrap())?;
+                assert_eq!(parse.next(), None);
+                pts.finalize();
+                Ok(pts)
+            }
         }
     }
 }
@@ -541,7 +544,8 @@ fn parse_odds<'parse>(
 
 #[cfg(test)]
 mod tests {
-    use pest::Parser;
+
+    use pest::Parser as PestParser;
 
     use crate::{
         assignment, guards, invariant,
@@ -553,11 +557,12 @@ mod tests {
         },
         parsers::{
             default::{
-                parse, parse_assignment, parse_constant, parse_constant_expr, parse_inequality,
+                parse_assignment, parse_constant, parse_constant_expr, parse_inequality,
                 parse_inequality_system, parse_linear_polynomial, parse_operation, parse_term,
-                parse_variable,
+                parse_variable, DefaultParser,
             },
-            grammars::default::{DefaultParser, Rule},
+            grammars::default::{DefaultPestParser, Rule},
+            Parser,
         },
         pts::{
             linear_polynomial::coefficient::Constant,
@@ -576,7 +581,7 @@ mod tests {
         let mut variables = variables!();
         let variable = ProgramVariable::new(&mut variables, "abc");
         let string = variable.to_string();
-        let mut parse = DefaultParser::parse(Rule::variable, string.as_str()).unwrap();
+        let mut parse = DefaultPestParser::parse(Rule::variable, string.as_str()).unwrap();
         let var = parse_variable(&mut variables, parse.next().unwrap());
         assert!(parse.next().is_none());
         assert_eq!(var.to_string(), variable.to_string());
@@ -584,7 +589,7 @@ mod tests {
 
     #[test]
     fn constant_sanity() {
-        let mut parse = DefaultParser::parse(Rule::constant, "123").unwrap();
+        let mut parse = DefaultPestParser::parse(Rule::constant, "123").unwrap();
         let constant = parse_constant(parse.next().unwrap());
         assert!(parse.next().is_none());
         assert_eq!(constant, Constant(123.0));
@@ -611,7 +616,7 @@ mod tests {
         let zipped = zip(zip(inputs, ops), rules);
 
         for ((input, op), rule) in zipped {
-            let mut parse = DefaultParser::parse(rule, input).unwrap();
+            let mut parse = DefaultPestParser::parse(rule, input).unwrap();
             assert_eq!(parse_operation(parse.next().unwrap()), op);
             assert!(parse.next().is_none());
         }
@@ -620,7 +625,7 @@ mod tests {
     #[test]
     fn constant_expr_sanity() {
         let mut parse =
-            DefaultParser::parse(Rule::constant_expr, "((4^2 + 5) - (2 * 2 / 2))").unwrap();
+            DefaultPestParser::parse(Rule::constant_expr, "((4^2 + 5) - (2 * 2 / 2))").unwrap();
         assert_eq!(parse_constant_expr(parse.next().unwrap()), Constant(19.0));
         assert!(parse.next().is_none());
     }
@@ -628,25 +633,25 @@ mod tests {
     #[test]
     fn term_sanity() {
         let mut variables = variables!();
-        let mut parse = DefaultParser::parse(Rule::term, "5a").unwrap();
+        let mut parse = DefaultPestParser::parse(Rule::term, "5a").unwrap();
         assert_eq!(
             parse_term(&mut variables, parse.next().unwrap()),
             (Constant(5.0), variables.get("a").cloned())
         );
         assert!(parse.next().is_none());
-        parse = DefaultParser::parse(Rule::term, "a * 5").unwrap();
+        parse = DefaultPestParser::parse(Rule::term, "a * 5").unwrap();
         assert_eq!(
             parse_term(&mut variables, parse.next().unwrap()),
             (Constant(5.0), variables.get("a").cloned())
         );
         assert!(parse.next().is_none());
-        parse = DefaultParser::parse(Rule::term, "a").unwrap();
+        parse = DefaultPestParser::parse(Rule::term, "a").unwrap();
         assert_eq!(
             parse_term(&mut variables, parse.next().unwrap()),
             (Constant(1.0), variables.get("a").cloned())
         );
         assert!(parse.next().is_none());
-        parse = DefaultParser::parse(Rule::term, "5").unwrap();
+        parse = DefaultPestParser::parse(Rule::term, "5").unwrap();
         assert_eq!(
             parse_term(&mut variables, parse.next().unwrap()),
             (Constant(5.0), None)
@@ -657,7 +662,7 @@ mod tests {
     #[test]
     fn linear_polynomial_sanity() {
         let mut parse =
-            DefaultParser::parse(Rule::linear_polynomial, "- a + 5 -(1/2) * b").unwrap();
+            DefaultPestParser::parse(Rule::linear_polynomial, "- a + 5 -(1/2) * b").unwrap();
         let mut variables = variables!();
         let pol = parse_linear_polynomial(&mut variables, parse.next().unwrap());
         assert!(parse.next().is_none());
@@ -668,7 +673,7 @@ mod tests {
     fn assignment_sanity() {
         let mut variables = variables!("x", "a", "b", "c");
         let mut parse =
-            DefaultParser::parse(Rule::assignment_statement, "x = -2a + 4b - 0c - 2").unwrap();
+            DefaultPestParser::parse(Rule::assignment_statement, "x = -2a + 4b - 0c - 2").unwrap();
         let assign = parse_assignment(&mut variables, parse.next().unwrap());
         assert!(parse.next().is_none());
         assert_eq!(
@@ -692,7 +697,7 @@ mod tests {
     #[test]
     fn inequality_sanity() {
         let mut variables = variables!();
-        let mut parse = DefaultParser::parse(Rule::inequality, "3a - 4 + b < 0").unwrap();
+        let mut parse = DefaultPestParser::parse(Rule::inequality, "3a - 4 + b < 0").unwrap();
         let pair = parse.next().unwrap();
         assert!(parse.next().is_none());
         let cond = parse_inequality(&mut variables, pair);
@@ -705,7 +710,7 @@ mod tests {
     #[test]
     fn inequality_system_sanity() {
         let mut variables = variables!("a", "b", "c");
-        let mut parse = DefaultParser::parse(
+        let mut parse = DefaultPestParser::parse(
             Rule::logic_condition,
             "- 2b - 4 < - a and 0 >= 0 and a >= 0",
         )
@@ -733,7 +738,7 @@ mod tests {
     #[test]
     fn invariant_sanity() {
         let input = INVARIANT_PROGRAM;
-        let parsed = parse(input).unwrap();
+        let parsed = DefaultParser::parse(input).unwrap();
 
         let mut locations = Locations::default();
         let handle = locations.new_location();
@@ -782,7 +787,7 @@ mod tests {
     #[test]
     fn parse_program_simple() {
         let input = SIMPLE_PROGRAM;
-        let parsed = parse(input).unwrap();
+        let parsed = DefaultParser::parse(input).unwrap();
 
         let mut locations = Locations::default();
         let mut locations_iter = locations.new_n_locations(3);
@@ -865,7 +870,7 @@ mod tests {
     #[test]
     fn parse_program_trivial() {
         let input = TRIVIAL_PROGRAM;
-        let parsed = parse(input).unwrap();
+        let parsed = DefaultParser::parse(input).unwrap();
         let mut variables = variables!("a", "b", "c",);
 
         let mut locations = Locations::default();
@@ -902,7 +907,7 @@ mod tests {
     #[test]
     fn parse_simple_if_program() {
         let input = SIMPLE_IF_PROGRAM;
-        let parsed = parse(input).unwrap();
+        let parsed = DefaultParser::parse(input).unwrap();
 
         let mut locations = Locations::default();
         let mut locations_iter = locations.new_n_locations(5);
@@ -1020,7 +1025,7 @@ mod tests {
     #[test]
     fn parse_trivial_if_program() {
         let input = TRIVIAL_IF_PROGRAM;
-        let parsed = parse(input).unwrap();
+        let parsed = DefaultParser::parse(input).unwrap();
 
         let mut locations = Locations::default();
         let mut locations_iter = locations.new_n_locations(3);
@@ -1100,7 +1105,7 @@ mod tests {
     #[test]
     fn parse_simple_odds_program() {
         let input = SIMPLE_ODDS_PROGRAM;
-        let parsed = parse(input).unwrap();
+        let parsed = DefaultParser::parse(input).unwrap();
 
         let mut locations = Locations::default();
         let mut locations_iter = locations.new_n_locations(4);
@@ -1189,7 +1194,7 @@ mod tests {
     #[test]
     fn parse_trivial_odds_program() {
         let input = TRIVIAL_ODDS_PROGRAM;
-        let parsed = parse(input).unwrap();
+        let parsed = DefaultParser::parse(input).unwrap();
 
         let mut locations = Locations::default();
         let mut locations_iter = locations.new_n_locations(3);
@@ -1262,7 +1267,7 @@ mod tests {
     #[test]
     fn parse_simple_choose_program() {
         let input = SIMPLE_CHOOSE_PROGRAM;
-        let parsed = parse(input).unwrap();
+        let parsed = DefaultParser::parse(input).unwrap();
 
         let mut locations = Locations::default();
         let mut locations_iter = locations.new_n_locations(5);
@@ -1357,7 +1362,7 @@ mod tests {
     #[test]
     fn parse_trivial_choose_program() {
         let input = TRIVIAL_CHOOSE_PROGRAM;
-        let parsed = parse(input).unwrap();
+        let parsed = DefaultParser::parse(input).unwrap();
 
         let mut locations = Locations::default();
         let mut locations_iter = locations.new_n_locations(3);
@@ -1426,7 +1431,7 @@ mod tests {
     #[test]
     fn parse_logic_while_program() {
         let input = WHILE_LOGIC_PROGRAM;
-        let parsed = parse(input).unwrap();
+        let parsed = DefaultParser::parse(input).unwrap();
 
         let mut locations = Locations::default();
         let mut locations_iter = locations.new_n_locations(3);
@@ -1506,7 +1511,7 @@ mod tests {
     #[test]
     fn parse_prob_while_program() {
         let input = WHILE_PROB_PROGRAM;
-        let parsed = parse(input).unwrap();
+        let parsed = DefaultParser::parse(input).unwrap();
 
         let mut locations = Locations::default();
         let mut locations_iter = locations.new_n_locations(3);
@@ -1581,7 +1586,7 @@ mod tests {
     #[test]
     fn parse_nondeterministic_while_program() {
         let input = WHILE_NONDETERMINISTIC_PROGRAM;
-        let parsed = parse(input).unwrap();
+        let parsed = DefaultParser::parse(input).unwrap();
 
         let mut locations = Locations::default();
         let mut locations_iter = locations.new_n_locations(3);
@@ -1646,30 +1651,30 @@ mod tests {
     }
 
     mod error_message {
-        use crate::parsers::default::parse;
+        use crate::parsers::{default::DefaultParser, Parser};
 
         #[test]
         fn empty() {
             assert_eq!(
-                parse("").err().unwrap().to_string(),
+                DefaultParser::parse("").err().unwrap().to_string(),
                 " --> 1:1\n  |\n1 | \n  | ^---\n  |\n  = expected invariant"
             );
         }
 
         #[test]
         fn deeper_rules() {
-            assert_eq!(parse("# 0>0\n  while ").err().unwrap().to_string(), " --> 2:9\n  |\n2 |   while \n  |         ^---\n  |\n  = expected nondeterminism_sign, linear_polynomial, or constant");
+            assert_eq!(DefaultParser::parse("# 0>0\n  while ").err().unwrap().to_string(), " --> 2:9\n  |\n2 |   while \n  |         ^---\n  |\n  = expected nondeterminism_sign, linear_polynomial, or constant");
         }
 
         #[test]
-        fn choice() {
-            assert_eq!(parse("# 0>0\n  choose ").err().unwrap().to_string(), " --> 2:3\n  |\n2 |   choose \n  |   ^---\n  |\n  = expected if_statement, odds_statement, choose_statement, while_statement, or assignment_statement");
+        fn statement_choice() {
+            assert_eq!(DefaultParser::parse("# 0>0\n  choose ").err().unwrap().to_string(), " --> 2:3\n  |\n2 |   choose \n  |   ^---\n  |\n  = expected if_statement, odds_statement, choose_statement, while_statement, or assignment_statement");
         }
 
         #[test]
         fn branching_odds_sum_zero() {
             assert_eq!(
-                parse("# 0>0\n  odds 0:0:0{\n#0<0\na=0\n}\n{\n#0<0\na=0\n}#0<0\n")
+                DefaultParser::parse("# 0>0\n  odds 0:0:0{\n#0<0\na=0\n}\n{\n#0<0\na=0\n}#0<0\n")
                     .err()
                     .unwrap()
                     .to_string(),
@@ -1680,7 +1685,7 @@ mod tests {
         #[test]
         fn while_odds_sum_zero() {
             assert_eq!(
-                parse("# 0>0\n  while 0:0{\n#0<0\na=0\n}#0<0\n")
+                DefaultParser::parse("# 0>0\n  while 0:0{\n#0<0\na=0\n}#0<0\n")
                     .err()
                     .unwrap()
                     .to_string(),
