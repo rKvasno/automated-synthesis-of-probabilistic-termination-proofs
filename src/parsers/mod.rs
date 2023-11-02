@@ -1,5 +1,6 @@
 pub mod default;
 mod grammars;
+pub mod linear_polynomial;
 use pest::error::Error as PestError;
 use pest::RuleType;
 
@@ -7,6 +8,8 @@ use crate::pts::PTS;
 
 use std::error;
 use std::fmt;
+
+pub const INVARIANT_ERROR: &'static str = "Programmer error: Function invariants not upheld.";
 
 #[derive(Debug)]
 pub struct ParserError {

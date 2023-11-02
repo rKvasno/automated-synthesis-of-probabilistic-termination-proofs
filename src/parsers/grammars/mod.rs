@@ -1,2 +1,2 @@
 pub mod default;
-mod linear_polynomial;
+pub mod linear_polynomial;

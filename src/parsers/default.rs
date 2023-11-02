@@ -3,8 +3,8 @@ use std::str::FromStr;
 use pest::iterators::Pair;
 use pest::Parser as PestParser;
 
-// TODO use LinearPolynomial parser from DefaultParser
-use crate::consume;
+use crate::parsers::linear_polynomial::LinearPolynomialParser;
+use crate::parsers::INVARIANT_ERROR;
 use crate::pts::guard::Guards;
 use crate::pts::invariant::Invariant;
 use crate::pts::linear_polynomial::coefficient::{Coefficient, Constant};
@@ -13,18 +13,11 @@ use crate::pts::location::LocationHandle;
 use crate::pts::relation::{RelationSign, StateRelation};
 use crate::pts::system::StateSystem;
 use crate::pts::transition::{Assignment, StateAssignment, Transition};
-use crate::pts::variable::program_variable::{ProgramVariable, ProgramVariables};
-use crate::pts::variable::Variable;
+use crate::pts::variable::program_variable::ProgramVariables;
 use crate::pts::PTS;
 
 use super::grammars::default::{DefaultPestParser, Rule};
 use super::{handle_pest_error, Parser, ParserError};
-
-macro_rules! invariant_error {
-    () => {
-        "Programmer error: Function invariants not upheld."
-    };
-}
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum Operation {
@@ -65,111 +58,13 @@ impl Parser for DefaultParser {
     }
 }
 
-// assumes the parses rule is Rule::variable
-fn parse_variable<'parse>(
-    variables: &mut ProgramVariables,
-    parse: Pair<'parse, Rule>,
-) -> ProgramVariable {
-    assert_eq!(parse.to_owned().as_rule(), Rule::variable);
-    ProgramVariable::new(variables, &parse.as_str())
-}
-
-// assumes the parses rule is Rule::constant
-fn parse_constant<'parse>(parse: Pair<'parse, Rule>) -> Constant {
-    assert_eq!(parse.to_owned().as_rule(), Rule::constant);
-    // all parses have to follow f64 grammar, no need to handle errors
-    parse
-        .as_str()
-        .parse::<Constant>()
-        .expect(invariant_error!())
-}
-
-// assumes the parses rule is Rule::power_op, Rule::multiplicative_op or Rule::additive_op
-fn parse_operation<'parse>(parse: Pair<'parse, Rule>) -> Operation {
-    match parse.as_str() {
-        "+" => Operation::Addition,
-        "-" => Operation::Subtraction,
-        "*" => Operation::Multiplication,
-        "/" => Operation::Division,
-        "^" => Operation::Power,
-        _ => panic!(invariant_error!()),
-    }
-}
-
-// assumes the parses rule is Rule::constant_expr
-fn parse_constant_expr<'parse>(parse: Pair<'parse, Rule>) -> Constant {
-    assert_eq!(parse.to_owned().as_rule(), Rule::constant_expr);
-    let mut iter = parse.into_inner().into_iter();
-    let first = iter.next().unwrap();
-    let mut acc = match first.as_rule() {
-        Rule::constant => parse_constant(first),
-        Rule::constant_expr => parse_constant_expr(first),
-        _ => panic!(invariant_error!()),
-    };
-
-    loop {
-        let op = iter.next();
-        if op.is_none() {
-            return acc;
-        }
-        match parse_operation(op.unwrap()) {
-            Operation::Addition => acc += parse_constant_expr(iter.next().unwrap()),
-            Operation::Subtraction => acc -= parse_constant_expr(iter.next().unwrap()),
-            Operation::Multiplication => acc *= parse_constant_expr(iter.next().unwrap()),
-            Operation::Division => acc /= parse_constant_expr(iter.next().unwrap()),
-            Operation::Power => acc = acc.pow(parse_constant_expr(iter.next().unwrap())),
-        }
-    }
-    // unreachable!();
-}
-
-// assumes the parses rule is Rule::term
-fn parse_term<'parse>(
-    variables: &mut ProgramVariables,
-    parse: Pair<'parse, Rule>,
-) -> (Constant, Option<ProgramVariable>) {
-    assert_eq!(parse.to_owned().as_rule(), Rule::term);
-    let pairs = parse.into_inner();
-    let mut variable: Option<ProgramVariable> = None;
-    let mut coefficient = Constant(1.0);
-    for pair in pairs {
-        match pair.as_rule() {
-            Rule::variable => variable = Some(parse_variable(variables, pair)),
-            Rule::constant_expr => coefficient = parse_constant_expr(pair),
-            _ => panic!(invariant_error!()),
-        }
-    }
-    (coefficient, variable)
-}
-
-// assumes the parses rule is Rule::linear_polynomial
 fn parse_linear_polynomial<'parse>(
     variables: &mut ProgramVariables,
     parse: Pair<'parse, Rule>,
 ) -> State {
     assert_eq!(parse.to_owned().as_rule(), Rule::linear_polynomial);
-    let mut op = Operation::Addition;
-    let pairs = parse.into_inner();
-    // theres no guarantee that there wont be duplicit terms, but its probably better to use
-    // with_capacity than shrink_to_fit afterwards
-    let mut pol = State::with_capacity(pairs.len());
-    for pair in pairs {
-        match pair.as_rule() {
-            Rule::additive_op => op = parse_operation(pair),
-            Rule::term if op == Operation::Addition => {
-                let (coeff, var) = parse_term(variables, pair);
-
-                consume!(pol.add_term(coeff, var))
-            }
-            Rule::term if op == Operation::Subtraction => {
-                let (coeff, var) = parse_term(variables, pair);
-                consume!(pol.add_term(-coeff, var))
-            }
-            //_ => panic!(invariant_error!()),
-            rule => panic!("{:?}", rule),
-        }
-    }
-    pol
+    // parse.as_str() upholds invariants for parse_polynomial
+    LinearPolynomialParser::parse_polynomial(variables, parse.as_str())
 }
 
 // assumes the parses rule is Rule::assignment_statement
@@ -179,7 +74,8 @@ fn parse_assignment<'parse>(
 ) -> StateAssignment {
     assert_eq!(parse.to_owned().as_rule(), Rule::assignment_statement);
     let mut pairs = parse.into_inner();
-    let var = parse_variable(variables, pairs.next().unwrap());
+    // pairs.next().unwrap().as_str() upholds invariants for parse_variable
+    let var = LinearPolynomialParser::parse_variable(variables, pairs.next().unwrap().as_str());
     let pol: State = parse_linear_polynomial(variables, pairs.next().unwrap());
     Assignment::new(var, pol)
 }
@@ -289,7 +185,7 @@ fn parse_locations<'parse>(
             Rule::assignment_statement => {
                 parse_assign(pts, instruction_parse, local_start, local_end)
             }
-            _ => panic!(invariant_error!()),
+            _ => panic!("{}", INVARIANT_ERROR),
         };
     }
     Ok(())
@@ -339,7 +235,8 @@ fn parse_condition<'parse>(
         Rule::odds_condition => {
             let mut odds: Vec<Constant> = Default::default();
             for pair in parse.into_inner() {
-                odds.push(parse_constant(pair));
+                // pairs.as_str() upholds invariants for parse_constant
+                odds.push(LinearPolynomialParser::parse_constant(pair.as_str()));
             }
             // assert_eq!(odds.len(), 2);
             let probabilities = odds_to_probabilities(odds).map_err(|mut e| {
@@ -366,7 +263,7 @@ fn parse_condition<'parse>(
                 target: end,
             },
         ])),
-        _ => panic!(invariant_error!()),
+        _ => panic!("{}", INVARIANT_ERROR),
     }
 }
 
@@ -396,7 +293,7 @@ fn parse_while<'parse>(
             parse_locations(pts, parse_iter.next().unwrap(), &mut vector[0], start)?
         }
 
-        _ => panic!(invariant_error!()),
+        _ => panic!("{}", INVARIANT_ERROR),
     };
 
     // start cannot be None, see parse_locations, guards cannot be empty, see parse_condition
@@ -454,7 +351,7 @@ fn parse_if<'parse>(
                 transitions.push(Transition::default());
                 parse_locations(pts, pair, transitions.last_mut().unwrap(), end)?;
             }
-            _ => panic!(invariant_error!()),
+            _ => panic!("{}", INVARIANT_ERROR),
         }
     }
 
@@ -510,7 +407,10 @@ fn parse_odds<'parse>(
         .peek()
         .is_some_and(|x| x.as_rule() == Rule::constant)
     {
-        odds.push(parse_constant(parse_iter.next().unwrap()));
+        // parse_iter.next().unwrap().as_str() upholds invariants for parse_constant
+        odds.push(LinearPolynomialParser::parse_constant(
+            parse_iter.next().unwrap().as_str(),
+        ));
     }
     let probabilities = odds_to_probabilities(odds).map_err(|mut e| {
         e.message = format!(" --> {}:{}\n  = {}\n", line_col.0, line_col.1, e.message);
@@ -556,118 +456,13 @@ mod tests {
             WHILE_PROB_PROGRAM,
         },
         parsers::{
-            default::{
-                parse_assignment, parse_constant, parse_constant_expr, parse_inequality,
-                parse_inequality_system, parse_linear_polynomial, parse_operation, parse_term,
-                parse_variable, DefaultParser,
-            },
+            default::{parse_assignment, parse_inequality, parse_inequality_system, DefaultParser},
             grammars::default::{DefaultPestParser, Rule},
             Parser,
         },
-        pts::{
-            linear_polynomial::coefficient::Constant,
-            location::Locations,
-            variable::{program_variable::ProgramVariable, Variable},
-            PTS,
-        },
-        relation, state, state_system, transition, variables,
+        pts::{location::Locations, PTS},
+        relation, state_system, transition, variables,
     };
-
-    use super::Operation;
-    use std::iter::zip;
-
-    #[test]
-    fn variable_sanity() {
-        let mut variables = variables!();
-        let variable = ProgramVariable::new(&mut variables, "abc");
-        let string = variable.to_string();
-        let mut parse = DefaultPestParser::parse(Rule::variable, string.as_str()).unwrap();
-        let var = parse_variable(&mut variables, parse.next().unwrap());
-        assert!(parse.next().is_none());
-        assert_eq!(var.to_string(), variable.to_string());
-    }
-
-    #[test]
-    fn constant_sanity() {
-        let mut parse = DefaultPestParser::parse(Rule::constant, "123").unwrap();
-        let constant = parse_constant(parse.next().unwrap());
-        assert!(parse.next().is_none());
-        assert_eq!(constant, Constant(123.0));
-    }
-
-    #[test]
-    fn operation_sanity() {
-        let inputs = vec!["+", "-", "*", "/", "^"];
-        let ops = vec![
-            Operation::Addition,
-            Operation::Subtraction,
-            Operation::Multiplication,
-            Operation::Division,
-            Operation::Power,
-        ];
-        let rules = vec![
-            Rule::additive_op,
-            Rule::additive_op,
-            Rule::multiplicative_op,
-            Rule::multiplicative_op,
-            Rule::power_op,
-        ];
-
-        let zipped = zip(zip(inputs, ops), rules);
-
-        for ((input, op), rule) in zipped {
-            let mut parse = DefaultPestParser::parse(rule, input).unwrap();
-            assert_eq!(parse_operation(parse.next().unwrap()), op);
-            assert!(parse.next().is_none());
-        }
-    }
-
-    #[test]
-    fn constant_expr_sanity() {
-        let mut parse =
-            DefaultPestParser::parse(Rule::constant_expr, "((4^2 + 5) - (2 * 2 / 2))").unwrap();
-        assert_eq!(parse_constant_expr(parse.next().unwrap()), Constant(19.0));
-        assert!(parse.next().is_none());
-    }
-
-    #[test]
-    fn term_sanity() {
-        let mut variables = variables!();
-        let mut parse = DefaultPestParser::parse(Rule::term, "5a").unwrap();
-        assert_eq!(
-            parse_term(&mut variables, parse.next().unwrap()),
-            (Constant(5.0), variables.get("a").cloned())
-        );
-        assert!(parse.next().is_none());
-        parse = DefaultPestParser::parse(Rule::term, "a * 5").unwrap();
-        assert_eq!(
-            parse_term(&mut variables, parse.next().unwrap()),
-            (Constant(5.0), variables.get("a").cloned())
-        );
-        assert!(parse.next().is_none());
-        parse = DefaultPestParser::parse(Rule::term, "a").unwrap();
-        assert_eq!(
-            parse_term(&mut variables, parse.next().unwrap()),
-            (Constant(1.0), variables.get("a").cloned())
-        );
-        assert!(parse.next().is_none());
-        parse = DefaultPestParser::parse(Rule::term, "5").unwrap();
-        assert_eq!(
-            parse_term(&mut variables, parse.next().unwrap()),
-            (Constant(5.0), None)
-        );
-        assert!(parse.next().is_none());
-    }
-
-    #[test]
-    fn linear_polynomial_sanity() {
-        let mut parse =
-            DefaultPestParser::parse(Rule::linear_polynomial, "- a + 5 -(1/2) * b").unwrap();
-        let mut variables = variables!();
-        let pol = parse_linear_polynomial(&mut variables, parse.next().unwrap());
-        assert!(parse.next().is_none());
-        assert_eq!(&pol, &state!(5.0, &mut variables, -1.0, "a", -0.5, "b"));
-    }
 
     #[test]
     fn assignment_sanity() {
