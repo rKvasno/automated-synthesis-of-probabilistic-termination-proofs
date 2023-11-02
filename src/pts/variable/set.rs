@@ -48,7 +48,7 @@ impl<V: Variable> VariableSet<V> {
     where
         K: Into<V> + ToOwned + ?Sized,
     {
-        // TODO uprade to Hashset::get_or_insert if it becomes stable
+        // TODO uprade to Indexset::get_or_insert if it becomes stable
         let tmp: V = variable.into();
         self.insert(tmp.to_owned());
         self.data.get(tmp.borrow()).unwrap().clone()

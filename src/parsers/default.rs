@@ -35,22 +35,26 @@ pub enum Operation {
     Power,
 }
 
-fn odds_to_probabilities(odds: Vec<Constant>) -> Vec<Constant> {
+fn odds_to_probabilities(odds: Vec<Constant>) -> Result<Vec<Constant>, ParserError> {
     // checks for negative probabilities
     assert!(odds.iter().find(|x| x.is_negative()).is_none());
     let sum: Constant = odds.to_owned().into_iter().sum();
-    // TODO since the user can input all 0.0, we need a ParserError
-    // could probably return the iterator, but that poses some lifetime issues
-    odds.into_iter().map(|x| x / sum).collect()
+    if sum.is_zero() {
+        Err(ParserError {
+            message: "the sum of odds cannot be zero".to_string(),
+        })
+    } else {
+        // could probably return the iterator, but that poses some lifetime issues
+        Ok(odds.into_iter().map(|x| x / sum).collect())
+    }
 }
 
-// TODO error propagation for division by zero
 pub fn parse(input: &str) -> Result<PTS, ParserError> {
     match DefaultParser::parse(Rule::program, input) {
         Err(error) => Err(handle_pest_error(error)),
         Ok(mut parse) => {
             let mut pts = Default::default();
-            parse_program(&mut pts, parse.next().unwrap());
+            parse_program(&mut pts, parse.next().unwrap())?;
             assert_eq!(parse.next(), None);
             pts.finalize();
             Ok(pts)
@@ -224,7 +228,7 @@ fn parse_invariant<'parse>(
 }
 
 // assumes the parses rule is Rule::program
-fn parse_program<'parse>(pts: &mut PTS, parse: Pair<'parse, Rule>) {
+fn parse_program<'parse>(pts: &mut PTS, parse: Pair<'parse, Rule>) -> Result<(), ParserError> {
     assert_eq!(parse.to_owned().as_rule(), Rule::program);
     let mut transition = Transition::default();
     let mut iter = parse.into_inner();
@@ -233,12 +237,13 @@ fn parse_program<'parse>(pts: &mut PTS, parse: Pair<'parse, Rule>) {
         iter.next().unwrap(),
         &mut transition,
         pts.locations.get_terminating_location(),
-    );
+    )?;
     pts.locations.initial = transition.target;
     pts.locations.set_invariant(
         pts.locations.get_terminating_location(),
         parse_invariant(&mut pts.variables, iter.next().unwrap()),
     );
+    Ok(())
 }
 
 // assumes the parses rule is Rule::locations
@@ -247,7 +252,7 @@ fn parse_locations<'parse>(
     parse: Pair<'parse, Rule>,
     start_transition: &mut Transition,
     end: LocationHandle,
-) {
+) -> Result<(), ParserError> {
     assert_eq!(parse.to_owned().as_rule(), Rule::locations);
     let parse_locations = parse.into_inner();
     let mut pts_locations = pts
@@ -274,16 +279,17 @@ fn parse_locations<'parse>(
 
         let instruction_parse = location_iter.next().unwrap();
         match instruction_parse.as_rule() {
-            Rule::if_statement => parse_if(pts, instruction_parse, local_start, local_end),
-            Rule::odds_statement => parse_odds(pts, instruction_parse, local_start, local_end),
-            Rule::choose_statement => parse_nondet(pts, instruction_parse, local_start, local_end),
-            Rule::while_statement => parse_while(pts, instruction_parse, local_start, local_end),
+            Rule::if_statement => parse_if(pts, instruction_parse, local_start, local_end)?,
+            Rule::odds_statement => parse_odds(pts, instruction_parse, local_start, local_end)?,
+            Rule::choose_statement => parse_nondet(pts, instruction_parse, local_start, local_end)?,
+            Rule::while_statement => parse_while(pts, instruction_parse, local_start, local_end)?,
             Rule::assignment_statement => {
                 parse_assign(pts, instruction_parse, local_start, local_end)
             }
             _ => panic!(invariant_error!()),
-        }
+        };
     }
+    Ok(())
 }
 
 // assumes the parses rule is Rule::assignment_statement
@@ -310,11 +316,13 @@ fn parse_condition<'parse>(
     pts: &mut PTS,
     parse: Pair<'parse, Rule>,
     end: LocationHandle,
-) -> Guards {
+) -> Result<Guards, ParserError> {
+    let line_col = parse.as_span().start_pos().line_col();
     match parse.to_owned().as_rule() {
         Rule::logic_condition => {
             let loop_condition = parse_inequality_system(&mut pts.variables, parse);
-            Guards::Logic(vec![
+            Ok(Guards::Logic(vec![
+                // default gets replaced
                 (loop_condition.to_owned(), Default::default()),
                 (
                     !loop_condition,
@@ -323,7 +331,7 @@ fn parse_condition<'parse>(
                         target: end,
                     },
                 ),
-            ])
+            ]))
         }
         Rule::odds_condition => {
             let mut odds: Vec<Constant> = Default::default();
@@ -331,8 +339,12 @@ fn parse_condition<'parse>(
                 odds.push(parse_constant(pair));
             }
             // assert_eq!(odds.len(), 2);
-            let probabilities = odds_to_probabilities(odds);
-            Guards::Probabilistic(vec![
+            let probabilities = odds_to_probabilities(odds).map_err(|mut e| {
+                e.message = format!(" --> {}:{}\n  = {}\n", line_col.0, line_col.1, e.message);
+                e
+            })?;
+            Ok(Guards::Probabilistic(vec![
+                // default gets replaced
                 (probabilities[0], Default::default()),
                 (
                     probabilities[1],
@@ -341,15 +353,16 @@ fn parse_condition<'parse>(
                         target: end,
                     },
                 ),
-            ])
+            ]))
         }
-        Rule::nondeterminism_sign => Guards::Nondeterministic(vec![
+        Rule::nondeterminism_sign => Ok(Guards::Nondeterministic(vec![
+            // default gets replaced
             Default::default(),
             Transition {
                 assignments: Default::default(),
                 target: end,
             },
-        ]),
+        ])),
         _ => panic!(invariant_error!()),
     }
 }
@@ -360,29 +373,32 @@ fn parse_while<'parse>(
     parse: Pair<'parse, Rule>,
     start: LocationHandle,
     end: LocationHandle,
-) {
+) -> Result<(), ParserError> {
     assert_eq!(parse.to_owned().as_rule(), Rule::while_statement);
     // condition ~ locations
     let mut parse_iter = parse.into_inner();
     // save the condition parse for later
     let condition = parse_iter.next().unwrap();
     // parse locations
-    let mut guards: Guards = parse_condition(pts, condition, end);
+    let mut guards: Guards = parse_condition(pts, condition, end)?;
     match guards {
         Guards::Logic(ref mut vector) => {
-            parse_locations(pts, parse_iter.next().unwrap(), &mut vector[0].1, start)
+            parse_locations(pts, parse_iter.next().unwrap(), &mut vector[0].1, start)?
         }
         Guards::Probabilistic(ref mut vector) => {
-            parse_locations(pts, parse_iter.next().unwrap(), &mut vector[0].1, start)
+            parse_locations(pts, parse_iter.next().unwrap(), &mut vector[0].1, start)?
         }
+
         Guards::Nondeterministic(ref mut vector) => {
-            parse_locations(pts, parse_iter.next().unwrap(), &mut vector[0], start)
+            parse_locations(pts, parse_iter.next().unwrap(), &mut vector[0], start)?
         }
+
         _ => panic!(invariant_error!()),
-    }
+    };
 
     // start cannot be None, see parse_locations, guards cannot be empty, see parse_condition
     pts.locations.set_outgoing(start, guards).unwrap();
+    Ok(())
 }
 
 // assumes the parses rule is Rule::choose_statement
@@ -391,12 +407,12 @@ fn parse_nondet<'parse>(
     parse: Pair<'parse, Rule>,
     start: LocationHandle,
     end: LocationHandle,
-) {
+) -> Result<(), ParserError> {
     assert_eq!(parse.to_owned().as_rule(), Rule::choose_statement);
     let mut transitions = vec![];
     for locations_parse in parse.into_inner() {
         transitions.push(Default::default());
-        parse_locations(pts, locations_parse, transitions.last_mut().unwrap(), end);
+        parse_locations(pts, locations_parse, transitions.last_mut().unwrap(), end)?;
     }
 
     // if theres just one block, the choice is between executing and skipping it
@@ -411,6 +427,7 @@ fn parse_nondet<'parse>(
     pts.locations
         .set_outgoing(start, Guards::Nondeterministic(transitions))
         .unwrap();
+    Ok(())
 }
 
 // assumes the parses rule is Rule::if_statement
@@ -419,7 +436,7 @@ fn parse_if<'parse>(
     parse: Pair<'parse, Rule>,
     start: LocationHandle,
     end: LocationHandle,
-) {
+) -> Result<(), ParserError> {
     assert_eq!(parse.to_owned().as_rule(), Rule::if_statement);
     let mut else_condition = StateSystem::default();
     let mut conditions: Vec<StateSystem> = vec![];
@@ -432,7 +449,7 @@ fn parse_if<'parse>(
             }
             Rule::locations => {
                 transitions.push(Transition::default());
-                parse_locations(pts, pair, transitions.last_mut().unwrap(), end);
+                parse_locations(pts, pair, transitions.last_mut().unwrap(), end)?;
             }
             _ => panic!(invariant_error!()),
         }
@@ -454,6 +471,7 @@ fn parse_if<'parse>(
             Guards::Logic(std::iter::zip(conditions, transitions).collect()),
         )
         .unwrap();
+    Ok(())
 }
 
 // assumes the parses rule is Rule::logic_condition
@@ -477,9 +495,10 @@ fn parse_odds<'parse>(
     parse: Pair<'parse, Rule>,
     start: LocationHandle,
     end: LocationHandle,
-) {
+) -> Result<(), ParserError> {
     assert_eq!(parse.to_owned().as_rule(), Rule::odds_statement);
     // constant^n ~ block^(n-1)
+    let line_col = parse.as_span().start_pos().line_col();
 
     let mut odds: Vec<Constant> = vec![];
     let mut parse_iter = parse.into_inner();
@@ -490,7 +509,10 @@ fn parse_odds<'parse>(
     {
         odds.push(parse_constant(parse_iter.next().unwrap()));
     }
-    let probabilities = odds_to_probabilities(odds);
+    let probabilities = odds_to_probabilities(odds).map_err(|mut e| {
+        e.message = format!(" --> {}:{}\n  = {}\n", line_col.0, line_col.1, e.message);
+        e
+    })?;
     let mut prob_iter = probabilities.into_iter();
     let mut guards: Vec<(Constant, Transition)> = vec![];
     for locations_parse in parse_iter {
@@ -498,7 +520,7 @@ fn parse_odds<'parse>(
         // assert!(prob_iter.peek().is_some());
         guards.push((prob_iter.next().unwrap(), Default::default()));
 
-        parse_locations(pts, locations_parse, &mut guards.last_mut().unwrap().1, end)
+        parse_locations(pts, locations_parse, &mut guards.last_mut().unwrap().1, end)?
     }
     // assert!(prob_iter.peek().is_some());
     guards.push((
@@ -514,6 +536,7 @@ fn parse_odds<'parse>(
     pts.locations
         .set_outgoing(start, Guards::Probabilistic(guards))
         .unwrap();
+    Ok(())
 }
 
 #[cfg(test)]
@@ -1641,6 +1664,28 @@ mod tests {
         #[test]
         fn choice() {
             assert_eq!(parse("# 0>0\n  choose ").err().unwrap().to_string(), " --> 2:3\n  |\n2 |   choose \n  |   ^---\n  |\n  = expected if_statement, odds_statement, choose_statement, while_statement, or assignment_statement");
+        }
+
+        #[test]
+        fn branching_odds_sum_zero() {
+            assert_eq!(
+                parse("# 0>0\n  odds 0:0:0{\n#0<0\na=0\n}\n{\n#0<0\na=0\n}#0<0\n")
+                    .err()
+                    .unwrap()
+                    .to_string(),
+                " --> 2:3\n  = the sum of odds cannot be zero\n"
+            );
+        }
+
+        #[test]
+        fn while_odds_sum_zero() {
+            assert_eq!(
+                parse("# 0>0\n  while 0:0{\n#0<0\na=0\n}#0<0\n")
+                    .err()
+                    .unwrap()
+                    .to_string(),
+                " --> 2:9\n  = the sum of odds cannot be zero\n"
+            );
         }
     }
 }
