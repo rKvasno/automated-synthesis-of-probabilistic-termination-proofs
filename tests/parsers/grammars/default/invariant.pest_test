@@ -52,7 +52,7 @@ a = c
           )
         )
       )
-      (assign_inst
+      (assignment_statement
         (variable: "a")
         (linear_polynomial: "c")
       )

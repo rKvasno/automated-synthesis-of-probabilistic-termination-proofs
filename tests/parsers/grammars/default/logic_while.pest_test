@@ -1,15 +1,11 @@
-Probabilistic branching
+Logic while_statement
 
 =======
 
 # 0 >= 0
-odds 0:1:0 {
- # a < a
- a = a
-}
-{
- # b >= a
- b = a
+while a > a and a < a {
+    # a > a
+    a = b
 }
 # 0 >= 0
 
@@ -27,25 +23,17 @@ odds 0:1:0 {
           )
         )
       )
-      (prob_inst
-        (constant: "0")
-        (constant: "1")
-        (constant: "0")
-        (locations
-          (location
-            (invariant
-              (logic_condition
-                (inequality
-                  (linear_polynomial: "a")
-                  (comparison_op: "<")
-                  (linear_polynomial: "a")
-                )
-              )
-            )
-            (assign_inst
-              (variable: "a")
-              (linear_polynomial: "a")
-            )
+      (while_statement
+        (logic_condition
+          (inequality
+            (linear_polynomial: "a")
+            (comparison_op: ">")
+            (linear_polynomial: "a")
+          )
+          (inequality
+            (linear_polynomial: "a")
+            (comparison_op: "<")
+            (linear_polynomial: "a")
           )
         )
         (locations
@@ -53,15 +41,15 @@ odds 0:1:0 {
             (invariant
               (logic_condition
                 (inequality
-                  (linear_polynomial: "b")
-                  (comparison_op: ">=")
+                  (linear_polynomial: "a")
+                  (comparison_op: ">")
                   (linear_polynomial: "a")
                 )
               )
             )
-            (assign_inst
-              (variable: "b")
-              (linear_polynomial: "a")
+            (assignment_statement
+              (variable: "a")
+              (linear_polynomial: "b")
             )
           )
         )

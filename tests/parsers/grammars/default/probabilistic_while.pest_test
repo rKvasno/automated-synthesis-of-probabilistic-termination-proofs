@@ -1,4 +1,4 @@
-Probabilistic while
+Probabilistic while_statement
 
 =======
 
@@ -23,8 +23,8 @@ while 1 : 0 {
           )
         )
       )
-      (while_inst
-        (prob_condition
+      (while_statement
+        (odds_condition
           (constant: "1")
           (constant: "0")
         )
@@ -39,7 +39,7 @@ while 1 : 0 {
                 )
               )
             )
-            (assign_inst
+            (assignment_statement
               (variable: "a")
               (linear_polynomial: "b")
             )

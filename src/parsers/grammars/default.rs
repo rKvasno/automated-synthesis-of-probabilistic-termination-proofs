@@ -1,4 +1,5 @@
 use pest_derive::Parser;
+
 #[derive(Parser)]
 #[grammar = "parsers/grammars/default.pest"]
 #[grammar = "parsers/grammars/linear_polynomial.pest"]
@@ -11,6 +12,7 @@ mod tests {
         crate::parsers::grammars::default::DefaultParser,
         crate::parsers::grammars::default::Rule,
         "program",
+        ext = "pest_test",
         skip_rule("term", "additive_op"),
         dir = "tests/parsers/grammars/default",
         no_eoi = true,

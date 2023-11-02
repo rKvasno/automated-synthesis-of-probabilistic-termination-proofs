@@ -124,9 +124,9 @@ mod tests {
         use crate::{
             guards, invariant,
             misc::tests::pts::{
-                DEFAULT, SIMPLE_IF_PROGRAM, SIMPLE_NONDET_PROGRAM, SIMPLE_ODDS_PROGRAM,
-                SIMPLE_PROGRAM, TRIVIAL_IF_PROGRAM, TRIVIAL_NONDET_PROGRAM, TRIVIAL_ODDS_PROGRAM,
-                TRIVIAL_PROGRAM, WHILE_LOGIC_PROGRAM, WHILE_NONDET_PROGRAM, WHILE_PROB_PROGRAM,
+                DEFAULT, SIMPLE_IF_PROGRAM, SIMPLE_CHOOSE_PROGRAM, SIMPLE_ODDS_PROGRAM,
+                SIMPLE_PROGRAM, TRIVIAL_IF_PROGRAM, TRIVIAL_CHOOSE_PROGRAM, TRIVIAL_ODDS_PROGRAM,
+                TRIVIAL_PROGRAM, WHILE_LOGIC_PROGRAM, WHILE_NONDETERMINISTIC_PROGRAM, WHILE_PROB_PROGRAM,
             },
             pts::{location::Locations, PTS},
             state_system, transition, variables,
@@ -714,7 +714,7 @@ mod tests {
             dot::render(&pts, &mut string).unwrap();
             let string = std::str::from_utf8(string.as_slice()).unwrap().to_string();
             print!("{}", string);
-            assert_eq!(string, SIMPLE_NONDET_PROGRAM);
+            assert_eq!(string, SIMPLE_CHOOSE_PROGRAM);
         }
 
         #[test]
@@ -780,7 +780,7 @@ mod tests {
             dot::render(&pts, &mut string).unwrap();
             let string = std::str::from_utf8(string.as_slice()).unwrap().to_string();
             print!("{}", string);
-            assert_eq!(string, TRIVIAL_NONDET_PROGRAM);
+            assert_eq!(string, TRIVIAL_CHOOSE_PROGRAM);
         }
 
         #[test]
@@ -1007,7 +1007,7 @@ mod tests {
             dot::render(&pts, &mut string).unwrap();
             let string = std::str::from_utf8(string.as_slice()).unwrap().to_string();
             print!("{}", string);
-            assert_eq!(string, WHILE_NONDET_PROGRAM);
+            assert_eq!(string, WHILE_NONDETERMINISTIC_PROGRAM);
         }
     }
 }

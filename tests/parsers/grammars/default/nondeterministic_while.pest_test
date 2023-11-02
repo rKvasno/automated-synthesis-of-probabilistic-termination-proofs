@@ -1,9 +1,9 @@
-Nondeterministic while
+Nondeterministic while_statement
 
 =======
 
 # 0 >= 0
-while nondet {
+while * {
   # a > a
   a = b
 }
@@ -23,8 +23,8 @@ while nondet {
           )
         )
       )
-      (while_inst
-        (nondet_condition: "nondet")
+      (while_statement
+        (nondeterminism_sign: "*")
         (locations
           (location
             (invariant
@@ -36,7 +36,7 @@ while nondet {
                 )
               )
             )
-            (assign_inst
+            (assignment_statement
               (variable: "a")
               (linear_polynomial: "b")
             )

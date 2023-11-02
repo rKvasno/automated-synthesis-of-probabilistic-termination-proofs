@@ -15,7 +15,7 @@ quit = 0
 while quit <= 0.5 and bank > 0 and dealer_bank > 0 {
 
   # quit <= 0.5 and bank > 0 and dealer_bank > 0
-  nondet {
+  choose {
 
     # quit <= 0.5 and bank > 0 and dealer_bank > 0
     odds 1:1:0 {
@@ -55,7 +55,7 @@ while quit <= 0.5 and bank > 0 and dealer_bank > 0 {
           )
         )
       )
-      (assign_inst
+      (assignment_statement
         (variable: "dealer_bank")
         (linear_polynomial: "bank")
       )
@@ -75,7 +75,7 @@ while quit <= 0.5 and bank > 0 and dealer_bank > 0 {
           )
         )
       )
-      (assign_inst
+      (assignment_statement
         (variable: "quit")
         (linear_polynomial: "0")
       )
@@ -100,7 +100,7 @@ while quit <= 0.5 and bank > 0 and dealer_bank > 0 {
           )
         )
       )
-      (while_inst
+      (while_statement
         (logic_condition
           (inequality
             (linear_polynomial: "quit")
@@ -139,7 +139,7 @@ while quit <= 0.5 and bank > 0 and dealer_bank > 0 {
                 )
               )
             )
-            (nondet_inst
+            (choose_statement
               (locations
                 (location
                   (invariant
@@ -161,7 +161,7 @@ while quit <= 0.5 and bank > 0 and dealer_bank > 0 {
                       )
                     )
                   )
-                  (prob_inst
+                  (odds_statement
                     (constant: "1")
                     (constant: "1")
                     (constant: "0")
@@ -186,7 +186,7 @@ while quit <= 0.5 and bank > 0 and dealer_bank > 0 {
                             )
                           )
                         )
-                        (assign_inst
+                        (assignment_statement
                           (variable: "bank")
                           (linear_polynomial: "bank + 1")
                         )
@@ -211,7 +211,7 @@ while quit <= 0.5 and bank > 0 and dealer_bank > 0 {
                             )
                           )
                         )
-                        (assign_inst
+                        (assignment_statement
                           (variable: "dealer_bank")
                           (linear_polynomial: "dealer_bank - 1")
                         )
@@ -238,7 +238,7 @@ while quit <= 0.5 and bank > 0 and dealer_bank > 0 {
                             )
                           )
                         )
-                        (assign_inst
+                        (assignment_statement
                           (variable: "dealer_bank")
                           (linear_polynomial: "dealer_bank + 1")
                         )
@@ -263,7 +263,7 @@ while quit <= 0.5 and bank > 0 and dealer_bank > 0 {
                             )
                           )
                         )
-                        (assign_inst
+                        (assignment_statement
                           (variable: "bank")
                           (linear_polynomial: "bank - 1")
                         )
@@ -293,7 +293,7 @@ while quit <= 0.5 and bank > 0 and dealer_bank > 0 {
                       )
                     )
                   )
-                  (assign_inst
+                  (assignment_statement
                     (variable: "quit")
                     (linear_polynomial: "1")
                   )

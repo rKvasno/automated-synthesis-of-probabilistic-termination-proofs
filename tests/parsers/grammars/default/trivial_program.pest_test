@@ -20,7 +20,7 @@ a = 1
           )
         )
       )
-      (assign_inst
+      (assignment_statement
         (variable: "a")
         (linear_polynomial: "1")
       )

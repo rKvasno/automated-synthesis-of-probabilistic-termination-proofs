@@ -12,6 +12,7 @@ mod tests {
         crate::parsers::grammars::linear_polynomial::PolynomialTestParser,
         crate::parsers::grammars::linear_polynomial::Rule,
         "linear_polynomial",
+        ext = "pest_test",
         dir = "tests/parsers/grammars/linear_polynomial",
         no_eoi = true
     )]

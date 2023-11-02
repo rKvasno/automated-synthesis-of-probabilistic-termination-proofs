@@ -1,5 +1,5 @@
 # 0 < 0
-nondet {
+choose {
   # a > a
   a = a
 }

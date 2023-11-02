@@ -165,12 +165,12 @@ fn parse_linear_polynomial<'parse>(
     pol
 }
 
-// assumes the parses rule is Rule::assign_inst
+// assumes the parses rule is Rule::assignment_statement
 fn parse_assignment<'parse>(
     variables: &mut ProgramVariables,
     parse: Pair<'parse, Rule>,
 ) -> StateAssignment {
-    assert_eq!(parse.to_owned().as_rule(), Rule::assign_inst);
+    assert_eq!(parse.to_owned().as_rule(), Rule::assignment_statement);
     let mut pairs = parse.into_inner();
     let var = parse_variable(variables, pairs.next().unwrap());
     let pol: State = parse_linear_polynomial(variables, pairs.next().unwrap());
@@ -274,24 +274,26 @@ fn parse_locations<'parse>(
 
         let instruction_parse = location_iter.next().unwrap();
         match instruction_parse.as_rule() {
-            Rule::if_inst => parse_if(pts, instruction_parse, local_start, local_end),
-            Rule::prob_inst => parse_odds(pts, instruction_parse, local_start, local_end),
-            Rule::nondet_inst => parse_nondet(pts, instruction_parse, local_start, local_end),
-            Rule::while_inst => parse_while(pts, instruction_parse, local_start, local_end),
-            Rule::assign_inst => parse_assign(pts, instruction_parse, local_start, local_end),
+            Rule::if_statement => parse_if(pts, instruction_parse, local_start, local_end),
+            Rule::odds_statement => parse_odds(pts, instruction_parse, local_start, local_end),
+            Rule::choose_statement => parse_nondet(pts, instruction_parse, local_start, local_end),
+            Rule::while_statement => parse_while(pts, instruction_parse, local_start, local_end),
+            Rule::assignment_statement => {
+                parse_assign(pts, instruction_parse, local_start, local_end)
+            }
             _ => panic!(invariant_error!()),
         }
     }
 }
 
-// assumes the parses rule is Rule::assign_inst
+// assumes the parses rule is Rule::assignment_statement
 fn parse_assign<'parse>(
     pts: &mut PTS,
     parse: Pair<'parse, Rule>,
     start: LocationHandle,
     end: LocationHandle,
 ) {
-    assert_eq!(parse.to_owned().as_rule(), Rule::assign_inst);
+    assert_eq!(parse.to_owned().as_rule(), Rule::assignment_statement);
     pts.locations
         .set_outgoing(
             start,
@@ -303,7 +305,7 @@ fn parse_assign<'parse>(
         .unwrap()
 }
 
-// assumes the parses rule is Rule::*_condition
+// assumes the parses rule is Rule::*_condition or Rule::nondeterminism_sign
 fn parse_condition<'parse>(
     pts: &mut PTS,
     parse: Pair<'parse, Rule>,
@@ -323,7 +325,7 @@ fn parse_condition<'parse>(
                 ),
             ])
         }
-        Rule::prob_condition => {
+        Rule::odds_condition => {
             let mut odds: Vec<Constant> = Default::default();
             for pair in parse.into_inner() {
                 odds.push(parse_constant(pair));
@@ -341,7 +343,7 @@ fn parse_condition<'parse>(
                 ),
             ])
         }
-        Rule::nondet_condition => Guards::Nondeterministic(vec![
+        Rule::nondeterminism_sign => Guards::Nondeterministic(vec![
             Default::default(),
             Transition {
                 assignments: Default::default(),
@@ -352,14 +354,14 @@ fn parse_condition<'parse>(
     }
 }
 
-// assumes the parses rule is Rule::while_inst
+// assumes the parses rule is Rule::while_statement
 fn parse_while<'parse>(
     pts: &mut PTS,
     parse: Pair<'parse, Rule>,
     start: LocationHandle,
     end: LocationHandle,
 ) {
-    assert_eq!(parse.to_owned().as_rule(), Rule::while_inst);
+    assert_eq!(parse.to_owned().as_rule(), Rule::while_statement);
     // condition ~ locations
     let mut parse_iter = parse.into_inner();
     // save the condition parse for later
@@ -383,14 +385,14 @@ fn parse_while<'parse>(
     pts.locations.set_outgoing(start, guards).unwrap();
 }
 
-// assumes the parses rule is Rule::nondet_inst
+// assumes the parses rule is Rule::choose_statement
 fn parse_nondet<'parse>(
     pts: &mut PTS,
     parse: Pair<'parse, Rule>,
     start: LocationHandle,
     end: LocationHandle,
 ) {
-    assert_eq!(parse.to_owned().as_rule(), Rule::nondet_inst);
+    assert_eq!(parse.to_owned().as_rule(), Rule::choose_statement);
     let mut transitions = vec![];
     for locations_parse in parse.into_inner() {
         transitions.push(Default::default());
@@ -411,14 +413,14 @@ fn parse_nondet<'parse>(
         .unwrap();
 }
 
-// assumes the parses rule is Rule::if_inst
+// assumes the parses rule is Rule::if_statement
 fn parse_if<'parse>(
     pts: &mut PTS,
     parse: Pair<'parse, Rule>,
     start: LocationHandle,
     end: LocationHandle,
 ) {
-    assert_eq!(parse.to_owned().as_rule(), Rule::if_inst);
+    assert_eq!(parse.to_owned().as_rule(), Rule::if_statement);
     let mut else_condition = StateSystem::default();
     let mut conditions: Vec<StateSystem> = vec![];
     let mut transitions: Vec<Transition> = vec![];
@@ -469,14 +471,14 @@ fn parse_if_condition<'parse>(
     pushed_cond.append(&mut new_cond);
 }
 
-// assumes the parses rule is Rule::prob_inst
+// assumes the parses rule is Rule::odds_statement
 fn parse_odds<'parse>(
     pts: &mut PTS,
     parse: Pair<'parse, Rule>,
     start: LocationHandle,
     end: LocationHandle,
 ) {
-    assert_eq!(parse.to_owned().as_rule(), Rule::prob_inst);
+    assert_eq!(parse.to_owned().as_rule(), Rule::odds_statement);
     // constant^n ~ block^(n-1)
 
     let mut odds: Vec<Constant> = vec![];
@@ -521,9 +523,10 @@ mod tests {
     use crate::{
         assignment, guards, invariant,
         misc::tests::parsers::default::{
-            INVARIANT_PROGRAM, SIMPLE_IF_PROGRAM, SIMPLE_NONDET_PROGRAM, SIMPLE_ODDS_PROGRAM,
-            SIMPLE_PROGRAM, TRIVIAL_IF_PROGRAM, TRIVIAL_NONDET_PROGRAM, TRIVIAL_ODDS_PROGRAM,
-            TRIVIAL_PROGRAM, WHILE_LOGIC_PROGRAM, WHILE_NONDET_PROGRAM, WHILE_PROB_PROGRAM,
+            INVARIANT_PROGRAM, SIMPLE_CHOOSE_PROGRAM, SIMPLE_IF_PROGRAM, SIMPLE_ODDS_PROGRAM,
+            SIMPLE_PROGRAM, TRIVIAL_CHOOSE_PROGRAM, TRIVIAL_IF_PROGRAM, TRIVIAL_ODDS_PROGRAM,
+            TRIVIAL_PROGRAM, WHILE_LOGIC_PROGRAM, WHILE_NONDETERMINISTIC_PROGRAM,
+            WHILE_PROB_PROGRAM,
         },
         parsers::{
             default::{
@@ -641,7 +644,8 @@ mod tests {
     #[test]
     fn assignment_sanity() {
         let mut variables = variables!("x", "a", "b", "c");
-        let mut parse = DefaultParser::parse(Rule::assign_inst, "x = -2a + 4b - 0c - 2").unwrap();
+        let mut parse =
+            DefaultParser::parse(Rule::assignment_statement, "x = -2a + 4b - 0c - 2").unwrap();
         let assign = parse_assignment(&mut variables, parse.next().unwrap());
         assert!(parse.next().is_none());
         assert_eq!(
@@ -1233,8 +1237,8 @@ mod tests {
     }
 
     #[test]
-    fn parse_simple_nondet_program() {
-        let input = SIMPLE_NONDET_PROGRAM;
+    fn parse_simple_choose_program() {
+        let input = SIMPLE_CHOOSE_PROGRAM;
         let parsed = parse(input).unwrap();
 
         let mut locations = Locations::default();
@@ -1328,8 +1332,8 @@ mod tests {
     }
 
     #[test]
-    fn parse_trivial_nondet_program() {
-        let input = TRIVIAL_NONDET_PROGRAM;
+    fn parse_trivial_choose_program() {
+        let input = TRIVIAL_CHOOSE_PROGRAM;
         let parsed = parse(input).unwrap();
 
         let mut locations = Locations::default();
@@ -1552,8 +1556,8 @@ mod tests {
     }
 
     #[test]
-    fn parse_nondet_while_program() {
-        let input = WHILE_NONDET_PROGRAM;
+    fn parse_nondeterministic_while_program() {
+        let input = WHILE_NONDETERMINISTIC_PROGRAM;
         let parsed = parse(input).unwrap();
 
         let mut locations = Locations::default();
@@ -1616,5 +1620,27 @@ mod tests {
                 variables
             }
         );
+    }
+
+    mod error_message {
+        use crate::parsers::default::parse;
+
+        #[test]
+        fn empty() {
+            assert_eq!(
+                parse("").err().unwrap().to_string(),
+                " --> 1:1\n  |\n1 | \n  | ^---\n  |\n  = expected invariant"
+            );
+        }
+
+        #[test]
+        fn deeper_rules() {
+            assert_eq!(parse("# 0>0\n  while ").err().unwrap().to_string(), " --> 2:9\n  |\n2 |   while \n  |         ^---\n  |\n  = expected nondeterminism_sign, linear_polynomial, or constant");
+        }
+
+        #[test]
+        fn choice() {
+            assert_eq!(parse("# 0>0\n  choose ").err().unwrap().to_string(), " --> 2:3\n  |\n2 |   choose \n  |   ^---\n  |\n  = expected if_statement, odds_statement, choose_statement, while_statement, or assignment_statement");
+        }
     }
 }

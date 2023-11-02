@@ -31,7 +31,7 @@ else {
           )
         )
       )
-      (if_inst
+      (if_statement
         (logic_condition
           (inequality
             (linear_polynomial: "a")
@@ -50,7 +50,7 @@ else {
                 )
               )
             )
-            (assign_inst
+            (assignment_statement
               (variable: "a")
               (linear_polynomial: "a")
             )
@@ -74,7 +74,7 @@ else {
                 )
               )
             )
-            (assign_inst
+            (assignment_statement
               (variable: "a")
               (linear_polynomial: "a")
             )
@@ -91,7 +91,7 @@ else {
                 )
               )
             )
-            (assign_inst
+            (assignment_statement
               (variable: "a")
               (linear_polynomial: "a")
             )

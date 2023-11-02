@@ -1,0 +1,99 @@
+Nondeterministic branching
+
+=======
+
+# 0 >= 0
+choose {
+  # a > a
+  a = a
+}
+or {
+  # a > a
+  a = a
+}
+or {
+  # a > a
+  a = a
+}
+# 0 >= 0
+
+=======
+
+(program
+  (locations
+    (location
+      (invariant
+        (logic_condition
+          (inequality
+            (linear_polynomial: "0")
+            (comparison_op: ">=")
+            (linear_polynomial: "0")
+          )
+        )
+      )
+      (choose_statement
+        (locations
+          (location
+            (invariant
+              (logic_condition
+                (inequality
+                  (linear_polynomial: "a")
+                  (comparison_op: ">")
+                  (linear_polynomial: "a")
+                )
+              )
+            )
+            (assignment_statement
+              (variable: "a")
+              (linear_polynomial: "a")
+            )
+          )
+        )
+        (locations
+          (location
+            (invariant
+              (logic_condition
+                (inequality
+                  (linear_polynomial: "a")
+                  (comparison_op: ">")
+                  (linear_polynomial: "a")
+                )
+              )
+            )
+            (assignment_statement
+              (variable: "a")
+              (linear_polynomial: "a")
+            )
+          )
+        )
+        (locations
+          (location
+            (invariant
+              (logic_condition
+                (inequality
+                  (linear_polynomial: "a")
+                  (comparison_op: ">")
+                  (linear_polynomial: "a")
+                )
+              )
+            )
+            (assignment_statement
+              (variable: "a")
+              (linear_polynomial: "a")
+            )
+          )
+        )
+      )
+    )
+  )
+  (invariant
+    (logic_condition
+      (inequality
+        (linear_polynomial: "0")
+        (comparison_op: ">=")
+        (linear_polynomial: "0")
+      )
+    )
+  )
+  (EOI: "")
+)
