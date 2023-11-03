@@ -11,6 +11,8 @@ use crate::pts::{
     variable::{program_variable::ProgramVariable, Variable},
 };
 
+use super::Generator;
+
 #[derive(Hash, Clone, Debug, PartialEq, Eq)]
 enum TemplateVariableData {
     _Eps,
@@ -61,5 +63,23 @@ impl Coefficient for Polynomial<TemplateVariable, Constant> {
 
     fn mul_by_constant(&mut self, n: Constant) {
         self.iter_mut().for_each(|(_, c)| c.mul_by_constant(n))
+    }
+}
+
+pub struct FarkasBasedGenerator;
+
+impl Generator for FarkasBasedGenerator {
+    fn generate_problem<S: super::linear_solvers::Solver>(
+        &self,
+        _pts: &crate::pts::PTS,
+    ) -> super::linear_solvers::Problem {
+        todo!()
+    }
+    fn build_ranking_function<Solution: Iterator<Item = (ProgramVariable, Constant)>>(
+        &self,
+        _pts: crate::pts::PTS,
+        _solution: Solution,
+    ) -> Result<super::RankedPTS, super::GeneratorError> {
+        todo!()
     }
 }
