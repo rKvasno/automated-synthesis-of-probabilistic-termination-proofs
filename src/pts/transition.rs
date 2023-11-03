@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use super::{
     linear_polynomial::{
         coefficient::{Coefficient, Constant},
@@ -112,7 +114,7 @@ impl<V: Variable> Assignment<V> {
     }
 }
 
-impl<V: Variable> std::fmt::Display for Assignment<V> {
+impl<V: Variable + Display> std::fmt::Display for Assignment<V> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{} = {}", self.0, self.1)
     }

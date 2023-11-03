@@ -1,18 +1,12 @@
-use std::{
-    borrow::Borrow,
-    fmt::{Debug, Display},
-    hash::Hash,
-    ops::Deref,
-    rc::Rc,
-};
+use std::{borrow::Borrow, fmt::Debug, hash::Hash, ops::Deref, rc::Rc};
 
 pub mod program_variable;
 pub mod set;
 
 pub trait Variable:
-    Display + Clone + Hash + PartialEq + Eq + Borrow<Rc<Self::DATA>> + Deref<Target = Self::DATA>
+    Clone + Hash + PartialEq + Eq + Borrow<Rc<Self::DATA>> + Deref<Target = Self::DATA>
 {
-    type DATA: ToOwned + Display + Debug + PartialEq + Eq + Hash + ?Sized;
+    type DATA: ToOwned + Debug + PartialEq + Eq + Hash + ?Sized;
     fn new<T: AsRef<Self::DATA> + ?Sized>(
         variables: &mut crate::pts::variable::set::VariableSet<Self>,
         data: &T,

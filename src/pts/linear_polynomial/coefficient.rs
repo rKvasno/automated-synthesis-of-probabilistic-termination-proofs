@@ -1,13 +1,12 @@
 use std::{
     borrow::{Borrow, BorrowMut},
-    fmt::{Debug, Display},
+    fmt::Debug,
     iter::Sum,
     ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign},
 };
 
 pub trait Coefficient:
     Default
-    + Display
     + Debug
     + PartialEq
     + Clone
@@ -17,47 +16,48 @@ pub trait Coefficient:
     + Sub<Output = Self>
     + Neg<Output = Self>
     + Sum
-    + From<f64>
 {
-    const ZERO: Self;
-    const ONE: Self;
-    fn pow(self, exponent: Self) -> Self;
-    fn mul_by_constant(&mut self, n: Constant);
-    fn is_negative(&self) -> bool;
+    fn zero() -> Self;
 
     fn is_zero(&self) -> bool {
-        self == &Self::ZERO
+        self == &Self::zero()
     }
 
-    fn is_one(&self) -> bool {
-        self == &Self::ONE
-    }
-
-    fn is_neg_one(&self) -> bool {
-        self == &-Self::ONE
-    }
+    fn mul_by_constant(&mut self, n: Constant);
 }
 
 // HINT: if something goes horribly wrong, it might just be -0.0
 #[derive(Debug, Default, PartialEq, PartialOrd, Clone, Copy)]
 pub struct Constant(pub f64);
 
-impl Coefficient for Constant {
-    // is_zero returns -0.0 == 0.0 which is True
-    const ZERO: Self = Constant(0.0);
-    const ONE: Self = Constant(1.0);
+impl Constant {
+    pub const ONE: Self = Constant(1.0);
 
-    fn pow(self, exponent: Self) -> Self {
+    pub fn pow(self, exponent: Self) -> Self {
         Constant(self.0.powf(exponent.0))
+    }
+
+    pub fn is_negative(&self) -> bool {
+        // .is_sign_negative returns true for -NaN, -0.0 and -inf
+        self.0 < 0.0
+    }
+
+    pub fn is_one(&self) -> bool {
+        self == &Self::ONE
+    }
+
+    pub fn is_neg_one(&self) -> bool {
+        self == &-Self::ONE
+    }
+}
+
+impl Coefficient for Constant {
+    fn zero() -> Self {
+        Constant(0.0)
     }
 
     fn mul_by_constant(&mut self, n: Constant) {
         *self *= n;
-    }
-
-    fn is_negative(&self) -> bool {
-        // .is_sign_negative returns true for -NaN, -0.0 and -inf
-        self.0 < 0.0
     }
 }
 

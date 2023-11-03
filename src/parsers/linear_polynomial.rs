@@ -1,6 +1,6 @@
 use crate::consume;
 use crate::parsers::INVARIANT_ERROR;
-use crate::pts::linear_polynomial::coefficient::{Coefficient, Constant};
+use crate::pts::linear_polynomial::coefficient::Constant;
 use crate::pts::variable::program_variable::ProgramVariable;
 use crate::pts::variable::Variable;
 use crate::pts::{linear_polynomial::State, variable::program_variable::ProgramVariables};

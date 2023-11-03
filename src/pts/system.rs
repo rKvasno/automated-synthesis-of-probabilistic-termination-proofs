@@ -1,5 +1,6 @@
 use std::{
     borrow::{Borrow, BorrowMut},
+    fmt::Display,
     ops::Not,
 };
 
@@ -160,7 +161,7 @@ impl<V: Variable, C: Coefficient> Default for System<V, C> {
     }
 }
 
-impl<V: Variable, C: Coefficient> std::fmt::Display for System<V, C> {
+impl<V: Variable + Display> std::fmt::Display for System<V, Constant> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         //ineq (\n ineq)*
         let mut iter = self.data.iter();

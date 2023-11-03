@@ -43,12 +43,15 @@ macro_rules! invariant {
     };
 }
 
+pub type TransitionID = usize; // index into Guards
+
 #[cfg_attr(test, derive(PartialEq))]
 #[derive(Debug, Default)]
 pub struct Invariant {
     data: Vec<StateSystem>,
 }
 
+pub type InvariantWithIDIterator<'a> = std::iter::Enumerate<InvariantIter<'a>>;
 pub type InvariantIter<'a> = std::slice::Iter<'a, StateSystem>;
 
 impl Invariant {
@@ -60,6 +63,11 @@ impl Invariant {
 
     pub fn iter(&self) -> InvariantIter {
         self.data.iter()
+    }
+
+    pub fn iter_with_ids(&self) -> InvariantWithIDIterator {
+        // two counters but its a lot simpler like this
+        self.iter().enumerate()
     }
 }
 

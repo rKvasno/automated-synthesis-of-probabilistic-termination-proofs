@@ -2,6 +2,7 @@ use std::{
     borrow::Borrow,
     fmt::{Debug, Display},
     hash::Hash,
+    iter::Sum,
     ops::{Add, AddAssign, Neg, Sub, SubAssign},
 };
 
@@ -80,28 +81,12 @@ pub struct Polynomial<V: Variable, C: Coefficient> {
 }
 
 impl<V: Variable, C: Coefficient> Polynomial<V, C> {
-    pub fn iter(&self) -> TermIter<V, C> {
-        self.data
-            .iter()
-            .filter(|(_, coeff): &(&Option<V>, &C)| !coeff.is_zero())
-    }
-
-    pub fn iter_mut(&mut self) -> TermIterMut<V, C> {
-        self.data
-            .iter_mut()
-            .filter(|(_, coeff): &(&Option<V>, &mut C)| !coeff.is_zero())
-    }
-}
-
-impl<V: Variable, C: Coefficient> Polynomial<V, C> {
     pub fn with_capacity(n: usize) -> Self {
         Self {
             data: IndexMap::with_capacity(n),
         }
     }
-}
 
-impl<V: Variable, C: Coefficient> Polynomial<V, C> {
     pub fn shrink_to_fit(&mut self) {
         self.data.shrink_to_fit()
     }
@@ -139,7 +124,7 @@ impl<V: Variable, C: Coefficient> Polynomial<V, C> {
         Option<V>: Borrow<K>,
         K: Hash + Eq + Into<Option<V>>,
     {
-        self.data.entry(Into::into(variable)).or_insert(C::ZERO)
+        self.data.entry(Into::into(variable)).or_insert(C::zero())
     }
 
     pub fn get_coefficient_mut_owned<K>(&mut self, variable: &K) -> &mut C
@@ -147,7 +132,7 @@ impl<V: Variable, C: Coefficient> Polynomial<V, C> {
         Option<V>: Borrow<K>,
         K: Hash + Eq + ToOwned<Owned = Option<V>>,
     {
-        self.data.entry(variable.to_owned()).or_insert(C::ZERO)
+        self.data.entry(variable.to_owned()).or_insert(C::zero())
     }
 
     pub fn get_term<K>(&self, variable: &K) -> Option<(&Option<V>, &C)>
@@ -165,6 +150,22 @@ impl<V: Variable, C: Coefficient> Polynomial<V, C> {
     {
         self.data.get_key_value(variable).map(|(k, _)| k)
     }
+
+    pub fn iter(&self) -> TermIter<V, C> {
+        self.data
+            .iter()
+            .filter(|(_, coeff): &(&Option<V>, &C)| !coeff.is_zero())
+    }
+
+    pub fn iter_mut(&mut self) -> TermIterMut<V, C> {
+        self.data
+            .iter_mut()
+            .filter(|(_, coeff): &(&Option<V>, &mut C)| !coeff.is_zero())
+    }
+
+    pub fn is_constant(&self) -> bool {
+        self.iter().find(|(v, _)| v.is_some()).is_none()
+    }
 }
 
 type TermIter<'a, V, C> =
@@ -176,6 +177,7 @@ type TermIterMut<'a, V, C> = std::iter::Filter<
 >;
 
 impl<V: Variable, C: Coefficient> Eq for Polynomial<V, C> {}
+
 impl<V: Variable, C: Coefficient> PartialEq for Polynomial<V, C> {
     // is twice as slow as regular eq on HashMaps
     fn eq(&self, other: &Self) -> bool {
@@ -227,10 +229,24 @@ impl<V: Variable, C: Coefficient> Default for Polynomial<V, C> {
     }
 }
 
-fn fmt_term<V: Variable, C: Coefficient>(
+impl<V: Variable, C: Coefficient> Sum for Polynomial<V, C> {
+    fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
+        let mut acc = Self::default();
+        iter.for_each(|pol| acc += pol);
+        acc
+    }
+}
+
+impl<V: Variable, C: Coefficient> From<C> for Polynomial<V, C> {
+    fn from(value: C) -> Self {
+        polynomial!(value)
+    }
+}
+
+fn fmt_term<V: Variable + Display>(
     f: &mut std::fmt::Formatter<'_>,
     variable: &Option<V>,
-    coefficient: &C,
+    coefficient: &Constant,
 ) -> std::fmt::Result {
     if variable.is_none() {
         // Constant term
@@ -254,7 +270,7 @@ fn fmt_term<V: Variable, C: Coefficient>(
     }
 }
 
-impl<V: Variable, C: Coefficient> Display for Polynomial<V, C> {
+impl<V: Variable + Display> Display for Polynomial<V, Constant> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut iter = self
             .data
@@ -266,7 +282,7 @@ impl<V: Variable, C: Coefficient> Display for Polynomial<V, C> {
         //let mut iter = self.data.iter();
         let first = iter.next();
         if first.is_none() {
-            write!(f, "{}", C::ZERO)?;
+            write!(f, "{}", Constant::zero())?;
         } else {
             let first = first.unwrap();
             fmt_term(f, first.0, first.1)?;
@@ -287,7 +303,7 @@ impl<V: Variable, C: Coefficient> Display for Polynomial<V, C> {
 impl<V: Variable, C: Coefficient> AddAssign for Polynomial<V, C> {
     fn add_assign(&mut self, other: Self) {
         for (var, coeff) in other.data {
-            *self.data.entry(var).or_insert(C::ZERO) += coeff;
+            *self.data.entry(var).or_insert(C::zero()) += coeff;
         }
     }
 }
@@ -304,7 +320,7 @@ impl<V: Variable, C: Coefficient> Add for Polynomial<V, C> {
 impl<V: Variable, C: Coefficient> SubAssign for Polynomial<V, C> {
     fn sub_assign(&mut self, other: Self) {
         for (var, coeff) in other.data {
-            *self.data.entry(var).or_insert(C::ZERO) -= coeff;
+            *self.data.entry(var).or_insert(C::zero()) -= coeff;
         }
     }
 }

@@ -15,7 +15,7 @@ impl Variable for ProgramVariable {
         variables: &mut crate::pts::variable::set::VariableSet<Self>,
         data: &T,
     ) -> Self {
-        variables.get_or_insert(ProgramVariable {
+        variables.get_or_insert(Self {
             ptr: Rc::from(data.as_ref().to_owned()),
         })
     }

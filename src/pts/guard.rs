@@ -28,6 +28,8 @@ macro_rules! guards {
 
 pub type Probability = Constant;
 
+pub type PolyhedraID = usize; // index into Invariant
+
 #[cfg_attr(test, derive(PartialEq))]
 #[derive(Debug)]
 pub enum Guards {
@@ -51,6 +53,11 @@ impl Guards {
 
     pub fn iter(&self) -> GuardsIterator {
         GuardsIterator(self, 0)
+    }
+
+    pub fn iter_with_ids(&self) -> GuardsWithIDIterator {
+        // two counters but its a lot simpler like this
+        self.iter().enumerate()
     }
 }
 
@@ -135,6 +142,7 @@ impl<'a> std::fmt::Display for GuardedTransition<'a> {
 }
 
 pub struct GuardsIterator<'a>(&'a Guards, usize);
+pub type GuardsWithIDIterator<'a> = std::iter::Enumerate<GuardsIterator<'a>>;
 
 impl<'a> Iterator for GuardsIterator<'a> {
     type Item = GuardedTransition<'a>;

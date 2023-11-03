@@ -1,4 +1,4 @@
-use std::{ops::Not, str::FromStr};
+use std::{fmt::Display, ops::Not, str::FromStr};
 
 use super::{
     linear_polynomial::{
@@ -158,7 +158,7 @@ impl<V: Variable, C: Coefficient> Relation<V, C> {
     }
 }
 
-impl<V: Variable, C: Coefficient> std::fmt::Display for Relation<V, C> {
+impl<V: Variable + Display> std::fmt::Display for Relation<V, Constant> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let leading_term = self.as_linear_polynomial().iter().find(|x| x.0.is_some());
 
