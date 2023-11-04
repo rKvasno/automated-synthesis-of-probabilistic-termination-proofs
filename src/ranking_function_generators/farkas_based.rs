@@ -2,7 +2,7 @@ use std::{borrow::Borrow, ops::Deref, rc::Rc};
 
 use crate::pts::{
     guard::{Guards, TransitionID},
-    invariant::{Invariant, PolyhedraID},
+    invariant::{Invariant, PolyhedronID},
     linear_polynomial::{
         coefficient::{Coefficient, Constant},
         Polynomial,
@@ -31,8 +31,8 @@ enum _TemplateVariableData {
     // TODO rename
     _A(LocationID, ProgramVariable),
     _B(LocationID),
-    _X1(LocationID, PolyhedraID, ProgramVariable),
-    _X2(LocationID, PolyhedraID, TransitionID, ProgramVariable),
+    _X1(LocationID, PolyhedronID, ProgramVariable),
+    _X2(LocationID, PolyhedronID, TransitionID, ProgramVariable),
 }
 
 impl AsRef<_TemplateVariableData> for _TemplateVariableData {
@@ -82,12 +82,96 @@ type _Predicate = System<_TemplateVariable, Constant>;
 fn _farkas_assertion(
     _program_variables: &ProgramVariables,
     _location_id: LocationID,
-    _polyhedra_id: PolyhedraID,
+    _polyhedron_id: PolyhedronID,
     _transition_id: Option<TransitionID>,
-    _polyhedra: &StateSystem,
+    _polyhedron: &StateSystem,
     _template: Relation<ProgramVariable, Polynomial<_TemplateVariable, Constant>>,
 ) -> Relation<_TemplateVariable, Constant> {
     todo!()
+}
+
+fn _terminating_negativity(
+    pts: &PTS,
+    template_variables: &mut _TemplateVariables,
+    location: LocationHandle,
+) -> _Predicate {
+    let mut result = _Predicate::default();
+
+    // location is valid => unwrap()
+    let location_id = pts.locations.get_id(location).unwrap();
+
+    // location is valid => unwrap()
+    for (polyhedron_id, polyhedron) in pts
+        .locations
+        .get_invariant(location)
+        .unwrap()
+        .iter_with_ids()
+    {
+        //upper
+        let template = Relation::new(
+            _generate_template(template_variables, &pts.variables, location_id),
+            RelationSign::LE,
+            _generate_constant_template(template_variables, &_TemplateVariableData::_UpperBound),
+        );
+        result.push(_farkas_assertion(
+            &pts.variables,
+            location_id,
+            polyhedron_id,
+            None,
+            polyhedron,
+            template,
+        ));
+
+        // lower
+        let template = Relation::new(
+            _generate_template(template_variables, &pts.variables, location_id),
+            RelationSign::GE,
+            _generate_constant_template(template_variables, &_TemplateVariableData::_LowerBound),
+        );
+        result.push(_farkas_assertion(
+            &pts.variables,
+            location_id,
+            polyhedron_id,
+            None,
+            polyhedron,
+            template,
+        ));
+    }
+    result
+}
+
+fn _non_terminating_non_negativity(
+    pts: &PTS,
+    template_variables: &mut _TemplateVariables,
+    location: LocationHandle,
+) -> _Predicate {
+    let mut result = _Predicate::default();
+
+    // location is valid => unwrap()
+    let location_id = pts.locations.get_id(location).unwrap();
+
+    // location is valid => unwrap()
+    for (polyhedron_id, polyhedron) in pts
+        .locations
+        .get_invariant(location)
+        .unwrap()
+        .iter_with_ids()
+    {
+        let template = Relation::new(
+            _generate_template(template_variables, &pts.variables, location_id),
+            RelationSign::GE,
+            Default::default(),
+        );
+        result.push(_farkas_assertion(
+            &pts.variables,
+            location_id,
+            polyhedron_id,
+            None,
+            polyhedron,
+            template,
+        ));
+    }
+    result
 }
 
 fn _martingale_difference(
@@ -215,16 +299,16 @@ where
                 _generate_template_expression(template_variables, &_TemplateVariableData::_Eps),
                 None,
             );
-            let mut conditioned_polyhedra = polyhedron.to_owned();
+            let mut conditioned_polyhedron = polyhedron.to_owned();
 
-            conditioned_polyhedra.append(&mut system.to_owned());
+            conditioned_polyhedron.append(&mut system.to_owned());
 
             result.push(_farkas_assertion(
                 &pts.variables,
                 location_id,
                 polyhedron_id,
                 Some(transition_id),
-                &conditioned_polyhedra,
+                &conditioned_polyhedron,
                 Relation::new(lhs, RelationSign::LE, rhs),
             ))
         }
@@ -298,6 +382,19 @@ fn _generate_template(
         _generate_template_expression(template_variables, &_TemplateVariableData::_B(location_id)),
         None,
     );
+    template
+}
+
+fn _generate_constant_template(
+    template_variables: &mut _TemplateVariables,
+    data: &_TemplateVariableData,
+) -> _Template {
+    let mut template = _Template::default();
+    template.add_term(
+        _generate_template_expression(template_variables, data),
+        None,
+    );
+
     template
 }
 

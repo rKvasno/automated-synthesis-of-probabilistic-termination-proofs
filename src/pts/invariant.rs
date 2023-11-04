@@ -43,7 +43,7 @@ macro_rules! invariant {
     };
 }
 
-pub type PolyhedraID = usize; // index into Invariant
+pub type PolyhedronID = usize; // index into Invariant
 
 #[cfg_attr(test, derive(PartialEq))]
 #[derive(Debug, Default)]
