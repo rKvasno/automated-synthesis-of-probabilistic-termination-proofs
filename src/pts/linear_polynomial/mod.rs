@@ -163,6 +163,10 @@ impl<V: Variable, C: Coefficient> Polynomial<V, C> {
             .filter(|(_, coeff): &(&Option<V>, &mut C)| !coeff.is_zero())
     }
 
+    pub fn mul_by_constant(&mut self, c: Constant) {
+        self.iter_mut().for_each(|(_, x)| x.mul_by_constant(c));
+    }
+
     pub fn is_constant(&self) -> bool {
         self.iter().find(|(v, _)| v.is_some()).is_none()
     }

@@ -58,10 +58,16 @@ impl Locations {
 
     // Gets a unique id for a location
     // Ids get invalidated when locations are added
-    pub fn get_id(&self, handle: LocationHandle) -> LocationID {
+    pub fn get_id(&self, handle: LocationHandle) -> Option<LocationID> {
         match handle {
-            Some(i) => i,
-            None => self.len(),
+            None => Some(self.len()),
+            Some(i) => {
+                if self.len() <= i {
+                    None
+                } else {
+                    Some(i)
+                }
+            }
         }
     }
 

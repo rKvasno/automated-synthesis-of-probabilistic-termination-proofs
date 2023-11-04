@@ -43,7 +43,7 @@ macro_rules! invariant {
     };
 }
 
-pub type TransitionID = usize; // index into Guards
+pub type PolyhedraID = usize; // index into Invariant
 
 #[cfg_attr(test, derive(PartialEq))]
 #[derive(Debug, Default)]
