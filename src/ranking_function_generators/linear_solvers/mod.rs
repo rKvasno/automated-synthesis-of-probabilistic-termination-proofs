@@ -3,9 +3,9 @@ pub mod minilp;
 use std::collections::HashMap;
 
 use crate::pts::{
-    linear_polynomial::{coefficient::Constant, State},
-    system::StateSystem,
-    variable::{program_variable::ProgramVariables, Variable},
+    linear_polynomial::{coefficient::Constant, Polynomial},
+    system::System,
+    variable::{set::VariableSet, Variable},
 };
 
 #[macro_export]
@@ -38,9 +38,9 @@ pub trait Solver {
 }
 
 #[derive(Clone, Debug)]
-pub enum Goal {
-    Minimize(ProgramVariables, State),
-    Maximize(ProgramVariables, State),
+pub enum Goal<V: Variable> {
+    Minimize(Polynomial<V, Constant>),
+    Maximize(Polynomial<V, Constant>),
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -58,9 +58,9 @@ pub type DomainMap<V> = HashMap<V, Interval>;
 pub struct Problem<V: Variable> {
     // assumes every variable is in "variables"
     // HashMap has constant next() on its iterator and good insert/update time
-    pub variables: V,
+    pub variables: VariableSet<V>,
     // if None, default to R
     pub domains: DomainMap<V>,
-    pub restrictions: StateSystem,
-    pub goal: Goal,
+    pub restrictions: System<V, Constant>,
+    pub goal: Goal<V>,
 }
