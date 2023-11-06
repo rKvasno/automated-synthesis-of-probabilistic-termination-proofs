@@ -13,3 +13,4 @@ pest_derive = "2.5"
 lazy_static = "1.4.0"
 pest-test = {git = "https://github.com/jdidion/pest-test.git"}
 pest-test-gen = {git = "https://github.com/jdidion/pest-test.git"}
+pretty_assertions = "1.4.0"

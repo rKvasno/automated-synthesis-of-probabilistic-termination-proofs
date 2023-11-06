@@ -215,13 +215,17 @@ mod tests {
         pts::{
             linear_polynomial::State,
             relation::{Relation, RelationSign},
+            variable::program_variable::ProgramVariables,
         },
         state, system, variables,
     };
 
     mod macros {
         use crate::{
-            pts::relation::{Relation, RelationType},
+            pts::{
+                relation::{Relation, RelationType},
+                variable::program_variable::ProgramVariables,
+            },
             state, variables,
         };
 
@@ -276,7 +280,7 @@ mod tests {
         }
         #[test]
         fn relation() {
-            let mut variables = variables!();
+            let mut variables: ProgramVariables = variables!();
             let a = Relation {
                 relation_type: RelationType::StrictInequality,
                 pol: state!(1.0, &mut variables, -4.5, "c", 0.0, "a"),
@@ -288,13 +292,16 @@ mod tests {
 
     mod new {
         use crate::{
-            pts::relation::{Relation, RelationSign},
+            pts::{
+                relation::{Relation, RelationSign},
+                variable::program_variable::ProgramVariables,
+            },
             state, variables,
         };
 
         #[test]
         fn less_than() {
-            let mut variables = variables!();
+            let mut variables: ProgramVariables = variables!();
             let cond = Relation::new(
                 state!(4.0, &mut variables, 5.0, "a", 3.0, "b", 2.0, "c"),
                 RelationSign::LT,
@@ -309,7 +316,7 @@ mod tests {
 
         #[test]
         fn greater_eq() {
-            let mut variables = variables!();
+            let mut variables: ProgramVariables = variables!();
             let cond = Relation::new(
                 state!(1.0, &mut variables, 0.0, "a", 2.0, "b", 2.0, "c"),
                 RelationSign::GE,
@@ -324,7 +331,7 @@ mod tests {
 
         #[test]
         fn equal() {
-            let mut variables = variables!();
+            let mut variables: ProgramVariables = variables!();
             let cond = Relation::new(
                 state!(1.0, &mut variables, 0.0, "a", 2.0, "b", 2.0, "c",),
                 RelationSign::EQ,
@@ -339,7 +346,7 @@ mod tests {
 
         #[test]
         fn not_equal() {
-            let mut variables = variables!();
+            let mut variables: ProgramVariables = variables!();
             let cond = Relation::new(
                 state!(4.0, &mut variables, 5.0, "a", 3.0, "b", 2.0, "c",),
                 RelationSign::NE,
@@ -354,11 +361,11 @@ mod tests {
     }
 
     mod split {
-        use crate::{state, variables};
+        use crate::{pts::variable::program_variable::ProgramVariables, state, variables};
 
         #[test]
         fn constant() {
-            let mut variables = variables!();
+            let mut variables: ProgramVariables = variables!();
             let lhs = relation!("<=", 9.0, &mut variables, -3.0, "x", -5.0, "y", 4.0, "z");
             let (lhs, rhs) = lhs.split_constant();
             assert_eq!(
@@ -432,7 +439,7 @@ mod tests {
 
     #[test]
     fn not() {
-        let mut variables = variables!();
+        let mut variables: ProgramVariables = variables!();
         let mut system = system!(
             Relation::new(
                 state!(4.0, &mut variables, -5.0, "a", 3.0, "b", -2.0, "c",),
@@ -463,7 +470,10 @@ mod tests {
 
     mod label {
         use crate::{
-            pts::relation::{Relation, RelationType},
+            pts::{
+                relation::{Relation, RelationType},
+                variable::program_variable::ProgramVariables,
+            },
             state, variables,
         };
 
@@ -487,7 +497,7 @@ mod tests {
 
         #[test]
         fn neg_const_neg_var() {
-            let mut variables = variables!();
+            let mut variables: ProgramVariables = variables!();
             let ineq = Relation {
                 relation_type: RelationType::StrictInequality,
                 pol: state!(-5.0, &mut variables, -1.0, "test"),
@@ -497,7 +507,7 @@ mod tests {
 
         #[test]
         fn neg_leading_var() {
-            let mut variables = variables!();
+            let mut variables: ProgramVariables = variables!();
             let ineq = Relation {
                 relation_type: RelationType::NonstrictInequality,
                 pol: state!(0.0, &mut variables, -1.0, "a", 0.0, "b", 3.0, "c"),
@@ -507,7 +517,7 @@ mod tests {
 
         #[test]
         fn neg_const_pos_var() {
-            let mut variables = variables!();
+            let mut variables: ProgramVariables = variables!();
             let ineq = Relation {
                 relation_type: RelationType::NonstrictInequality,
                 pol: state!(-1.0, &mut variables, 1.0, "a", 0.0, "b", 0.0, "c",),
@@ -517,7 +527,7 @@ mod tests {
 
         #[test]
         fn pos_var() {
-            let mut variables = variables!();
+            let mut variables: ProgramVariables = variables!();
             let ineq = Relation {
                 relation_type: RelationType::NonstrictInequality,
                 pol: state!(0.0, &mut variables, 1.0, "a", 0.0, "b", 0.0, "c"),

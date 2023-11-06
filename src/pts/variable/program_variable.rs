@@ -1,4 +1,4 @@
-use std::{borrow::Borrow, ops::Deref, rc::Rc};
+use std::{borrow::Borrow, hash::BuildHasher, ops::Deref, rc::Rc};
 
 use super::{set::VariableSet, Variable};
 
@@ -11,8 +11,8 @@ pub struct ProgramVariable {
 
 impl Variable for ProgramVariable {
     type DATA = str;
-    fn new<T: AsRef<Self::DATA> + ?Sized>(
-        variables: &mut crate::pts::variable::set::VariableSet<Self>,
+    fn new<T: AsRef<Self::DATA> + ?Sized, S: BuildHasher + Default>(
+        variables: &mut crate::pts::variable::set::VariableSet<Self, S>,
         data: &T,
     ) -> Self {
         variables.get_or_insert(Self {

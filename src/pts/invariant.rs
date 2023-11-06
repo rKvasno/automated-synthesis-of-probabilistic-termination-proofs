@@ -5,40 +5,34 @@ use super::system::StateSystem;
 #[macro_export]
 macro_rules! invariant {
     [
+        $varset: expr,
         $(
-            $varset: expr,
-            $(
-                [
-                    $(
-                       $sign:literal, $constant:expr $( ,$coeff:expr, $var:expr )*
-                    );*
-                ]
-            ),* $(,)?
-        )?
+            [
+                $(
+                   $sign:literal, $constant:expr $( ,$coeff:expr, $var:expr )*
+                );*
+            ]
+        ),* $(,)?
     ] => {
-
-
         {
-            $(
-                $crate::pts::invariant::Invariant::from(
-                    vec![
-                        $($crate::system![
-                            $(
-                                $crate::relation!
-                                [
-                                    $sign,
-                                    $constant,
-                                    $varset
-                                    $(
-                                        ,$coeff, $var
-                                    )*
+            $crate::pts::invariant::Invariant::from(
+                vec![
+                    $($crate::system![
+                        $(
+                            $crate::relation!
+                            [
+                                $sign,
+                                $constant,
+                                $varset
+                                $(
+                                    ,$coeff, $var
+                                )*
 
-                                ],
-                            ) *
-                        ], )*
-                    ]
-                )
-            )?
+                            ],
+                        ) *
+                    ], )*
+                ]
+            )
         }
     };
 }
@@ -61,12 +55,15 @@ impl Invariant {
         }
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.data.is_empty()
+    }
+
     pub fn iter(&self) -> InvariantIter {
         self.data.iter()
     }
 
     pub fn iter_with_ids(&self) -> InvariantWithIDIterator {
-        // two counters but its a lot simpler like this
         self.iter().enumerate()
     }
 }
@@ -124,13 +121,29 @@ impl std::fmt::Display for Invariant {
     }
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum InvariantError {
+    Empty,
+}
+
+impl std::fmt::Display for InvariantError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            InvariantError::Empty => write!(f, "invariant can't be empty"),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::{pts::invariant::Invariant, relation, system, variables};
+    use crate::{
+        pts::{invariant::Invariant, variable::program_variable::ProgramVariables},
+        relation, system, variables,
+    };
 
     #[test]
     fn invariant() {
-        let mut variables = variables!();
+        let mut variables: ProgramVariables = variables!();
         assert_eq!(
             Invariant {
                 data: vec![system!(

@@ -148,14 +148,17 @@ mod tests {
         },
         pts::{
             linear_polynomial::coefficient::Constant,
-            variable::{program_variable::ProgramVariable, Variable},
+            variable::{
+                program_variable::{ProgramVariable, ProgramVariables},
+                Variable,
+            },
         },
         state, variables,
     };
 
     #[test]
     fn variable_sanity() {
-        let mut variables = variables!();
+        let mut variables: ProgramVariables = variables!();
         let variable = ProgramVariable::new(&mut variables, "abc");
         let input = variable.to_string();
         let var = LinearPolynomialParser::parse_variable(&mut variables, input.as_str());
@@ -211,7 +214,7 @@ mod tests {
 
     #[test]
     fn term_sanity() {
-        let mut variables = variables!();
+        let mut variables: ProgramVariables = variables!();
         let mut parse = PolynomialPestParser::parse(Rule::term, "5a").unwrap();
         assert_eq!(
             LinearPolynomialParser::parse_term(&mut variables, parse.next().unwrap()),
@@ -242,7 +245,7 @@ mod tests {
     fn linear_polynomial_sanity() {
         let mut parse =
             PolynomialPestParser::parse(Rule::linear_polynomial, "- a + 5 -(1/2) * b").unwrap();
-        let mut variables = variables!();
+        let mut variables: ProgramVariables = variables!();
         let pol = LinearPolynomialParser::parse_polynomial(
             &mut variables,
             parse.next().unwrap().as_str(),

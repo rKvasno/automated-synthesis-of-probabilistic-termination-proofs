@@ -1,6 +1,7 @@
 use super::{
     guard::{Guards, GuardsError},
-    invariant::Invariant,
+    invariant::{Invariant, InvariantError},
+    system::StateSystem,
 };
 
 // use of handles across different instances of Locations is undefined
@@ -16,10 +17,19 @@ type IndexToHandleFn = fn(usize) -> LocationHandle;
 pub type LocationID = usize;
 
 #[cfg_attr(test, derive(PartialEq))]
-#[derive(Debug, Default)]
+#[derive(Debug)]
 struct Location {
     invariant: Invariant,
     outgoing: Guards,
+}
+
+impl Default for Location {
+    fn default() -> Self {
+        Self {
+            invariant: vec![StateSystem::default()].into(),
+            outgoing: Default::default(),
+        }
+    }
 }
 
 #[cfg_attr(test, derive(PartialEq))]
@@ -53,7 +63,7 @@ impl Locations {
     }
 
     pub fn is_nonterminating_location(&self, handle: LocationHandle) -> bool {
-        handle.is_none()
+        handle.is_some()
     }
 
     // Gets a unique id for a location
@@ -97,12 +107,21 @@ impl Locations {
         Ok(())
     }
 
-    pub fn set_invariant(&mut self, location: LocationHandle, invariant: Invariant) {
+    pub fn set_invariant(
+        &mut self,
+        location: LocationHandle,
+        invariant: Invariant,
+    ) -> Result<(), InvariantError> {
+        if invariant.is_empty() {
+            return Err(InvariantError::Empty);
+        };
+
         if location.is_none() {
             self.terminating_invariant = invariant;
         } else {
             self.data[location.unwrap()].invariant = invariant;
-        }
+        };
+        Ok(())
     }
 
     pub fn iter(&self) -> LocationIter {

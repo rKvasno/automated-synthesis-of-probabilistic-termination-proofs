@@ -90,6 +90,7 @@ impl From<Transition> for Guards {
         Self::Unguarded(Box::new(value))
     }
 }
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum GuardsError {
     StateTerminatingLocation,
@@ -177,12 +178,15 @@ mod tests {
 
         mod guards {
             use crate::{
-                pts::{guard::Guards, linear_polynomial::coefficient::Constant},
+                pts::{
+                    guard::Guards, linear_polynomial::coefficient::Constant,
+                    variable::program_variable::ProgramVariables,
+                },
                 state_system, transition, variables,
             };
             #[test]
             fn unguarded() {
-                let mut variables = variables!();
+                let mut variables: ProgramVariables = variables!();
                 assert_eq!(
                     guards!(
                         transition!(Some(23), &mut variables; "a", 2.4, 1.3, "a"; "b", 1.0, -1.0, "a")
@@ -195,7 +199,7 @@ mod tests {
 
             #[test]
             fn nondeterministic() {
-                let mut variables = variables!();
+                let mut variables: ProgramVariables = variables!();
                 assert_eq!(
                     guards!(
                         transition!(Some(23), &mut variables; "a", 2.4, 1.3, "a"; "b", 1.0, -1.0, "a"),
@@ -212,7 +216,7 @@ mod tests {
 
             #[test]
             fn logic() {
-                let mut variables = variables!();
+                let mut variables: ProgramVariables = variables!();
                 assert_eq!(
                     guards!(L:
                         state_system!(&mut variables; ">", 0.1, -2.3, "a"),
@@ -247,7 +251,7 @@ mod tests {
 
             #[test]
             fn probabilistic() {
-                let mut variables = variables!();
+                let mut variables: ProgramVariables = variables!();
                 assert_eq!(
                     guards!(P:
                         0.0,
@@ -278,7 +282,10 @@ mod tests {
     mod label {
 
         use crate::{
-            pts::{guard::GuardedTransition, linear_polynomial::coefficient::Constant},
+            pts::{
+                guard::GuardedTransition, linear_polynomial::coefficient::Constant,
+                variable::program_variable::ProgramVariables,
+            },
             relation, state_system, system, transition, variables,
         };
 
@@ -288,7 +295,7 @@ mod tests {
             let guarded_transition = GuardedTransition::Logic(&data);
             assert_eq!(guarded_transition.to_string(), "0 < -1");
 
-            let mut variables = variables!();
+            let mut variables: ProgramVariables = variables!();
 
             let data = (
                 state_system!(&mut variables;
@@ -306,7 +313,7 @@ mod tests {
 
         #[test]
         fn probabilistic() {
-            let mut variables = variables!("a", "b", "c",);
+            let mut variables: ProgramVariables = variables!("a", "b", "c",);
             let data = (
                 Constant(0.0),
                 transition!(None, &mut variables;

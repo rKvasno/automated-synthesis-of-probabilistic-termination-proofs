@@ -68,7 +68,10 @@ $varset
     };
 }
 
-pub type RelationIter<'a, V, C> = std::slice::Iter<'a, Relation<V, C>>;
+pub type RelationIterator<'a, V, C> = std::slice::Iter<'a, Relation<V, C>>;
+pub type RelationID = usize;
+pub type RelationWithIDIterator<'a, V, C> = std::iter::Enumerate<RelationIterator<'a, V, C>>;
+
 pub type StateSystem = System<ProgramVariable, Constant>;
 
 #[cfg_attr(test, derive(PartialEq))]
@@ -98,8 +101,12 @@ impl<V: Variable, C: Coefficient> System<V, C> {
         self.data.get_mut(index)
     }
 
-    pub fn iter(&self) -> RelationIter<V, C> {
+    pub fn iter(&self) -> RelationIterator<V, C> {
         self.data.iter()
+    }
+
+    pub fn iter_with_ids(&self) -> RelationWithIDIterator<V, C> {
+        self.iter().enumerate()
     }
 }
 
@@ -189,11 +196,14 @@ impl<V: Variable, C: Coefficient> Not for System<V, C> {
 mod tests {
 
     mod macros {
-        use crate::{pts::system::StateSystem, relation, variables};
+        use crate::{
+            pts::{system::StateSystem, variable::program_variable::ProgramVariables},
+            relation, variables,
+        };
 
         #[test]
         fn system() {
-            let mut variables = variables!();
+            let mut variables: ProgramVariables = variables!();
 
             let mut system = StateSystem::default();
             system.push(relation!(
@@ -251,7 +261,7 @@ mod tests {
 
         #[test]
         fn system_append() {
-            let mut variables = variables!();
+            let mut variables: ProgramVariables = variables!();
             let a: StateSystem = system!(
                 relation!(
                     ">",
@@ -296,7 +306,7 @@ mod tests {
 
         #[test]
         fn state_system() {
-            let mut variables = variables!();
+            let mut variables: ProgramVariables = variables!();
             assert_eq!(
                 state_system!(
                     &mut variables;
@@ -328,7 +338,10 @@ mod tests {
     }
 
     mod label {
-        use crate::{pts::system::StateSystem, relation, variables};
+        use crate::{
+            pts::{system::StateSystem, variable::program_variable::ProgramVariables},
+            relation, variables,
+        };
 
         #[test]
         fn zeroes() {
@@ -337,7 +350,7 @@ mod tests {
         }
         #[test]
         fn vars() {
-            let mut variables = variables!("a");
+            let mut variables: ProgramVariables = variables!("a");
             let system = state_system!(&mut variables;
                 "<=", 0.0, 1.0, "a";
                 "<=", 0.0, -1.0, "a";
@@ -346,7 +359,7 @@ mod tests {
         }
         #[test]
         fn neg() {
-            let mut variables = variables!("test1", "test2", "test3",);
+            let mut variables: ProgramVariables = variables!("test1", "test2", "test3",);
             let system = state_system!(
                 &mut variables;
                 "<",

@@ -2,7 +2,7 @@ use core::fmt;
 
 use crate::pts::{
     linear_polynomial::{coefficient::Constant, State},
-    variable::program_variable::ProgramVariable,
+    variable::{program_variable::ProgramVariable, Variable},
     PTS,
 };
 
@@ -44,7 +44,8 @@ impl fmt::Display for GeneratorError {
 }
 
 pub trait Generator {
-    fn generate_problem<S: Solver>(&self, pts: &PTS) -> Problem;
+    type VAR: Variable;
+    fn generate_problem<S: Solver>(&self, pts: &PTS) -> Problem<Self::VAR>;
     fn build_ranking_function<Solution: Iterator<Item = (ProgramVariable, Constant)>>(
         &self,
         pts: PTS,

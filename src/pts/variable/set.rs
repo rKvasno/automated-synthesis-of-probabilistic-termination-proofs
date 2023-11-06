@@ -1,4 +1,8 @@
-use std::{borrow::Borrow, collections::HashSet, hash::Hash};
+use std::{
+    borrow::Borrow,
+    collections::{hash_map::RandomState, HashSet},
+    hash::{BuildHasher, Hash},
+};
 
 use super::Variable;
 
@@ -6,7 +10,7 @@ use super::Variable;
 macro_rules! variables{
     [ $( $x:expr ),+ $(,)?] => {
         {
-            let mut tmp = $crate::pts::variable::set::VariableSet::default();
+            let mut tmp = Default::default();
             $(
                 $crate::pts::variable::Variable::new(&mut tmp, $x);
             )+
@@ -20,15 +24,21 @@ macro_rules! variables{
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub struct VariableSet<V: Variable> {
-    data: HashSet<V>,
+#[derive(Debug, Eq, Clone)]
+pub struct VariableSet<V: Variable, S: BuildHasher = RandomState> {
+    data: HashSet<V, S>,
 }
 
-impl<V: Variable> VariableSet<V> {
+impl<V: Variable, S: BuildHasher> PartialEq for VariableSet<V, S> {
+    fn eq(&self, other: &Self) -> bool {
+        self.data == other.data
+    }
+}
+
+impl<V: Variable, S: BuildHasher + Default> VariableSet<V, S> {
     pub fn with_capacity(n: usize) -> Self {
         Self {
-            data: HashSet::with_capacity(n),
+            data: HashSet::with_capacity_and_hasher(n, S::default()),
         }
     }
 
@@ -71,7 +81,7 @@ impl<V: Variable> VariableSet<V> {
     }
 }
 
-impl<V: Variable> Default for VariableSet<V> {
+impl<V: Variable, S: BuildHasher + Default> Default for VariableSet<V, S> {
     fn default() -> Self {
         Self {
             data: HashSet::default(),
@@ -80,19 +90,19 @@ impl<V: Variable> Default for VariableSet<V> {
 }
 
 // Only immut borrow, since we don't want elements removed
-impl<V: Variable> Borrow<HashSet<V>> for VariableSet<V> {
-    fn borrow(&self) -> &HashSet<V> {
+impl<V: Variable, S: BuildHasher + Default> Borrow<HashSet<V, S>> for VariableSet<V, S> {
+    fn borrow(&self) -> &HashSet<V, S> {
         &self.data
     }
 }
 
-impl<V: Variable> From<HashSet<V>> for VariableSet<V> {
-    fn from(value: HashSet<V>) -> Self {
+impl<V: Variable, S: BuildHasher + Default> From<HashSet<V, S>> for VariableSet<V, S> {
+    fn from(value: HashSet<V, S>) -> Self {
         Self { data: value }
     }
 }
 
-impl<V: Variable> FromIterator<V> for VariableSet<V> {
+impl<V: Variable, S: BuildHasher + Default> FromIterator<V> for VariableSet<V, S> {
     fn from_iter<T: IntoIterator<Item = V>>(iter: T) -> Self {
         Self {
             data: HashSet::from_iter(iter.into_iter().map(Into::into)),
@@ -100,7 +110,7 @@ impl<V: Variable> FromIterator<V> for VariableSet<V> {
     }
 }
 
-impl<V: Variable> IntoIterator for VariableSet<V> {
+impl<V: Variable, S: BuildHasher> IntoIterator for VariableSet<V, S> {
     type Item = V;
     type IntoIter = std::collections::hash_set::IntoIter<Self::Item>;
     fn into_iter(self) -> Self::IntoIter {
@@ -108,7 +118,7 @@ impl<V: Variable> IntoIterator for VariableSet<V> {
     }
 }
 
-impl<'a, V: Variable> IntoIterator for &'a VariableSet<V> {
+impl<'a, V: Variable, S: BuildHasher> IntoIterator for &'a VariableSet<V, S> {
     type Item = &'a V;
     type IntoIter = std::collections::hash_set::Iter<'a, V>;
     fn into_iter(self) -> Self::IntoIter {
@@ -134,7 +144,7 @@ mod tests {
 
             #[test]
             fn non_empty() {
-                let mut variables = ProgramVariables::default();
+                let mut variables: ProgramVariables = ProgramVariables::default();
                 ProgramVariable::new(&mut variables, "test");
                 ProgramVariable::new(&mut variables, "apple");
                 ProgramVariable::new(&mut variables, "testington");
@@ -142,10 +152,10 @@ mod tests {
                 ProgramVariable::new(&mut variables, "testington");
                 assert_eq!(variables, variables!("test", "apple", "testington"));
 
-                let mut variables = HashSet::<ProgramVariable>::default();
-                variables.insert(Rc::<str>::from("testington").into());
-                variables.insert(Rc::<str>::from("test").into());
-                variables.insert(Rc::<str>::from("apple").into());
+                let mut variables: ProgramVariables = HashSet::<ProgramVariable>::default().into();
+                variables.insert(Rc::<str>::from("testington"));
+                variables.insert(Rc::<str>::from("test"));
+                variables.insert(Rc::<str>::from("apple"));
                 assert_eq!(
                     &variables,
                     variables!("test", "apple", "testington").borrow()
@@ -162,7 +172,7 @@ mod tests {
 
     #[test]
     fn insert() {
-        let mut variables = ProgramVariables::default();
+        let mut variables: ProgramVariables = ProgramVariables::default();
         assert_eq!(variables, variables!());
         assert!(variables.insert(Rc::<str>::from("testington")));
         assert_eq!(variables, variables!("testington"));
@@ -216,7 +226,7 @@ mod tests {
 
     #[test]
     fn get_or_insert() {
-        let mut variables = ProgramVariables::default();
+        let mut variables: ProgramVariables = ProgramVariables::default();
         assert_eq!(variables, variables!());
         assert_eq!(
             variables.get_or_insert(Rc::<str>::from("testington")),

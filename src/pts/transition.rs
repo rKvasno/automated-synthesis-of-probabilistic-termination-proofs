@@ -174,11 +174,11 @@ mod tests {
     }
 
     mod assignment {
-        use crate::{state, variables};
+        use crate::{pts::variable::program_variable::ProgramVariables, state, variables};
 
         #[test]
         fn apply() {
-            let mut variables = variables!();
+            let mut variables: ProgramVariables = variables!();
             assert_eq!(
                 assignment!(
                     &mut variables,
@@ -210,11 +210,14 @@ mod tests {
         }
 
         mod transition {
-            use crate::{pts::transition::Transition, variables};
+            use crate::{
+                pts::{transition::Transition, variable::program_variable::ProgramVariables},
+                variables,
+            };
 
             #[test]
             fn some() {
-                let mut variables = variables!();
+                let mut variables: ProgramVariables = variables!();
                 assert_eq!(
                     Transition {
                         target: Some(1234),
@@ -229,7 +232,7 @@ mod tests {
 
             #[test]
             fn none() {
-                let mut variables = variables!();
+                let mut variables: ProgramVariables = variables!();
                 assert_eq!(
                     Transition {
                         target: None,
