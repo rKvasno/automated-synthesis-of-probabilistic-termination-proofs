@@ -75,6 +75,12 @@ impl From<f64> for Constant {
     }
 }
 
+impl Into<f64> for Constant {
+    fn into(self) -> f64 {
+        self.0
+    }
+}
+
 impl Neg for Constant {
     type Output = Self;
 

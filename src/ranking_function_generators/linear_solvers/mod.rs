@@ -1,6 +1,6 @@
 pub mod minilp;
 
-use std::collections::HashMap;
+use std::{collections::HashMap, error::Error};
 
 use crate::pts::{
     linear_polynomial::{coefficient::Constant, Polynomial},
@@ -31,10 +31,29 @@ macro_rules! domains {
     }
 }
 
-pub trait Solver {
-    fn solve<V: Variable, Solution: Iterator<Item = (V, Constant)>>(
-        problem: Problem<V>,
-    ) -> Option<Solution>;
+pub trait Solver<V: Variable> {
+    type Error: Error;
+    type Solution: IntoIterator<Item = (V, Constant)>;
+    fn solve(problem: Problem<V>) -> Result<Self::Solution, SolverError<Self::Error>>;
+}
+
+#[derive(Debug)]
+pub enum SolverError<E: Error> {
+    InvalidRelationType,
+    ForeignVariable,
+    Other(E),
+}
+
+impl<E: Error> std::fmt::Display for SolverError<E> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::InvalidRelationType => {
+                write!(f, "only equations and nonstrict inequalities are allowed")
+            }
+            Self::ForeignVariable => write!(f, "variable not in variable set"),
+            Self::Other(e) => write!(f, "solver failed with: {}", e),
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -49,6 +68,12 @@ pub struct Interval(pub f64, pub f64);
 impl Default for Interval {
     fn default() -> Self {
         Self(f64::NEG_INFINITY, f64::INFINITY)
+    }
+}
+
+impl Into<(f64, f64)> for Interval {
+    fn into(self) -> (f64, f64) {
+        (self.0, self.1)
     }
 }
 

@@ -8,6 +8,7 @@ dot = "0.1.4"
 indexmap = "2.0.2"
 pest = "2.5"
 pest_derive = "2.5"
+minilp = "0.2.2"
 
 [dev-dependencies]
 lazy_static = "1.4.0"

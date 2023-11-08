@@ -545,7 +545,7 @@ pub struct FarkasBasedGenerator;
 
 impl Generator for FarkasBasedGenerator {
     type VAR = TemplateVariable;
-    fn generate_problem<S: super::linear_solvers::Solver>(
+    fn generate_problem<S: super::linear_solvers::Solver<Self::VAR>>(
         &self,
         pts: &crate::pts::PTS,
     ) -> super::linear_solvers::Problem<TemplateVariable> {
