@@ -40,7 +40,7 @@ macro_rules! invariant {
 pub type PolyhedronID = usize; // index into Invariant
 
 #[cfg_attr(test, derive(PartialEq))]
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct Invariant {
     data: Vec<StateSystem>,
 }

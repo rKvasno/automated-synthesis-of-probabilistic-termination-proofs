@@ -9,14 +9,17 @@ use crate::{
             coefficient::{Coefficient, Constant},
             Polynomial,
         },
-        location::{LocationHandle, LocationID},
+        location::LocationHandle,
         relation::{Relation, RelationSign},
         system::{RelationID, StateSystem, System},
         transition::Transition,
         variable::{program_variable::ProgramVariable, set::VariableSet, Variable},
         PTS,
     },
-    ranking_function_generators::linear_solvers::{Interval, Problem},
+    ranking_function_generators::{
+        linear_solvers::{Interval, Problem},
+        GeneratorError,
+    },
     system, variables,
 };
 
@@ -57,8 +60,8 @@ $varset
 }
 
 use super::{
-    linear_solvers::{DomainMap, Goal},
-    Generator,
+    linear_solvers::{DomainMap, Goal, Solution},
+    Generator, RankedPTS, RankingFunction,
 };
 pub type TemplateDomains = DomainMap<TemplateVariable>;
 
@@ -69,9 +72,14 @@ pub enum TemplateVariableData {
     Eps,
     UpperBound,
     LowerBound,
-    RankingCoefficient(LocationID, ProgramVariable),
-    RankingConstant(LocationID),
-    FarkasVariable(LocationID, PolyhedronID, RelationID, Option<TransitionID>),
+    RankingCoefficient(LocationHandle, ProgramVariable),
+    RankingConstant(LocationHandle),
+    FarkasVariable(
+        LocationHandle,
+        PolyhedronID,
+        RelationID,
+        Option<TransitionID>,
+    ),
 }
 
 impl AsRef<TemplateVariableData> for TemplateVariableData {
@@ -121,7 +129,7 @@ type Predicate = System<TemplateVariable, Constant>;
 fn farkas_assertion<S: BuildHasher + Default>(
     program_variables: &VariableSet<ProgramVariable, S>,
     template_variables: &mut TemplateVariables,
-    location_id: LocationID,
+    location: LocationHandle,
     polyhedron_id: PolyhedronID,
     transition_id: Option<TransitionID>,
     polyhedron: &StateSystem,
@@ -141,7 +149,7 @@ fn farkas_assertion<S: BuildHasher + Default>(
         let y = TemplateVariable::new(
             template_variables,
             &TemplateVariableData::FarkasVariable(
-                location_id,
+                location,
                 polyhedron_id,
                 halfspace_id,
                 transition_id,
@@ -198,21 +206,20 @@ fn terminating_negativity<S: BuildHasher + Default>(
 ) {
     let invariant = pts.locations.get_invariant(None).unwrap();
     assert!(!invariant.is_empty());
-    // location is valid => unwrap()
-    let location_id = pts.locations.get_id(None).unwrap();
+    let location = pts.locations.get_terminating_location();
 
     // location is valid => unwrap()
     for (polyhedron_id, polyhedron) in invariant.iter_with_ids() {
         //upper
         let template = Relation::new(
-            generate_template(template_variables, &pts.variables, location_id),
+            generate_template(template_variables, &pts.variables, location),
             RelationSign::LE,
             generate_constant_template(template_variables, &TemplateVariableData::UpperBound),
         );
         farkas_assertion(
             &pts.variables,
             template_variables,
-            location_id,
+            location,
             polyhedron_id,
             None,
             polyhedron,
@@ -223,14 +230,14 @@ fn terminating_negativity<S: BuildHasher + Default>(
 
         // lower
         let template = Relation::new(
-            generate_template(template_variables, &pts.variables, location_id),
+            generate_template(template_variables, &pts.variables, location),
             RelationSign::GE,
             generate_constant_template(template_variables, &TemplateVariableData::LowerBound),
         );
         farkas_assertion(
             &pts.variables,
             template_variables,
-            location_id,
+            location,
             polyhedron_id,
             None,
             polyhedron,
@@ -252,20 +259,18 @@ fn non_terminating_non_negativity<S: BuildHasher + Default>(
     assert!(!invariant.is_empty());
 
     assert!(pts.locations.is_nonterminating_location(location));
-    // location is valid => unwrap()
-    let location_id = pts.locations.get_id(location).unwrap();
 
     // location is valid => unwrap()
     for (polyhedron_id, polyhedron) in invariant.iter_with_ids() {
         let template = Relation::new(
-            generate_template(template_variables, &pts.variables, location_id),
+            generate_template(template_variables, &pts.variables, location),
             RelationSign::GE,
             Default::default(),
         );
         farkas_assertion(
             &pts.variables,
             template_variables,
-            location_id,
+            location,
             polyhedron_id,
             None,
             polyhedron,
@@ -290,8 +295,7 @@ fn martingale_difference<S: BuildHasher + Default>(
         Guards::Logic(transitions) => logic_martingale_difference(
             pts,
             template_variables,
-            // handle is valid => unwrap
-            pts.locations.get_id(location).unwrap(),
+            location,
             // handle is valid => unwrap
             pts.locations.get_invariant(location).unwrap(),
             transitions.iter().enumerate(),
@@ -301,8 +305,7 @@ fn martingale_difference<S: BuildHasher + Default>(
         Guards::Unguarded(boxed_transition) => nondeterministic_martingale_difference(
             pts,
             template_variables,
-            // handle is valid => unwrap
-            pts.locations.get_id(location).unwrap(),
+            location,
             // handle is valid => unwrap
             pts.locations.get_invariant(location).unwrap(),
             std::iter::once(&(**boxed_transition)).enumerate(),
@@ -312,8 +315,7 @@ fn martingale_difference<S: BuildHasher + Default>(
         Guards::Probabilistic(transitions) => probabilistic_martingale_difference(
             pts,
             template_variables,
-            // handle is valid => unwrap
-            pts.locations.get_id(location).unwrap(),
+            location,
             // handle is valid => unwrap
             pts.locations.get_invariant(location).unwrap(),
             transitions.iter().enumerate(),
@@ -323,8 +325,7 @@ fn martingale_difference<S: BuildHasher + Default>(
         Guards::Nondeterministic(transitions) => nondeterministic_martingale_difference(
             pts,
             template_variables,
-            // handle is valid => unwrap
-            pts.locations.get_id(location).unwrap(),
+            location,
             // handle is valid => unwrap
             pts.locations.get_invariant(location).unwrap(),
             transitions.iter().enumerate(),
@@ -337,7 +338,7 @@ fn martingale_difference<S: BuildHasher + Default>(
 fn probabilistic_martingale_difference<'a, I, S: BuildHasher + Default>(
     pts: &PTS<S>,
     template_variables: &mut TemplateVariables,
-    location_id: LocationID,
+    location: LocationHandle,
     invariant: &Invariant,
     branches: I,
     domains: &mut TemplateDomains,
@@ -353,7 +354,7 @@ fn probabilistic_martingale_difference<'a, I, S: BuildHasher + Default>(
                 template_variables,
                 &pts.variables,
                 // handl is valid => unwrap
-                pts.locations.get_id(transition.target).unwrap(),
+                transition.target,
             );
 
             for assignment in transition.assignments.iter() {
@@ -364,7 +365,7 @@ fn probabilistic_martingale_difference<'a, I, S: BuildHasher + Default>(
             lhs += template;
         }
 
-        let rhs = generate_template(template_variables, &pts.variables, location_id);
+        let rhs = generate_template(template_variables, &pts.variables, location);
         lhs.add_term(
             generate_template_expression(template_variables, &TemplateVariableData::Eps),
             None,
@@ -373,7 +374,7 @@ fn probabilistic_martingale_difference<'a, I, S: BuildHasher + Default>(
         farkas_assertion(
             &pts.variables,
             template_variables,
-            location_id,
+            location,
             polyhedron_id,
             None,
             polyhedron,
@@ -387,7 +388,7 @@ fn probabilistic_martingale_difference<'a, I, S: BuildHasher + Default>(
 fn logic_martingale_difference<'a, I, S: BuildHasher + Default>(
     pts: &PTS<S>,
     template_variables: &mut TemplateVariables,
-    location_id: LocationID,
+    location: LocationHandle,
     invariant: &Invariant,
     branches: I,
     domains: &mut TemplateDomains,
@@ -403,7 +404,7 @@ fn logic_martingale_difference<'a, I, S: BuildHasher + Default>(
                 template_variables,
                 &pts.variables,
                 // handl is valid => unwrap
-                pts.locations.get_id(transition.target).unwrap(),
+                transition.target,
             );
 
             for assignment in transition.assignments.iter() {
@@ -412,7 +413,7 @@ fn logic_martingale_difference<'a, I, S: BuildHasher + Default>(
 
             lhs += template;
 
-            let rhs = generate_template(template_variables, &pts.variables, location_id);
+            let rhs = generate_template(template_variables, &pts.variables, location);
             lhs.add_term(
                 generate_template_expression(template_variables, &TemplateVariableData::Eps),
                 None,
@@ -424,7 +425,7 @@ fn logic_martingale_difference<'a, I, S: BuildHasher + Default>(
             farkas_assertion(
                 &pts.variables,
                 template_variables,
-                location_id,
+                location,
                 polyhedron_id,
                 Some(transition_id),
                 &conditioned_polyhedron,
@@ -439,7 +440,7 @@ fn logic_martingale_difference<'a, I, S: BuildHasher + Default>(
 fn nondeterministic_martingale_difference<'a, I, S: BuildHasher + Default>(
     pts: &PTS<S>,
     template_variables: &mut TemplateVariables,
-    location_id: LocationID,
+    location: LocationHandle,
     invariant: &Invariant,
     branches: I,
     domains: &mut TemplateDomains,
@@ -455,7 +456,7 @@ fn nondeterministic_martingale_difference<'a, I, S: BuildHasher + Default>(
                 template_variables,
                 &pts.variables,
                 // handle is valid => unwrap
-                pts.locations.get_id(transition.target).unwrap(),
+                transition.target,
             );
 
             for assignment in transition.assignments.iter() {
@@ -464,7 +465,7 @@ fn nondeterministic_martingale_difference<'a, I, S: BuildHasher + Default>(
 
             lhs += template;
 
-            let rhs = generate_template(template_variables, &pts.variables, location_id);
+            let rhs = generate_template(template_variables, &pts.variables, location);
             lhs.add_term(
                 generate_template_expression(template_variables, &TemplateVariableData::Eps),
                 None,
@@ -473,7 +474,7 @@ fn nondeterministic_martingale_difference<'a, I, S: BuildHasher + Default>(
             farkas_assertion(
                 &pts.variables,
                 template_variables,
-                location_id,
+                location,
                 polyhedron_id,
                 Some(transition_id),
                 polyhedron,
@@ -488,14 +489,14 @@ fn nondeterministic_martingale_difference<'a, I, S: BuildHasher + Default>(
 fn generate_template<S: BuildHasher + Default>(
     template_variables: &mut TemplateVariables,
     program_variables: &VariableSet<ProgramVariable, S>,
-    location_id: LocationID,
+    location: LocationHandle,
 ) -> Template {
     let mut template = Template::default();
     for var in program_variables.into_iter() {
         template.add_term(
             generate_template_expression(
                 template_variables,
-                &TemplateVariableData::RankingCoefficient(location_id, var.to_owned()),
+                &TemplateVariableData::RankingCoefficient(location, var.to_owned()),
             ),
             var.to_owned(),
         );
@@ -504,7 +505,7 @@ fn generate_template<S: BuildHasher + Default>(
     template.add_term(
         generate_template_expression(
             template_variables,
-            &TemplateVariableData::RankingConstant(location_id),
+            &TemplateVariableData::RankingConstant(location),
         ),
         None,
     );
@@ -546,7 +547,6 @@ pub struct FarkasBasedGenerator;
 impl Generator for FarkasBasedGenerator {
     type VAR = TemplateVariable;
     fn generate_problem<S: super::linear_solvers::Solver<Self::VAR>>(
-        &self,
         pts: &crate::pts::PTS,
     ) -> super::linear_solvers::Problem<TemplateVariable> {
         let mut template_variables = variables!();
@@ -606,30 +606,164 @@ impl Generator for FarkasBasedGenerator {
         }
     }
 
-    fn build_ranking_function<Solution: Iterator<Item = (ProgramVariable, Constant)>>(
-        &self,
-        _pts: crate::pts::PTS,
-        _solution: Solution,
+    fn build_ranking_function<S: Solution<Self::VAR>>(
+        pts: crate::pts::PTS,
+        solution: S,
     ) -> Result<super::RankedPTS, super::GeneratorError> {
-        todo!()
+        let mut rf = RankingFunction::new(&pts);
+        let mut found_solution = false;
+        for (variable, value) in solution {
+            match variable.as_ref() {
+                TemplateVariableData::Eps => {
+                    found_solution = value.is_nonnegative() && !value.is_zero();
+                }
+                TemplateVariableData::RankingConstant(location) => {
+                    rf.get_mut(location.clone()).unwrap().add_term(value, None)
+                }
+
+                TemplateVariableData::RankingCoefficient(location, var) => rf
+                    .get_mut(location.clone())
+                    .unwrap()
+                    .add_term(value, Some(var.clone())),
+                _ => (),
+            }
+        }
+        if !found_solution {
+            Err(GeneratorError::EpsIsZero)
+        } else {
+            Ok(RankedPTS { pts, function: rf })
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::{collections::hash_map::DefaultHasher, hash::BuildHasherDefault};
+    use std::{
+        collections::hash_map::{DefaultHasher, RandomState},
+        hash::BuildHasherDefault,
+    };
 
     use crate::{
-        domains, invariant,
+        domains, guards, invariant,
         pts::{
-            variable::{program_variable::ProgramVariable, Variable},
+            linear_polynomial::coefficient::Constant,
+            variable::{program_variable::ProgramVariable, set::VariableSet, Variable},
             PTS,
         },
-        ranking_function_generators::farkas_based::{
-            non_terminating_non_negativity, TemplateVariableData,
+        ranking_function_generators::{
+            farkas_based::{non_terminating_non_negativity, TemplateVariableData},
+            linear_solvers::Solution,
+            Generator, RankedPTS, RankingFunction,
         },
-        variables,
+        transition, variables,
     };
+
+    use super::{FarkasBasedGenerator, TemplateVariable};
+
+    impl Solution<TemplateVariable> for Vec<(TemplateVariable, Constant)> {}
+
+    #[test]
+    fn build_ranking_function() {
+        let mut template_variables: VariableSet<TemplateVariable, RandomState> = Default::default();
+        let mut pts = PTS::default();
+        let start_location = pts.locations.new_location();
+        let intermediate_location = pts.locations.new_location();
+        pts.locations
+            .set_invariant(
+                start_location,
+                invariant!(&mut pts.variables, ["<=", 5.0, -2.0, "a"], []),
+            )
+            .unwrap();
+        pts.locations
+            .set_outgoing(
+                start_location,
+                guards!(P:
+                        0.25,
+                        transition!(intermediate_location, &mut pts.variables; "a", 3.0, 7.0, "a"),
+                        0.75,
+                        transition!(None)
+                ),
+            )
+            .unwrap();
+        let var = ProgramVariable::new(&mut pts.variables, "a");
+        let solution = vec![
+            (
+                TemplateVariable::new(
+                    &mut template_variables,
+                    &TemplateVariableData::RankingConstant(Some(0)),
+                ),
+                Constant(1.0),
+            ),
+            (
+                TemplateVariable::new(
+                    &mut template_variables,
+                    &TemplateVariableData::RankingConstant(None),
+                ),
+                Constant(2.0),
+            ),
+            (
+                TemplateVariable::new(
+                    &mut template_variables,
+                    &TemplateVariableData::FarkasVariable(Some(0), 0, 0, None),
+                ),
+                Constant(3.0),
+            ),
+            (
+                TemplateVariable::new(
+                    &mut template_variables,
+                    &TemplateVariableData::RankingCoefficient(None, var.clone()),
+                ),
+                Constant(4.0),
+            ),
+            (
+                TemplateVariable::new(
+                    &mut template_variables,
+                    &TemplateVariableData::RankingCoefficient(Some(0), var.clone()),
+                ),
+                Constant(5.0),
+            ),
+            (
+                TemplateVariable::new(&mut template_variables, &TemplateVariableData::Eps),
+                Constant(6.0),
+            ),
+            (
+                TemplateVariable::new(
+                    &mut template_variables,
+                    &TemplateVariableData::RankingConstant(Some(1)),
+                ),
+                Constant(7.0),
+            ),
+            (
+                TemplateVariable::new(
+                    &mut template_variables,
+                    &TemplateVariableData::RankingCoefficient(Some(1), var.clone()),
+                ),
+                Constant(8.0),
+            ),
+        ];
+
+        let mut function = RankingFunction::new(&pts);
+
+        function.get_mut(Some(0)).unwrap().add_term(1.0, None);
+        function.get_mut(None).unwrap().add_term(2.0, None);
+        function
+            .get_mut(None)
+            .unwrap()
+            .add_term(4.0, Some(var.clone()));
+        function
+            .get_mut(Some(0))
+            .unwrap()
+            .add_term(5.0, var.clone());
+        function.get_mut(Some(1)).unwrap().add_term(7.0, None);
+        function
+            .get_mut(Some(1))
+            .unwrap()
+            .add_term(8.0, var.clone());
+        assert_eq!(
+            FarkasBasedGenerator::build_ranking_function(pts.clone(), solution).unwrap(),
+            RankedPTS { pts, function }
+        );
+    }
 
     #[test]
     fn terminating_negativity() {
@@ -653,11 +787,11 @@ mod tests {
             template_variables,
             variables!(
                 &TemplateVariableData::RankingCoefficient(
-                    0,
+                    None,
                     ProgramVariable::new(&mut pts.variables, "a")
                 ),
-                &TemplateVariableData::FarkasVariable(0, 0, 0, None),
-                &TemplateVariableData::RankingConstant(0),
+                &TemplateVariableData::FarkasVariable(None, 0, 0, None),
+                &TemplateVariableData::RankingConstant(None),
                 &TemplateVariableData::UpperBound,
                 &TemplateVariableData::LowerBound,
             )
@@ -667,7 +801,7 @@ mod tests {
             domains,
             domains!(
                 &mut template_variables,
-                &TemplateVariableData::FarkasVariable(0, 0, 0, None),
+                &TemplateVariableData::FarkasVariable(None, 0, 0, None),
                 0.0,
                 f64::INFINITY
             )
@@ -679,32 +813,32 @@ mod tests {
                 "==",
                 0.0,
                 -1.0,
-                &TemplateVariableData::RankingCoefficient(0, ProgramVariable::new(&mut pts.variables, "a")),
+                &TemplateVariableData::RankingCoefficient(None, ProgramVariable::new(&mut pts.variables, "a")),
                 -2.0,
-                &TemplateVariableData::FarkasVariable(0, 0, 0, None);
+                &TemplateVariableData::FarkasVariable(None, 0, 0, None);
 
                 "<=",
                 0.0,
                 -5.0,
-                &TemplateVariableData::FarkasVariable(0, 0, 0, None),
+                &TemplateVariableData::FarkasVariable(None, 0, 0, None),
                 1.0,
-                &TemplateVariableData::RankingConstant(0),
+                &TemplateVariableData::RankingConstant(None),
                 -1.0,
                 &TemplateVariableData::UpperBound;
 
                 "==",
                 0.0,
                 1.0,
-                &TemplateVariableData::RankingCoefficient(0, ProgramVariable::new(&mut pts.variables, "a")),
+                &TemplateVariableData::RankingCoefficient(None, ProgramVariable::new(&mut pts.variables, "a")),
                 -2.0,
-                &TemplateVariableData::FarkasVariable(0, 0, 0, None);
+                &TemplateVariableData::FarkasVariable(None, 0, 0, None);
 
                 "<=",
                 0.0,
                 -5.0,
-                &TemplateVariableData::FarkasVariable(0, 0, 0, None),
+                &TemplateVariableData::FarkasVariable(None, 0, 0, None),
                 -1.0,
-                &TemplateVariableData::RankingConstant(0),
+                &TemplateVariableData::RankingConstant(None),
                 1.0,
                 &TemplateVariableData::LowerBound;
 
@@ -712,24 +846,24 @@ mod tests {
                 "==",
                 0.0,
                 -1.0,
-                &TemplateVariableData::RankingCoefficient(0, ProgramVariable::new(&mut pts.variables, "a"));
+                &TemplateVariableData::RankingCoefficient(None, ProgramVariable::new(&mut pts.variables, "a"));
 
                 "<=",
                 0.0,
                 1.0,
-                &TemplateVariableData::RankingConstant(0),
+                &TemplateVariableData::RankingConstant(None),
                 -1.0,
                 &TemplateVariableData::UpperBound;
 
                 "==",
                 0.0,
                 1.0,
-                &TemplateVariableData::RankingCoefficient(0, ProgramVariable::new(&mut pts.variables, "a"));
+                &TemplateVariableData::RankingCoefficient(None, ProgramVariable::new(&mut pts.variables, "a"));
 
                 "<=",
                 0.0,
                 -1.0,
-                &TemplateVariableData::RankingConstant(0),
+                &TemplateVariableData::RankingConstant(None),
                 1.0,
                 &TemplateVariableData::LowerBound;
             )
@@ -760,11 +894,11 @@ mod tests {
             template_variables,
             variables!(
                 &TemplateVariableData::RankingCoefficient(
-                    0,
+                    Some(0),
                     ProgramVariable::new(&mut pts.variables, "a")
                 ),
-                &TemplateVariableData::FarkasVariable(0, 0, 0, None),
-                &TemplateVariableData::RankingConstant(0),
+                &TemplateVariableData::FarkasVariable(Some(0), 0, 0, None),
+                &TemplateVariableData::RankingConstant(Some(0)),
             )
         );
 
@@ -772,7 +906,7 @@ mod tests {
             domains,
             domains!(
                 &mut template_variables,
-                &TemplateVariableData::FarkasVariable(0, 0, 0, None),
+                &TemplateVariableData::FarkasVariable(Some(0), 0, 0, None),
                 0.0,
                 f64::INFINITY
             )
@@ -784,27 +918,27 @@ mod tests {
                 "==",
                 0.0,
                 1.0,
-                &TemplateVariableData::RankingCoefficient(0, ProgramVariable::new(&mut pts.variables, "a")),
+                &TemplateVariableData::RankingCoefficient(Some(0), ProgramVariable::new(&mut pts.variables, "a")),
                 -2.0,
-                &TemplateVariableData::FarkasVariable(0, 0, 0, None);
+                &TemplateVariableData::FarkasVariable(Some(0), 0, 0, None);
 
                 "<=",
                 0.0,
                 -5.0,
-                &TemplateVariableData::FarkasVariable(0, 0, 0, None),
+                &TemplateVariableData::FarkasVariable(Some(0), 0, 0, None),
                 -1.0,
-                &TemplateVariableData::RankingConstant(0);
+                &TemplateVariableData::RankingConstant(Some(0));
 
 
                 "==",
                 0.0,
                 1.0,
-                &TemplateVariableData::RankingCoefficient(0, ProgramVariable::new(&mut pts.variables, "a"));
+                &TemplateVariableData::RankingCoefficient(Some(0), ProgramVariable::new(&mut pts.variables, "a"));
 
                 "<=",
                 0.0,
                 -1.0,
-                &TemplateVariableData::RankingConstant(0);
+                &TemplateVariableData::RankingConstant(Some(0));
 
             )
         );
@@ -861,21 +995,21 @@ mod tests {
                 template_variables,
                 variables!(
                     &TemplateVariableData::RankingCoefficient(
-                        0,
+                        Some(0),
                         ProgramVariable::new(&mut pts.variables, "a")
                     ),
                     &TemplateVariableData::RankingCoefficient(
-                        1,
+                        Some(1),
                         ProgramVariable::new(&mut pts.variables, "a")
                     ),
                     &TemplateVariableData::RankingCoefficient(
-                        2,
+                        None,
                         ProgramVariable::new(&mut pts.variables, "a")
                     ),
-                    &TemplateVariableData::FarkasVariable(0, 0, 0, None),
-                    &TemplateVariableData::RankingConstant(0),
-                    &TemplateVariableData::RankingConstant(1),
-                    &TemplateVariableData::RankingConstant(2),
+                    &TemplateVariableData::FarkasVariable(Some(0), 0, 0, None),
+                    &TemplateVariableData::RankingConstant(Some(0)),
+                    &TemplateVariableData::RankingConstant(Some(1)),
+                    &TemplateVariableData::RankingConstant(None),
                     &TemplateVariableData::Eps,
                 )
             );
@@ -884,7 +1018,7 @@ mod tests {
                 domains,
                 domains!(
                     &mut template_variables,
-                    &TemplateVariableData::FarkasVariable(0, 0, 0, None),
+                    &TemplateVariableData::FarkasVariable(Some(0), 0, 0, None),
                     0.0,
                     f64::INFINITY
                 )
@@ -896,48 +1030,48 @@ mod tests {
                     "==",
                     0.0,
                     1.0,
-                    &TemplateVariableData::RankingCoefficient(0, ProgramVariable::new(&mut pts.variables, "a")),
+                    &TemplateVariableData::RankingCoefficient(Some(0), ProgramVariable::new(&mut pts.variables, "a")),
                     -1.75,
-                    &TemplateVariableData::RankingCoefficient(1, ProgramVariable::new(&mut pts.variables, "a")),
+                    &TemplateVariableData::RankingCoefficient(Some(1), ProgramVariable::new(&mut pts.variables, "a")),
                     -0.75,
-                    &TemplateVariableData::RankingCoefficient(2, ProgramVariable::new(&mut pts.variables, "a")),
+                    &TemplateVariableData::RankingCoefficient(None, ProgramVariable::new(&mut pts.variables, "a")),
                     -2.0,
-                    &TemplateVariableData::FarkasVariable(0, 0, 0, None);
+                    &TemplateVariableData::FarkasVariable(Some(0), 0, 0, None);
 
                     "<=",
                     0.0,
                     0.75,
-                    &TemplateVariableData::RankingCoefficient(1, ProgramVariable::new(&mut pts.variables, "a")),
+                    &TemplateVariableData::RankingCoefficient(Some(1), ProgramVariable::new(&mut pts.variables, "a")),
                     -5.0,
-                    &TemplateVariableData::FarkasVariable(0, 0, 0, None),
+                    &TemplateVariableData::FarkasVariable(Some(0), 0, 0, None),
                     -1.0,
-                    &TemplateVariableData::RankingConstant(0),
+                    &TemplateVariableData::RankingConstant(Some(0)),
                     0.25,
-                    &TemplateVariableData::RankingConstant(1),
+                    &TemplateVariableData::RankingConstant(Some(1)),
                     0.75,
-                    &TemplateVariableData::RankingConstant(2),
+                    &TemplateVariableData::RankingConstant(None),
                     1.0,
                     &TemplateVariableData::Eps;
 
                     "==",
                     0.0,
                     1.0,
-                    &TemplateVariableData::RankingCoefficient(0, ProgramVariable::new(&mut pts.variables, "a")),
+                    &TemplateVariableData::RankingCoefficient(Some(0), ProgramVariable::new(&mut pts.variables, "a")),
                     -1.75,
-                    &TemplateVariableData::RankingCoefficient(1, ProgramVariable::new(&mut pts.variables, "a")),
+                    &TemplateVariableData::RankingCoefficient(Some(1), ProgramVariable::new(&mut pts.variables, "a")),
                     -0.75,
-                    &TemplateVariableData::RankingCoefficient(2, ProgramVariable::new(&mut pts.variables, "a"));
+                    &TemplateVariableData::RankingCoefficient(None, ProgramVariable::new(&mut pts.variables, "a"));
 
                     "<=",
                     0.0,
                     0.75,
-                    &TemplateVariableData::RankingCoefficient(1, ProgramVariable::new(&mut pts.variables, "a")),
+                    &TemplateVariableData::RankingCoefficient(Some(1), ProgramVariable::new(&mut pts.variables, "a")),
                     -1.0,
-                    &TemplateVariableData::RankingConstant(0),
+                    &TemplateVariableData::RankingConstant(Some(0)),
                     0.25,
-                    &TemplateVariableData::RankingConstant(1),
+                    &TemplateVariableData::RankingConstant(Some(1)),
                     0.75,
-                    &TemplateVariableData::RankingConstant(2),
+                    &TemplateVariableData::RankingConstant(None),
                     1.0,
                     &TemplateVariableData::Eps
 
@@ -983,26 +1117,26 @@ mod tests {
                 template_variables,
                 variables!(
                     &TemplateVariableData::RankingCoefficient(
-                        0,
+                        Some(0),
                         ProgramVariable::new(&mut pts.variables, "a")
                     ),
                     &TemplateVariableData::RankingCoefficient(
-                        1,
+                        Some(1),
                         ProgramVariable::new(&mut pts.variables, "a")
                     ),
                     &TemplateVariableData::RankingCoefficient(
-                        2,
+                        None,
                         ProgramVariable::new(&mut pts.variables, "a")
                     ),
-                    &TemplateVariableData::FarkasVariable(0, 0, 0, Some(0)),
-                    &TemplateVariableData::FarkasVariable(0, 0, 1, Some(0)),
-                    &TemplateVariableData::FarkasVariable(0, 1, 0, Some(0)),
-                    &TemplateVariableData::FarkasVariable(0, 0, 0, Some(1)),
-                    &TemplateVariableData::FarkasVariable(0, 0, 1, Some(1)),
-                    &TemplateVariableData::FarkasVariable(0, 1, 0, Some(1)),
-                    &TemplateVariableData::RankingConstant(0),
-                    &TemplateVariableData::RankingConstant(1),
-                    &TemplateVariableData::RankingConstant(2),
+                    &TemplateVariableData::FarkasVariable(Some(0), 0, 0, Some(0)),
+                    &TemplateVariableData::FarkasVariable(Some(0), 0, 1, Some(0)),
+                    &TemplateVariableData::FarkasVariable(Some(0), 1, 0, Some(0)),
+                    &TemplateVariableData::FarkasVariable(Some(0), 0, 0, Some(1)),
+                    &TemplateVariableData::FarkasVariable(Some(0), 0, 1, Some(1)),
+                    &TemplateVariableData::FarkasVariable(Some(0), 1, 0, Some(1)),
+                    &TemplateVariableData::RankingConstant(Some(0)),
+                    &TemplateVariableData::RankingConstant(Some(1)),
+                    &TemplateVariableData::RankingConstant(None),
                     &TemplateVariableData::Eps,
                 )
             );
@@ -1011,22 +1145,22 @@ mod tests {
                 domains,
                 domains!(
                     &mut template_variables,
-                    &TemplateVariableData::FarkasVariable(0, 0, 0, Some(0)),
+                    &TemplateVariableData::FarkasVariable(Some(0), 0, 0, Some(0)),
                     0.0,
                     f64::INFINITY,
-                    &TemplateVariableData::FarkasVariable(0, 0, 1, Some(0)),
+                    &TemplateVariableData::FarkasVariable(Some(0), 0, 1, Some(0)),
                     0.0,
                     f64::INFINITY,
-                    &TemplateVariableData::FarkasVariable(0, 1, 0, Some(0)),
+                    &TemplateVariableData::FarkasVariable(Some(0), 1, 0, Some(0)),
                     0.0,
                     f64::INFINITY,
-                    &TemplateVariableData::FarkasVariable(0, 0, 0, Some(1)),
+                    &TemplateVariableData::FarkasVariable(Some(0), 0, 0, Some(1)),
                     0.0,
                     f64::INFINITY,
-                    &TemplateVariableData::FarkasVariable(0, 0, 1, Some(1)),
+                    &TemplateVariableData::FarkasVariable(Some(0), 0, 1, Some(1)),
                     0.0,
                     f64::INFINITY,
-                    &TemplateVariableData::FarkasVariable(0, 1, 0, Some(1)),
+                    &TemplateVariableData::FarkasVariable(Some(0), 1, 0, Some(1)),
                     0.0,
                     f64::INFINITY,
                 )
@@ -1038,92 +1172,92 @@ mod tests {
                     "==",
                     0.0,
                     1.0,
-                    &TemplateVariableData::RankingCoefficient(0, ProgramVariable::new(&mut pts.variables, "a")),
+                    &TemplateVariableData::RankingCoefficient(Some(0), ProgramVariable::new(&mut pts.variables, "a")),
                     -7.0,
-                    &TemplateVariableData::RankingCoefficient(1, ProgramVariable::new(&mut pts.variables, "a")),
+                    &TemplateVariableData::RankingCoefficient(Some(1), ProgramVariable::new(&mut pts.variables, "a")),
                     -2.0,
-                    &TemplateVariableData::FarkasVariable(0, 0, 0, Some(0)),
+                    &TemplateVariableData::FarkasVariable(Some(0), 0, 0, Some(0)),
                     -1.0,
-                    &TemplateVariableData::FarkasVariable(0, 0, 1, Some(0));
+                    &TemplateVariableData::FarkasVariable(Some(0), 0, 1, Some(0));
 
                     "<=",
                     0.0,
                     3.0,
-                    &TemplateVariableData::RankingCoefficient(1, ProgramVariable::new(&mut pts.variables, "a")),
+                    &TemplateVariableData::RankingCoefficient(Some(1), ProgramVariable::new(&mut pts.variables, "a")),
                     -5.0,
-                    &TemplateVariableData::FarkasVariable(0, 0, 0, Some(0)),
+                    &TemplateVariableData::FarkasVariable(Some(0), 0, 0, Some(0)),
                     -11.0,
-                    &TemplateVariableData::FarkasVariable(0, 0, 1, Some(0)),
+                    &TemplateVariableData::FarkasVariable(Some(0), 0, 1, Some(0)),
                     -1.0,
-                    &TemplateVariableData::RankingConstant(0),
+                    &TemplateVariableData::RankingConstant(Some(0)),
                     1.0,
-                    &TemplateVariableData::RankingConstant(1),
+                    &TemplateVariableData::RankingConstant(Some(1)),
                     1.0,
                     &TemplateVariableData::Eps;
 
                     "==",
                     0.0,
                     1.0,
-                    &TemplateVariableData::RankingCoefficient(0, ProgramVariable::new(&mut pts.variables, "a")),
+                    &TemplateVariableData::RankingCoefficient(Some(0), ProgramVariable::new(&mut pts.variables, "a")),
                     -1.0,
-                    &TemplateVariableData::RankingCoefficient(2, ProgramVariable::new(&mut pts.variables, "a")),
+                    &TemplateVariableData::RankingCoefficient(None, ProgramVariable::new(&mut pts.variables, "a")),
                     -2.0,
-                    &TemplateVariableData::FarkasVariable(0, 0, 0, Some(1)),
+                    &TemplateVariableData::FarkasVariable(Some(0), 0, 0, Some(1)),
                     1.0,
-                    &TemplateVariableData::FarkasVariable(0, 0, 1, Some(1));
+                    &TemplateVariableData::FarkasVariable(Some(0), 0, 1, Some(1));
 
                     "<=",
                     0.0,
                     -5.0,
-                    &TemplateVariableData::FarkasVariable(0, 0, 0, Some(1)),
+                    &TemplateVariableData::FarkasVariable(Some(0), 0, 0, Some(1)),
                     11.0,
-                    &TemplateVariableData::FarkasVariable(0, 0, 1, Some(1)),
+                    &TemplateVariableData::FarkasVariable(Some(0), 0, 1, Some(1)),
                     -1.0,
-                    &TemplateVariableData::RankingConstant(0),
+                    &TemplateVariableData::RankingConstant(Some(0)),
                     1.0,
-                    &TemplateVariableData::RankingConstant(2),
+                    &TemplateVariableData::RankingConstant(None),
                     1.0,
                     &TemplateVariableData::Eps;
 
                     "==",
                     0.0,
                     1.0,
-                    &TemplateVariableData::RankingCoefficient(0, ProgramVariable::new(&mut pts.variables, "a")),
+                    &TemplateVariableData::RankingCoefficient(Some(0), ProgramVariable::new(&mut pts.variables, "a")),
                     -7.0,
-                    &TemplateVariableData::RankingCoefficient(1, ProgramVariable::new(&mut pts.variables, "a")),
+                    &TemplateVariableData::RankingCoefficient(Some(1), ProgramVariable::new(&mut pts.variables, "a")),
                     -1.0,
-                    &TemplateVariableData::FarkasVariable(0, 1, 0, Some(0));
+                    &TemplateVariableData::FarkasVariable(Some(0), 1, 0, Some(0));
 
                     "<=",
                     0.0,
                     3.0,
-                    &TemplateVariableData::RankingCoefficient(1, ProgramVariable::new(&mut pts.variables, "a")),
+                    &TemplateVariableData::RankingCoefficient(Some(1), ProgramVariable::new(&mut pts.variables, "a")),
                     -11.0,
-                    &TemplateVariableData::FarkasVariable(0, 1, 0, Some(0)),
+                    &TemplateVariableData::FarkasVariable(Some(0), 1, 0, Some(0)),
                     -1.0,
-                    &TemplateVariableData::RankingConstant(0),
+                    &TemplateVariableData::RankingConstant(Some(0)),
                     1.0,
-                    &TemplateVariableData::RankingConstant(1),
+                    &TemplateVariableData::RankingConstant(Some(1)),
                     1.0,
                     &TemplateVariableData::Eps;
 
                     "==",
                     0.0,
                     1.0,
-                    &TemplateVariableData::RankingCoefficient(0, ProgramVariable::new(&mut pts.variables, "a")),
+                    &TemplateVariableData::RankingCoefficient(Some(0), ProgramVariable::new(&mut pts.variables, "a")),
                     -1.0,
-                    &TemplateVariableData::RankingCoefficient(2, ProgramVariable::new(&mut pts.variables, "a")),
+                    &TemplateVariableData::RankingCoefficient(None, ProgramVariable::new(&mut pts.variables, "a")),
                     1.0,
-                    &TemplateVariableData::FarkasVariable(0, 1, 0, Some(1));
+                    &TemplateVariableData::FarkasVariable(Some(0), 1, 0, Some(1));
 
                     "<=",
                     0.0,
                     11.0,
-                    &TemplateVariableData::FarkasVariable(0, 1, 0, Some(1)),
+                    &TemplateVariableData::FarkasVariable(Some(0), 1, 0, Some(1)),
                     -1.0,
-                    &TemplateVariableData::RankingConstant(0),
+                    &TemplateVariableData::RankingConstant(Some(0)),
                     1.0,
-                    &TemplateVariableData::RankingConstant(2),
+                    &TemplateVariableData::RankingConstant(None),
                     1.0,
                     &TemplateVariableData::Eps;
                 )
@@ -1165,22 +1299,22 @@ mod tests {
                 template_variables,
                 variables!(
                     &TemplateVariableData::RankingCoefficient(
-                        0,
+                        Some(0),
                         ProgramVariable::new(&mut pts.variables, "a")
                     ),
                     &TemplateVariableData::RankingCoefficient(
-                        1,
+                        Some(1),
                         ProgramVariable::new(&mut pts.variables, "a")
                     ),
                     &TemplateVariableData::RankingCoefficient(
-                        2,
+                        None,
                         ProgramVariable::new(&mut pts.variables, "a")
                     ),
-                    &TemplateVariableData::FarkasVariable(0, 0, 0, Some(0)),
-                    &TemplateVariableData::FarkasVariable(0, 0, 0, Some(1)),
-                    &TemplateVariableData::RankingConstant(0),
-                    &TemplateVariableData::RankingConstant(1),
-                    &TemplateVariableData::RankingConstant(2),
+                    &TemplateVariableData::FarkasVariable(Some(0), 0, 0, Some(0)),
+                    &TemplateVariableData::FarkasVariable(Some(0), 0, 0, Some(1)),
+                    &TemplateVariableData::RankingConstant(Some(0)),
+                    &TemplateVariableData::RankingConstant(Some(1)),
+                    &TemplateVariableData::RankingConstant(None),
                     &TemplateVariableData::Eps,
                 )
             );
@@ -1189,10 +1323,10 @@ mod tests {
                 domains,
                 domains!(
                     &mut template_variables,
-                    &TemplateVariableData::FarkasVariable(0, 0, 0, Some(0)),
+                    &TemplateVariableData::FarkasVariable(Some(0), 0, 0, Some(0)),
                     0.0,
                     f64::INFINITY,
-                    &TemplateVariableData::FarkasVariable(0, 0, 0, Some(1)),
+                    &TemplateVariableData::FarkasVariable(Some(0), 0, 0, Some(1)),
                     0.0,
                     f64::INFINITY
                 )
@@ -1204,42 +1338,42 @@ mod tests {
                     "==",
                     0.0,
                     1.0,
-                    &TemplateVariableData::RankingCoefficient(0, ProgramVariable::new(&mut pts.variables, "a")),
+                    &TemplateVariableData::RankingCoefficient(Some(0), ProgramVariable::new(&mut pts.variables, "a")),
                     -7.0,
-                    &TemplateVariableData::RankingCoefficient(1, ProgramVariable::new(&mut pts.variables, "a")),
+                    &TemplateVariableData::RankingCoefficient(Some(1), ProgramVariable::new(&mut pts.variables, "a")),
                     -2.0,
-                    &TemplateVariableData::FarkasVariable(0, 0, 0, Some(0));
+                    &TemplateVariableData::FarkasVariable(Some(0), 0, 0, Some(0));
 
                     "<=",
                     0.0,
                     3.0,
-                    &TemplateVariableData::RankingCoefficient(1, ProgramVariable::new(&mut pts.variables, "a")),
+                    &TemplateVariableData::RankingCoefficient(Some(1), ProgramVariable::new(&mut pts.variables, "a")),
                     -5.0,
-                    &TemplateVariableData::FarkasVariable(0, 0, 0, Some(0)),
+                    &TemplateVariableData::FarkasVariable(Some(0), 0, 0, Some(0)),
                     -1.0,
-                    &TemplateVariableData::RankingConstant(0),
+                    &TemplateVariableData::RankingConstant(Some(0)),
                     1.0,
-                    &TemplateVariableData::RankingConstant(1),
+                    &TemplateVariableData::RankingConstant(Some(1)),
                     1.0,
                     &TemplateVariableData::Eps;
 
                     "==",
                     0.0,
                     1.0,
-                    &TemplateVariableData::RankingCoefficient(0, ProgramVariable::new(&mut pts.variables, "a")),
+                    &TemplateVariableData::RankingCoefficient(Some(0), ProgramVariable::new(&mut pts.variables, "a")),
                     -1.0,
-                    &TemplateVariableData::RankingCoefficient(2, ProgramVariable::new(&mut pts.variables, "a")),
+                    &TemplateVariableData::RankingCoefficient(None, ProgramVariable::new(&mut pts.variables, "a")),
                     -2.0,
-                    &TemplateVariableData::FarkasVariable(0, 0, 0, Some(1));
+                    &TemplateVariableData::FarkasVariable(Some(0), 0, 0, Some(1));
 
                     "<=",
                     0.0,
                     -5.0,
-                    &TemplateVariableData::FarkasVariable(0, 0, 0, Some(1)),
+                    &TemplateVariableData::FarkasVariable(Some(0), 0, 0, Some(1)),
                     -1.0,
-                    &TemplateVariableData::RankingConstant(0),
+                    &TemplateVariableData::RankingConstant(Some(0)),
                     1.0,
-                    &TemplateVariableData::RankingConstant(2),
+                    &TemplateVariableData::RankingConstant(None),
                     1.0,
                     &TemplateVariableData::Eps;
 
@@ -1248,34 +1382,34 @@ mod tests {
                     "==",
                     0.0,
                     1.0,
-                    &TemplateVariableData::RankingCoefficient(0, ProgramVariable::new(&mut pts.variables, "a")),
+                    &TemplateVariableData::RankingCoefficient(Some(0), ProgramVariable::new(&mut pts.variables, "a")),
                     -7.0,
-                    &TemplateVariableData::RankingCoefficient(1, ProgramVariable::new(&mut pts.variables, "a"));
+                    &TemplateVariableData::RankingCoefficient(Some(1), ProgramVariable::new(&mut pts.variables, "a"));
 
                     "<=",
                     0.0,
                     3.0,
-                    &TemplateVariableData::RankingCoefficient(1, ProgramVariable::new(&mut pts.variables, "a")),
+                    &TemplateVariableData::RankingCoefficient(Some(1), ProgramVariable::new(&mut pts.variables, "a")),
                     -1.0,
-                    &TemplateVariableData::RankingConstant(0),
+                    &TemplateVariableData::RankingConstant(Some(0)),
                     1.0,
-                    &TemplateVariableData::RankingConstant(1),
+                    &TemplateVariableData::RankingConstant(Some(1)),
                     1.0,
                     &TemplateVariableData::Eps;
 
                     "==",
                     0.0,
                     1.0,
-                    &TemplateVariableData::RankingCoefficient(0, ProgramVariable::new(&mut pts.variables, "a")),
+                    &TemplateVariableData::RankingCoefficient(Some(0), ProgramVariable::new(&mut pts.variables, "a")),
                     -1.0,
-                    &TemplateVariableData::RankingCoefficient(2, ProgramVariable::new(&mut pts.variables, "a"));
+                    &TemplateVariableData::RankingCoefficient(None, ProgramVariable::new(&mut pts.variables, "a"));
 
                     "<=",
                     0.0,
                     -1.0,
-                    &TemplateVariableData::RankingConstant(0),
+                    &TemplateVariableData::RankingConstant(Some(0)),
                     1.0,
-                    &TemplateVariableData::RankingConstant(2),
+                    &TemplateVariableData::RankingConstant(None),
                     1.0,
                     &TemplateVariableData::Eps;
                 )
@@ -1316,16 +1450,16 @@ mod tests {
                 template_variables,
                 variables!(
                     &TemplateVariableData::RankingCoefficient(
-                        0,
+                        Some(0),
                         ProgramVariable::new(&mut pts.variables, "a")
                     ),
                     &TemplateVariableData::RankingCoefficient(
-                        1,
+                        Some(1),
                         ProgramVariable::new(&mut pts.variables, "a")
                     ),
-                    &TemplateVariableData::FarkasVariable(0, 0, 0, start_location),
-                    &TemplateVariableData::RankingConstant(0),
-                    &TemplateVariableData::RankingConstant(1),
+                    &TemplateVariableData::FarkasVariable(Some(0), 0, 0, start_location),
+                    &TemplateVariableData::RankingConstant(Some(0)),
+                    &TemplateVariableData::RankingConstant(Some(1)),
                     &TemplateVariableData::Eps,
                 )
             );
@@ -1334,7 +1468,7 @@ mod tests {
                 domains,
                 domains!(
                     &mut template_variables,
-                    &TemplateVariableData::FarkasVariable(0, 0, 0, start_location),
+                    &TemplateVariableData::FarkasVariable(Some(0), 0, 0, start_location),
                     0.0,
                     f64::INFINITY
                 )
@@ -1346,40 +1480,40 @@ mod tests {
                     "==",
                     0.0,
                     1.0,
-                    &TemplateVariableData::RankingCoefficient(0, ProgramVariable::new(&mut pts.variables, "a")),
+                    &TemplateVariableData::RankingCoefficient(Some(0), ProgramVariable::new(&mut pts.variables, "a")),
                     -7.0,
-                    &TemplateVariableData::RankingCoefficient(1, ProgramVariable::new(&mut pts.variables, "a")),
+                    &TemplateVariableData::RankingCoefficient(Some(1), ProgramVariable::new(&mut pts.variables, "a")),
                     -2.0,
-                    &TemplateVariableData::FarkasVariable(0, 0, 0, start_location);
+                    &TemplateVariableData::FarkasVariable(Some(0), 0, 0, start_location);
 
                     "<=",
                     0.0,
                     3.0,
-                    &TemplateVariableData::RankingCoefficient(1, ProgramVariable::new(&mut pts.variables, "a")),
+                    &TemplateVariableData::RankingCoefficient(Some(1), ProgramVariable::new(&mut pts.variables, "a")),
                     -5.0,
-                    &TemplateVariableData::FarkasVariable(0, 0, 0, start_location),
+                    &TemplateVariableData::FarkasVariable(Some(0), 0, 0, start_location),
                     -1.0,
-                    &TemplateVariableData::RankingConstant(0),
+                    &TemplateVariableData::RankingConstant(Some(0)),
                     1.0,
-                    &TemplateVariableData::RankingConstant(1),
+                    &TemplateVariableData::RankingConstant(Some(1)),
                     1.0,
                     &TemplateVariableData::Eps;
 
                     "==",
                     0.0,
                     1.0,
-                    &TemplateVariableData::RankingCoefficient(0, ProgramVariable::new(&mut pts.variables, "a")),
+                    &TemplateVariableData::RankingCoefficient(Some(0), ProgramVariable::new(&mut pts.variables, "a")),
                     -7.0,
-                    &TemplateVariableData::RankingCoefficient(1, ProgramVariable::new(&mut pts.variables, "a"));
+                    &TemplateVariableData::RankingCoefficient(Some(1), ProgramVariable::new(&mut pts.variables, "a"));
 
                     "<=",
                     0.0,
                     3.0,
-                    &TemplateVariableData::RankingCoefficient(1, ProgramVariable::new(&mut pts.variables, "a")),
+                    &TemplateVariableData::RankingCoefficient(Some(1), ProgramVariable::new(&mut pts.variables, "a")),
                     -1.0,
-                    &TemplateVariableData::RankingConstant(0),
+                    &TemplateVariableData::RankingConstant(Some(0)),
                     1.0,
-                    &TemplateVariableData::RankingConstant(1),
+                    &TemplateVariableData::RankingConstant(Some(1)),
                     1.0,
                     &TemplateVariableData::Eps
                 )
@@ -1419,7 +1553,7 @@ mod tests {
                 farkas_assertion(
                     &program_variables,
                     &mut template_variables,
-                    5,
+                    Some(5),
                     3,
                     Some(1),
                     &state_system!(),
@@ -1452,7 +1586,7 @@ mod tests {
                 farkas_assertion(
                     &program_variables,
                     &mut template_variables,
-                    5,
+                    Some(5),
                     3,
                     Some(1),
                     &state_system!(
@@ -1469,13 +1603,13 @@ mod tests {
                     domains,
                     domains!(
                         &mut template_variables,
-                        &TemplateVariableData::FarkasVariable(5, 3, 0, Some(1)),
+                        &TemplateVariableData::FarkasVariable(Some(5), 3, 0, Some(1)),
                         0.0,
                         f64::INFINITY,
-                        &TemplateVariableData::FarkasVariable(5, 3, 1, Some(1)),
+                        &TemplateVariableData::FarkasVariable(Some(5), 3, 1, Some(1)),
                         0.0,
                         f64::INFINITY,
-                        &TemplateVariableData::FarkasVariable(5, 3, 2, Some(1)),
+                        &TemplateVariableData::FarkasVariable(Some(5), 3, 2, Some(1)),
                         0.0,
                         f64::INFINITY
                     )
@@ -1507,7 +1641,7 @@ mod tests {
                 farkas_assertion(
                     &program_variables,
                     &mut template_variables,
-                    5,
+                    Some(5),
                     3,
                     Some(1),
                     &state_system!(),
@@ -1539,7 +1673,7 @@ mod tests {
                 farkas_assertion(
                     &program_variables,
                     &mut template_variables,
-                    5,
+                    Some(5),
                     3,
                     Some(1),
                     &state_system!(),
@@ -1567,14 +1701,14 @@ mod tests {
             let program_variables: VariableSet<ProgramVariable, BuildHasherDefault<DefaultHasher>> =
                 variables!("a", "b", "c");
             let mut template_variables = Default::default();
-            let lhs = generate_template(&mut template_variables, &program_variables, 5);
+            let lhs = generate_template(&mut template_variables, &program_variables, Some(5));
             let rhs = Default::default();
             let mut domains = Default::default();
             let mut restrictions = Default::default();
             farkas_assertion(
                 &program_variables,
                 &mut template_variables,
-                5,
+                Some(5),
                 3,
                 Some(1),
                 &state_system!(),
@@ -1592,7 +1726,7 @@ mod tests {
                     0.0,
                     -1.0,
                     &TemplateVariableData::RankingCoefficient(
-                        5,
+                        Some(5),
                         program_variables.get("c").unwrap().clone(),
                     );
 
@@ -1600,7 +1734,7 @@ mod tests {
                     0.0,
                     -1.0,
                     &TemplateVariableData::RankingCoefficient(
-                        5,
+                        Some(5),
                         program_variables.get("b").unwrap().clone(),
                     );
 
@@ -1608,7 +1742,7 @@ mod tests {
                     0.0,
                     -1.0,
                     &TemplateVariableData::RankingCoefficient(
-                        5,
+                        Some(5),
                         program_variables.get("a").unwrap().clone(),
                     );
 
@@ -1616,7 +1750,7 @@ mod tests {
                     0.0,
                     1.0,
                     &TemplateVariableData::RankingConstant(
-                        5,
+                        Some(5),
                     );
                 )
             );
@@ -1627,14 +1761,14 @@ mod tests {
             let program_variables: VariableSet<ProgramVariable, BuildHasherDefault<DefaultHasher>> =
                 variables!("a", "b", "c");
             let mut template_variables = Default::default();
-            let lhs = generate_template(&mut template_variables, &program_variables, 5);
-            let rhs = generate_template(&mut template_variables, &program_variables, 6);
+            let lhs = generate_template(&mut template_variables, &program_variables, Some(5));
+            let rhs = generate_template(&mut template_variables, &program_variables, Some(6));
             let mut domains = Default::default();
             let mut restrictions = Default::default();
             farkas_assertion(
                 &program_variables,
                 &mut template_variables,
-                5,
+                Some(5),
                 3,
                 Some(1),
                 &state_system!(),
@@ -1652,12 +1786,12 @@ mod tests {
                     0.0,
                     -1.0,
                     &TemplateVariableData::RankingCoefficient(
-                        5,
+                        Some(5),
                         program_variables.get("c").unwrap().clone(),
                     ),
                     1.0,
                     &TemplateVariableData::RankingCoefficient(
-                        6,
+                        Some(6),
                         program_variables.get("c").unwrap().clone(),
                     );
 
@@ -1665,12 +1799,12 @@ mod tests {
                     0.0,
                     -1.0,
                     &TemplateVariableData::RankingCoefficient(
-                        5,
+                        Some(5),
                         program_variables.get("b").unwrap().clone(),
                     ),
                     1.0,
                     &TemplateVariableData::RankingCoefficient(
-                        6,
+                        Some(6),
                         program_variables.get("b").unwrap().clone(),
                     );
 
@@ -1678,12 +1812,12 @@ mod tests {
                     0.0,
                     -1.0,
                     &TemplateVariableData::RankingCoefficient(
-                        5,
+                        Some(5),
                         program_variables.get("a").unwrap().clone(),
                     ),
                     1.0,
                     &TemplateVariableData::RankingCoefficient(
-                        6,
+                        Some(6),
                         program_variables.get("a").unwrap().clone(),
                     );
 
@@ -1691,11 +1825,11 @@ mod tests {
                     0.0,
                     1.0,
                     &TemplateVariableData::RankingConstant(
-                        5,
+                        Some(5),
                     ),
                     -1.0,
                     &TemplateVariableData::RankingConstant(
-                        6,
+                        Some(6),
                     );
                 )
             );
@@ -1736,7 +1870,7 @@ mod tests {
             farkas_assertion(
                 &program_variables,
                 &mut template_variables,
-                5,
+                Some(5),
                 3,
                 Some(1),
                 &polyhedron,
@@ -1749,13 +1883,13 @@ mod tests {
                 domains,
                 domains!(
                     &mut template_variables,
-                    &TemplateVariableData::FarkasVariable(5, 3, 0, Some(1)),
+                    &TemplateVariableData::FarkasVariable(Some(5), 3, 0, Some(1)),
                     0.0,
                     f64::INFINITY,
-                    &TemplateVariableData::FarkasVariable(5, 3, 1, Some(1)),
+                    &TemplateVariableData::FarkasVariable(Some(5), 3, 1, Some(1)),
                     0.0,
                     f64::INFINITY,
-                    &TemplateVariableData::FarkasVariable(5, 3, 2, Some(1)),
+                    &TemplateVariableData::FarkasVariable(Some(5), 3, 2, Some(1)),
                     0.0,
                     f64::INFINITY
                 )
@@ -1768,23 +1902,23 @@ mod tests {
                 "==",
                 0.0,
                 2.0,
-                &TemplateVariableData::FarkasVariable(5, 3, 0, Some(1));
+                &TemplateVariableData::FarkasVariable(Some(5), 3, 0, Some(1));
                 "==",
                 0.0,
                 1.0,
-                &TemplateVariableData::FarkasVariable(5, 3, 0, Some(1)),
+                &TemplateVariableData::FarkasVariable(Some(5), 3, 0, Some(1)),
                 0.5,
-                &TemplateVariableData::FarkasVariable(5, 3, 2, Some(1));
+                &TemplateVariableData::FarkasVariable(Some(5), 3, 2, Some(1));
                 "==",
                 0.0,
                 5.0,
-                &TemplateVariableData::FarkasVariable(5, 3, 1, Some(1));
+                &TemplateVariableData::FarkasVariable(Some(5), 3, 1, Some(1));
                 "<=",
                 0.0,
                 1.0,
-                &TemplateVariableData::FarkasVariable(5, 3, 1, Some(1)),
+                &TemplateVariableData::FarkasVariable(Some(5), 3, 1, Some(1)),
                 -10.0,
-                &TemplateVariableData::FarkasVariable(5, 3, 2, Some(1));
+                &TemplateVariableData::FarkasVariable(Some(5), 3, 2, Some(1));
                 )
             );
         }
@@ -1817,7 +1951,8 @@ mod tests {
             };
             let mut template_variables = Default::default();
             let lhs = {
-                let mut tmp = generate_template(&mut template_variables, &program_variables, 5);
+                let mut tmp =
+                    generate_template(&mut template_variables, &program_variables, Some(5));
                 tmp.mul_by_constant(0.1.into());
                 tmp
             };
@@ -1827,7 +1962,7 @@ mod tests {
             farkas_assertion(
                 &program_variables,
                 &mut template_variables,
-                5,
+                Some(5),
                 3,
                 Some(1),
                 &polyhedron,
@@ -1840,13 +1975,13 @@ mod tests {
                 domains,
                 domains!(
                     &mut template_variables,
-                    &TemplateVariableData::FarkasVariable(5, 3, 0, Some(1)),
+                    &TemplateVariableData::FarkasVariable(Some(5), 3, 0, Some(1)),
                     0.0,
                     f64::INFINITY,
-                    &TemplateVariableData::FarkasVariable(5, 3, 1, Some(1)),
+                    &TemplateVariableData::FarkasVariable(Some(5), 3, 1, Some(1)),
                     0.0,
                     f64::INFINITY,
-                    &TemplateVariableData::FarkasVariable(5, 3, 2, Some(1)),
+                    &TemplateVariableData::FarkasVariable(Some(5), 3, 2, Some(1)),
                     0.0,
                     f64::INFINITY
                 )
@@ -1860,12 +1995,12 @@ mod tests {
                     0.0,
                     -0.1,
                     &TemplateVariableData::RankingCoefficient(
-                        5,
+                        Some(5),
                         program_variables.get("b").unwrap().clone(),
                     ),
                     2.0,
                     &TemplateVariableData::FarkasVariable(
-                        5,
+                        Some(5),
                         3,
                         0,
                         Some(1)
@@ -1875,19 +2010,19 @@ mod tests {
                     0.0,
                     -0.1,
                     &TemplateVariableData::RankingCoefficient(
-                        5,
+                        Some(5),
                         program_variables.get("a").unwrap().clone(),
                     ),
                     1.0,
                     &TemplateVariableData::FarkasVariable(
-                        5,
+                        Some(5),
                         3,
                         0,
                         Some(1)
                     ),
                     0.5,
                     &TemplateVariableData::FarkasVariable(
-                        5,
+                        Some(5),
                         3,
                         2,
                         Some(1)
@@ -1897,12 +2032,12 @@ mod tests {
                     0.0,
                     -0.1,
                     &TemplateVariableData::RankingCoefficient(
-                        5,
+                        Some(5),
                         program_variables.get("c").unwrap().clone(),
                     ),
                     5.0,
                     &TemplateVariableData::FarkasVariable(
-                        5,
+                        Some(5),
                         3,
                         1,
                         Some(1)
@@ -1912,20 +2047,20 @@ mod tests {
                     0.0,
                     1.0,
                     &TemplateVariableData::FarkasVariable(
-                        5,
+                        Some(5),
                         3,
                         1,
                         Some(1)
                     ),
                     -10.0,
                     &TemplateVariableData::FarkasVariable(
-                        5,
+                        Some(5),
                         3,
                         2,
                         Some(1)
                     ),
                     0.1,
-                    &TemplateVariableData::RankingConstant(5)
+                    &TemplateVariableData::RankingConstant(Some(5))
                 )
             );
         }

@@ -31,7 +31,7 @@ pub type Probability = Constant;
 pub type TransitionID = usize; // index into Guards
 
 #[cfg_attr(test, derive(PartialEq))]
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Guards {
     // it is the programmers responsibility to make sure probabilities are non-negative and their
     // sum is 1.0 (as close to 1.0 as f64 allows)

@@ -1,26 +1,48 @@
 use core::fmt;
 
-use crate::pts::{
-    linear_polynomial::{coefficient::Constant, State},
-    variable::{program_variable::ProgramVariable, Variable},
-    PTS,
-};
+use crate::pts::{linear_polynomial::State, location::LocationHandle, variable::Variable, PTS};
 
-#[derive(Debug, Default)]
+#[cfg_attr(test, derive(PartialEq))]
+#[derive(Debug)]
 pub struct RankingFunction {
     // indexed by LocationId
-    _locations: Vec<State>,
+    data: Vec<State>,
+    end_location: State,
 }
 
-use self::linear_solvers::{Problem, Solver};
+impl RankingFunction {
+    pub fn new(pts: &PTS) -> Self {
+        Self {
+            data: vec![Default::default(); pts.locations.len()],
+            end_location: Default::default(),
+        }
+    }
+
+    pub fn get(&self, location: LocationHandle) -> Option<&State> {
+        match location {
+            Some(i) => self.data.get(i),
+            None => Some(&self.end_location),
+        }
+    }
+
+    pub fn get_mut(&mut self, location: LocationHandle) -> Option<&mut State> {
+        match location {
+            Some(i) => self.data.get_mut(i),
+            None => Some(&mut self.end_location),
+        }
+    }
+}
+
+use self::linear_solvers::{Problem, Solution, Solver};
 
 pub mod farkas_based;
 pub mod linear_solvers;
 
-#[derive(Debug, Default)]
+#[cfg_attr(test, derive(PartialEq))]
+#[derive(Debug)]
 pub struct RankedPTS {
-    _pts: PTS,
-    _function: RankingFunction,
+    pub pts: PTS,
+    pub function: RankingFunction,
 }
 
 // write!(f, "f({}, ...) = {}\n", l, fun)?;
@@ -30,7 +52,7 @@ pub struct RankedPTS {
 
 #[derive(Debug)]
 pub enum GeneratorError {
-    WrongFormat,
+    EpsIsZero,
 }
 
 impl std::error::Error for GeneratorError {}
@@ -38,17 +60,16 @@ impl std::error::Error for GeneratorError {}
 impl fmt::Display for GeneratorError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            GeneratorError::WrongFormat => write!(f, "incorrect format of solution"),
+            GeneratorError::EpsIsZero => write!(f, "no function was found"),
         }
     }
 }
 
 pub trait Generator {
     type VAR: Variable;
-    fn generate_problem<S: Solver<Self::VAR>>(&self, pts: &PTS) -> Problem<Self::VAR>;
-    fn build_ranking_function<Solution: Iterator<Item = (ProgramVariable, Constant)>>(
-        &self,
+    fn generate_problem<S: Solver<Self::VAR>>(pts: &PTS) -> Problem<Self::VAR>;
+    fn build_ranking_function<S: Solution<Self::VAR>>(
         pts: PTS,
-        solution: Solution,
+        solution: S,
     ) -> Result<RankedPTS, GeneratorError>;
 }

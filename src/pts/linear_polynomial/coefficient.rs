@@ -42,6 +42,11 @@ impl Constant {
         self.0 < 0.0
     }
 
+    pub fn is_nonnegative(&self) -> bool {
+        // .is_sign_negative returns true for -NaN, -0.0 and -inf
+        self.0 >= 0.0
+    }
+
     pub fn is_one(&self) -> bool {
         self == &Self::ONE
     }
@@ -52,6 +57,7 @@ impl Constant {
 }
 
 impl Coefficient for Constant {
+    // TODO is_zero returns what on nan?
     fn zero() -> Self {
         Constant(0.0)
     }
@@ -170,5 +176,20 @@ impl Sum for Constant {
 impl std::fmt::Display for Constant {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
         std::fmt::Display::fmt(&self.0, f)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::pts::linear_polynomial::coefficient::{Coefficient, Constant};
+
+    #[test]
+    fn is_zero() {
+        assert!(!Constant(f64::NAN).is_zero())
+    }
+
+    #[test]
+    fn is_nonnegative() {
+        assert!(!Constant(f64::NAN).is_nonnegative())
     }
 }

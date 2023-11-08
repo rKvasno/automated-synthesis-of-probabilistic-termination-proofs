@@ -14,7 +14,7 @@ pub mod system;
 pub mod transition;
 pub mod variable;
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct PTS<S: BuildHasher + Default = RandomState> {
     // the implementation assumes that every variable is in variables
     pub locations: Locations,

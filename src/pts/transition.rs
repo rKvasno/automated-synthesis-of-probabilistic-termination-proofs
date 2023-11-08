@@ -84,13 +84,13 @@ macro_rules! transition {
     };
 }
 #[cfg_attr(test, derive(PartialEq))]
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct Transition {
     pub target: LocationHandle,
     pub assignments: Vec<StateAssignment>,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Assignment<V: Variable>(V, Polynomial<V, Constant>);
 pub type StateAssignment = Assignment<ProgramVariable>;
 

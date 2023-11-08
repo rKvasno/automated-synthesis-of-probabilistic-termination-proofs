@@ -31,9 +31,11 @@ macro_rules! domains {
     }
 }
 
+pub trait Solution<V: Variable>: IntoIterator<Item = (V, Constant)> {}
+
 pub trait Solver<V: Variable> {
     type Error: Error;
-    type Solution: IntoIterator<Item = (V, Constant)>;
+    type Solution: Solution<V>;
     fn solve(problem: Problem<V>) -> Result<Self::Solution, SolverError<Self::Error>>;
 }
 

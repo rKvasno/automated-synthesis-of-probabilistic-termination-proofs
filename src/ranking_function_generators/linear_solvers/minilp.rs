@@ -5,7 +5,7 @@ use crate::{
     ranking_function_generators::linear_solvers::Goal,
 };
 
-use super::{Problem, Solver, SolverError};
+use super::{Problem, Solution, Solver, SolverError};
 
 use minilp::{
     Error as MinilpError, LinearExpr, OptimizationDirection, Problem as MinilpProblem,
@@ -34,6 +34,7 @@ impl<V: Variable> MinilpSolution<V> {
         }
     }
 }
+
 impl<V: Variable> IntoIterator for MinilpSolution<V> {
     type Item = (V, Constant);
     type IntoIter = MinilpIterator<V>;
@@ -44,6 +45,8 @@ impl<V: Variable> IntoIterator for MinilpSolution<V> {
         }
     }
 }
+
+impl<V: Variable> Solution<V> for MinilpSolution<V> {}
 
 impl<V: Variable> Iterator for MinilpIterator<V> {
     type Item = (V, Constant);
@@ -57,6 +60,7 @@ impl<V: Variable> Solver<V> for Minilp {
     type Error = MinilpError;
     type Solution = MinilpSolution<V>;
     fn solve(problem: Problem<V>) -> Result<Self::Solution, SolverError<Self::Error>> {
+        //TODO can return NaN
         let (direction, function) = match problem.goal {
             Goal::Minimize(pol) => (OptimizationDirection::Minimize, pol),
             Goal::Maximize(pol) => (OptimizationDirection::Maximize, pol),

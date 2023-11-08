@@ -17,7 +17,7 @@ type IndexToHandleFn = fn(usize) -> LocationHandle;
 pub type LocationID = usize;
 
 #[cfg_attr(test, derive(PartialEq))]
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct Location {
     invariant: Invariant,
     outgoing: Guards,
@@ -33,7 +33,7 @@ impl Default for Location {
 }
 
 #[cfg_attr(test, derive(PartialEq))]
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct Locations {
     data: Vec<Location>,
     pub initial: LocationHandle,
