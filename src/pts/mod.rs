@@ -72,10 +72,11 @@ impl<'a> dot::Labeller<'a, LocationHandle, Edge> for PTS {
     }
 
     fn node_id(&'a self, node: &LocationHandle) -> dot::Id<'a> {
-        match node {
-            Some(n) => dot::Id::new(format!("Location_{n}")).unwrap(),
-            None => dot::Id::new(format!("Location_terminating")).unwrap(),
-        }
+        dot::Id::new(format!(
+            "Location_{}",
+            self.locations.get_id(node.clone()).unwrap()
+        ))
+        .unwrap()
     }
 
     fn node_label(&'a self, n: &LocationHandle) -> dot::LabelText<'a> {

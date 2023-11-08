@@ -1,3 +1,3 @@
 digraph PTS {
-    Location_terminating[label=""][style="bold"][shape="doublecircle"];
+    Location_0[label=""][style="bold"][shape="doublecircle"];
 }

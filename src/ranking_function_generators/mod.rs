@@ -1,4 +1,5 @@
 use core::fmt;
+use std::borrow::Cow;
 
 use crate::pts::{linear_polynomial::State, location::LocationHandle, variable::Variable, PTS};
 
@@ -72,4 +73,53 @@ pub trait Generator {
         pts: PTS,
         solution: S,
     ) -> Result<RankedPTS, GeneratorError>;
+}
+
+type Edge = (LocationHandle, LocationHandle);
+
+impl<'a> dot::GraphWalk<'a, LocationHandle, Edge> for RankedPTS {
+    fn nodes(&'a self) -> dot::Nodes<'a, LocationHandle> {
+        self.pts.nodes()
+    }
+
+    fn edges(&'a self) -> dot::Edges<'a, Edge> {
+        self.pts.edges()
+    }
+
+    fn source(&'a self, edge: &Edge) -> LocationHandle {
+        edge.0
+    }
+
+    fn target(&'a self, edge: &Edge) -> LocationHandle {
+        edge.1
+    }
+}
+
+impl<'a> dot::Labeller<'a, LocationHandle, Edge> for RankedPTS {
+    fn graph_id(&'a self) -> dot::Id<'a> {
+        dot::Id::new("RankedPTS").unwrap()
+    }
+
+    fn node_id(&'a self, node: &LocationHandle) -> dot::Id<'a> {
+        self.pts.node_id(node)
+    }
+
+    fn node_label(&'a self, n: &LocationHandle) -> dot::LabelText<'a> {
+        // invariant
+        dot::LabelText::LabelStr(Cow::Owned(
+            self.function.get(n.to_owned()).unwrap().to_string(),
+        ))
+    }
+
+    fn edge_label(&'a self, e: &Edge) -> dot::LabelText<'a> {
+        self.pts.edge_label(e)
+    }
+
+    fn node_style(&'a self, node: &LocationHandle) -> dot::Style {
+        self.pts.node_style(node)
+    }
+
+    fn node_shape(&'a self, node: &LocationHandle) -> Option<dot::LabelText<'a>> {
+        self.pts.node_shape(node)
+    }
 }

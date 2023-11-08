@@ -52,7 +52,12 @@ impl<V: Variable> Iterator for MinilpIterator<V> {
     type Item = (V, Constant);
     fn next(&mut self) -> Option<Self::Item> {
         let (var, index) = self.variable_iter.next()?;
-        Some((var, self.solution[index.clone()].into()))
+        let value = self.solution[index.clone()];
+        if value.is_nan() {
+            self.next()
+        } else {
+            Some((var, value.into()))
+        }
     }
 }
 
@@ -60,7 +65,6 @@ impl<V: Variable> Solver<V> for Minilp {
     type Error = MinilpError;
     type Solution = MinilpSolution<V>;
     fn solve(problem: Problem<V>) -> Result<Self::Solution, SolverError<Self::Error>> {
-        //TODO can return NaN
         let (direction, function) = match problem.goal {
             Goal::Minimize(pol) => (OptimizationDirection::Minimize, pol),
             Goal::Maximize(pol) => (OptimizationDirection::Maximize, pol),

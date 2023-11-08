@@ -57,7 +57,6 @@ impl Constant {
 }
 
 impl Coefficient for Constant {
-    // TODO is_zero returns what on nan?
     fn zero() -> Self {
         Constant(0.0)
     }
