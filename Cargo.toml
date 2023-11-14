@@ -1,7 +1,22 @@
 [package]
 name = "automated_synthesis_of_probabilistic_termination_proofs"
+description = "A tool and a library providing static termination analysis of affine probabilistic programs with non-determinism"
+authors = ["Radoslav Kvasňovský"]
 version = "0.1.0"
+keywords = ["termination", "proof", "analysis"]
+categories = ["program-analysis"]
 edition = "2021"
+rust-version = "1.72.1"
+license = "MIT OR Apache-2.0"
+
+[lib]
+name = "automated_synthesis_of_probabilistic_termination_proofs"
+path = "src/lib.rs"
+
+[[bin]]
+name = "automated_synthesis_of_probabilistic_termination_proofs"
+path = "src/main.rs"
+
 
 [dependencies]
 dot = "0.1.4"
@@ -16,3 +31,4 @@ lazy_static = "1.4.0"
 pest-test = "0.1.6"
 pest-test-gen = "0.1.7"
 pretty_assertions = "1.4.0"
+
