@@ -2,50 +2,52 @@ Complex program
 
 =======
 
-##bank is user input
+# bank is user input 
 
 
-# bank >= 0
+[ bank >= 0 ]
 dealer_bank = bank
 
-# bank >= 0 and dealer_bank >= 0
+[ bank >= 0 and dealer_bank >= 0 ]
 quit = 0
 
-# bank >= -1 and dealer_bank >= -1 and quit >= 0
-while quit <= 0.5 and bank > 0 and dealer_bank > 0 {
+[ bank >= -1 and dealer_bank >= -1 and quit >= 0 ]
+while quit <= 0.5 and
+      bank > 0 and
+      dealer_bank > 0 {
 
-  # quit <= 0.5 and bank > 0 and dealer_bank > 0
+  [ quit <= 0.5 and bank > 0 and dealer_bank > 0 ]
   choose {
 
-    # quit <= 0.5 and bank > 0 and dealer_bank > 0
+    [ quit <= 0.5 and bank > 0 and dealer_bank > 0 ]
     odds 1:1:0 {
-      # quit <= 0.5 and bank > 0 and dealer_bank > 0
+      [ quit <= 0.5 and bank > 0 and dealer_bank > 0 ]
       bank = bank + 1
 
-      # quit <= 0.5 and bank > 1 and dealer_bank > 0
+      [ quit <= 0.5 and bank > 1 and dealer_bank > 0 ]
       dealer_bank = dealer_bank - 1
     }
     {
-      # quit <= 0.5 and bank > 0 and dealer_bank > 0
+      [ quit <= 0.5 and bank > 0 and dealer_bank > 0 ]
       dealer_bank = dealer_bank + 1
       
-      # quit <= 0.5 and bank > 0 and dealer_bank > 1
+      [ quit <= 0.5 and bank > 0 and dealer_bank > 1 ]
       bank = bank - 1
     }
   }
   or {
-    # quit <= 0.5 and bank > 0 and dealer_bank > 0
+    [ quit <= 0.5 and bank > 0 and dealer_bank > 0 ]
     quit = 1
   }
 }
 
-# bank >= -1 and dealer_bank >= -1 and quit >= 0
+[ bank >= -1 and dealer_bank >= -1 and quit >= 0 ]
 
 =======
 
 (program
-  (locations
-    (location
+  (statements
+    (statement
       (invariant
         (logic_condition
           (inequality
@@ -60,7 +62,7 @@ while quit <= 0.5 and bank > 0 and dealer_bank > 0 {
         (linear_polynomial: "bank")
       )
     )
-    (location
+    (statement
       (invariant
         (logic_condition
           (inequality
@@ -80,7 +82,7 @@ while quit <= 0.5 and bank > 0 and dealer_bank > 0 {
         (linear_polynomial: "0")
       )
     )
-    (location
+    (statement
       (invariant
         (logic_condition
           (inequality
@@ -118,8 +120,8 @@ while quit <= 0.5 and bank > 0 and dealer_bank > 0 {
             (linear_polynomial: "0")
           )
         )
-        (locations
-          (location
+        (statements
+          (statement
             (invariant
               (logic_condition
                 (inequality
@@ -140,8 +142,8 @@ while quit <= 0.5 and bank > 0 and dealer_bank > 0 {
               )
             )
             (choose_statement
-              (locations
-                (location
+              (statements
+                (statement
                   (invariant
                     (logic_condition
                       (inequality
@@ -165,8 +167,8 @@ while quit <= 0.5 and bank > 0 and dealer_bank > 0 {
                     (constant: "1")
                     (constant: "1")
                     (constant: "0")
-                    (locations
-                      (location
+                    (statements
+                      (statement
                         (invariant
                           (logic_condition
                             (inequality
@@ -191,7 +193,7 @@ while quit <= 0.5 and bank > 0 and dealer_bank > 0 {
                           (linear_polynomial: "bank + 1")
                         )
                       )
-                      (location
+                      (statement
                         (invariant
                           (logic_condition
                             (inequality
@@ -217,8 +219,8 @@ while quit <= 0.5 and bank > 0 and dealer_bank > 0 {
                         )
                       )
                     )
-                    (locations
-                      (location
+                    (statements
+                      (statement
                         (invariant
                           (logic_condition
                             (inequality
@@ -243,7 +245,7 @@ while quit <= 0.5 and bank > 0 and dealer_bank > 0 {
                           (linear_polynomial: "dealer_bank + 1")
                         )
                       )
-                      (location
+                      (statement
                         (invariant
                           (logic_condition
                             (inequality
@@ -272,8 +274,8 @@ while quit <= 0.5 and bank > 0 and dealer_bank > 0 {
                   )
                 )
               )
-              (locations
-                (location
+              (statements
+                (statement
                   (invariant
                     (logic_condition
                       (inequality

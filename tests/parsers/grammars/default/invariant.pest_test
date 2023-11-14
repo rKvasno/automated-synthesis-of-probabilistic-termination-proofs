@@ -2,18 +2,26 @@ invariant
 
 =======
 
-# a < 4 and b > 3
-# b > a and b >= 4
-# a < b and a > 0
+[ a < 4
+ and b > 3 ]
+[ b > a and
+  b >= 4 ]
+[ a < b 
+and
+a > 0 ]
 a = c
-# 1 < a and c > a and b > 0
-# c < 2 and c < a and b < c
+[
+  1 < a and
+  c > a and
+  b > 0
+]
+[ c < 2 and c < a and b < c ]
 
 =======
 
 (program
-  (locations
-    (location
+  (statements
+    (statement
       (invariant
         (logic_condition
           (inequality

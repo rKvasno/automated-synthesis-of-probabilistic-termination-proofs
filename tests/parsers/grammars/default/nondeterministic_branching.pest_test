@@ -2,26 +2,26 @@ Nondeterministic branching
 
 =======
 
-# 0 >= 0
+[ 0 >= 0 ]
 choose {
-  # a > a
+  [ a > a ]
   a = a
 }
 or {
-  # a > a
+  [ a > a ]
   a = a
 }
 or {
-  # a > a
+  [ a > a ]
   a = a
 }
-# 0 >= 0
+[ 0 >= 0 ]
 
 =======
 
 (program
-  (locations
-    (location
+  (statements
+    (statement
       (invariant
         (logic_condition
           (inequality
@@ -32,8 +32,8 @@ or {
         )
       )
       (choose_statement
-        (locations
-          (location
+        (statements
+          (statement
             (invariant
               (logic_condition
                 (inequality
@@ -49,8 +49,8 @@ or {
             )
           )
         )
-        (locations
-          (location
+        (statements
+          (statement
             (invariant
               (logic_condition
                 (inequality
@@ -66,8 +66,8 @@ or {
             )
           )
         )
-        (locations
-          (location
+        (statements
+          (statement
             (invariant
               (logic_condition
                 (inequality

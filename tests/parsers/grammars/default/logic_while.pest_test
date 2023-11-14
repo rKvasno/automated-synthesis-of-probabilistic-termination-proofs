@@ -2,18 +2,17 @@ Logic while_statement
 
 =======
 
-# 0 >= 0
+[ 0 >= 0 ]
 while a > a and a < a {
-    # a > a
     a = b
 }
-# 0 >= 0
+[ 0 >= 0 ]
 
 =======
 
 (program
-  (locations
-    (location
+  (statements
+    (statement
       (invariant
         (logic_condition
           (inequality
@@ -36,17 +35,8 @@ while a > a and a < a {
             (linear_polynomial: "a")
           )
         )
-        (locations
-          (location
-            (invariant
-              (logic_condition
-                (inequality
-                  (linear_polynomial: "a")
-                  (comparison_op: ">")
-                  (linear_polynomial: "a")
-                )
-              )
-            )
+        (statements
+          (statement
             (assignment_statement
               (variable: "a")
               (linear_polynomial: "b")

@@ -1,39 +1,39 @@
-program = { SOI ~ locations ~ invariant ~ NEWLINE* ~ EOI }
-location = { invariant ~ statement }
+program = { SOI ~ statements ~ invariant? ~ NEWLINE* ~ EOI }
+statement = { invariant? ~ statement_helper }
 
-invariant = { ("#" ~ logic_condition ~ NEWLINE)+ }
+invariant = { ("[" ~ NEWLINE* ~ logic_condition ~ NEWLINE* ~ "]" ~ NEWLINE* )+ }
 
-locations = { NEWLINE* ~ location ~ (NEWLINE+ ~ location)* ~ NEWLINE* | 
-            NEWLINE* ~ location ~ NEWLINE*             }
+statements = { NEWLINE* ~ statement ~ (NEWLINE+ ~ statement)* ~ NEWLINE* | 
+               NEWLINE* ~ statement ~ NEWLINE*                           }
 
-block = _{ NEWLINE* ~ "{" ~ locations ~ "}" }
+block = _{ NEWLINE? ~ "{" ~ statements ~ "}" }
 
-statement = _{ if_statement         |
-               odds_statement       | 
-               choose_statement     |
-               while_statement      |
-               assignment_statement }
+statement_helper = _{ "if" ~ if_statement         |
+                      "odds" ~ odds_statement     | 
+                      "choose" ~ choose_statement |
+                      "while" ~ while_statement   |
+                      assignment_statement        }
 
-if_statement = { "if " ~ if_helper }
+if_statement = { if_helper }
 if_helper = _{ logic_condition ~ block ~ ( NEWLINE? ~ "else" ~ NEWLINE? ~ else)? }
 else =  _{ "if " ~ if_helper |
-         block      }
+           block             }
 
-odds_statement = { "odds " ~ odds_helper }
+odds_statement = { odds_helper }
 odds_helper = _{ constant ~ ":" ~ ( odds_helper | constant ) ~ block }
 
-choose_statement = { "choose " ~ block ~ ( NEWLINE? ~ "or" ~ NEWLINE? ~ block )*}
-while_statement = { "while " ~ condition ~ block }
+choose_statement = { block ~ ( NEWLINE? ~ "or" ~  block )*}
+while_statement = { condition ~ block }
 assignment_statement = { variable ~ "=" ~ linear_polynomial}
 
-condition = _{ logic_condition   |
-             odds_condition    |
-             nondeterminism_sign  }
-logic_condition = { inequality ~ ( "and" ~ inequality )* }
+condition = _{ logic_condition     |
+               odds_condition      |
+               nondeterminism_sign }
+logic_condition = { inequality ~ ( NEWLINE? ~ "and" ~ NEWLINE? ~ inequality )* }
 odds_condition = { constant ~ ":" ~ constant }
 nondeterminism_sign = @{ "*" }
 
 inequality = { linear_polynomial ~ comparison_op ~ linear_polynomial }
 comparison_op = @{ "<=" | ">=" | "<" | ">" }
 
-COMMENT = _{ "##" ~ (!NEWLINE ~ ANY)* ~ NEWLINE }
+COMMENT = _{ "#" ~ (!NEWLINE ~ ANY)* ~ NEWLINE }

@@ -2,55 +2,25 @@ Nondeterministic while_statement
 
 =======
 
-# 0 >= 0
 while * {
-  # a > a
   a = b
 }
-# 0 >= 0
 
 =======
 
 (program
-  (locations
-    (location
-      (invariant
-        (logic_condition
-          (inequality
-            (linear_polynomial: "0")
-            (comparison_op: ">=")
-            (linear_polynomial: "0")
-          )
-        )
-      )
+  (statements
+    (statement
       (while_statement
         (nondeterminism_sign: "*")
-        (locations
-          (location
-            (invariant
-              (logic_condition
-                (inequality
-                  (linear_polynomial: "a")
-                  (comparison_op: ">")
-                  (linear_polynomial: "a")
-                )
-              )
-            )
+        (statements
+          (statement
             (assignment_statement
               (variable: "a")
               (linear_polynomial: "b")
             )
           )
         )
-      )
-    )
-  )
-  (invariant
-    (logic_condition
-      (inequality
-        (linear_polynomial: "0")
-        (comparison_op: ">=")
-        (linear_polynomial: "0")
       )
     )
   )

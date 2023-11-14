@@ -153,14 +153,14 @@ fn parse_program<'parse>(pts: &mut PTS, parse: Pair<'parse, Rule>) -> Result<(),
     Ok(())
 }
 
-// assumes the parses rule is Rule::locations
+// assumes the parses rule is Rule::statements
 fn parse_locations<'parse>(
     pts: &mut PTS,
     parse: Pair<'parse, Rule>,
     start_transition: &mut Transition,
     end: LocationHandle,
 ) -> Result<(), ParserError> {
-    assert_eq!(parse.to_owned().as_rule(), Rule::locations);
+    assert_eq!(parse.to_owned().as_rule(), Rule::statements);
     let parse_locations = parse.into_inner();
     let mut pts_locations = pts
         .locations
@@ -361,7 +361,7 @@ fn parse_if<'parse>(
             Rule::logic_condition => {
                 parse_if_condition(pts, pair, &mut conditions, &mut else_condition)
             }
-            Rule::locations => {
+            Rule::statements => {
                 transitions.push(Transition::default());
                 parse_locations(pts, pair, transitions.last_mut().unwrap(), end)?;
             }
@@ -433,7 +433,7 @@ fn parse_odds<'parse>(
     let mut prob_iter = probabilities.into_iter();
     let mut guards: Vec<(Constant, Transition)> = vec![];
     for locations_parse in parse_iter {
-        assert_eq!(locations_parse.to_owned().as_rule(), Rule::locations);
+        assert_eq!(locations_parse.to_owned().as_rule(), Rule::statements);
         // assert!(prob_iter.peek().is_some());
         guards.push((prob_iter.next().unwrap(), Default::default()));
 
@@ -714,9 +714,8 @@ mod tests {
         );
     }
 
-    //TODO incorrect
-    //#[test]
-    fn _parse_simple_if_program() {
+    #[test]
+    fn parse_simple_if_program() {
         let input = SIMPLE_IF_PROGRAM;
         let parsed = DefaultParser::parse(input).unwrap();
 
@@ -892,9 +891,8 @@ mod tests {
         );
     }
 
-    //TODO incorrect
-    //#[test]
-    fn _parse_simple_odds_program() {
+    #[test]
+    fn parse_simple_odds_program() {
         let input = SIMPLE_ODDS_PROGRAM;
         let parsed = DefaultParser::parse(input).unwrap();
 
@@ -1041,9 +1039,8 @@ mod tests {
         );
     }
 
-    //TODO incorrect
-    //#[test]
-    fn _parse_simple_choose_program() {
+    #[test]
+    fn parse_simple_choose_program() {
         let input = SIMPLE_CHOOSE_PROGRAM;
         let parsed = DefaultParser::parse(input).unwrap();
 
@@ -1422,41 +1419,80 @@ mod tests {
 
         #[test]
         fn empty() {
+            // this error is awful, but it only appears when the input contains only whitespace
             assert_eq!(
                 DefaultParser::parse("").err().unwrap().to_string(),
-                " --> 1:1\n  |\n1 | \n  | ^---\n  |\n  = expected invariant"
+                " --> 1:1\n  |\n1 | \n  | ^---\n  |\n  = expected statement"
             );
         }
 
         #[test]
-        fn deeper_rules() {
-            assert_eq!(DefaultParser::parse("# 0>0\n  while ").err().unwrap().to_string(), " --> 2:9\n  |\n2 |   while \n  |         ^---\n  |\n  = expected nondeterminism_sign, linear_polynomial, or constant");
+        fn statement() {
+            assert_eq!(
+                DefaultParser::parse("test").err().unwrap().to_string(),
+                " --> 1:1\n  |\n1 | test\n  | ^---\n  |\n  = expected statement"
+            );
         }
 
         #[test]
-        fn statement_choice() {
-            assert_eq!(DefaultParser::parse("# 0>0\n  choose ").err().unwrap().to_string(), " --> 2:3\n  |\n2 |   choose \n  |   ^---\n  |\n  = expected if_statement, odds_statement, choose_statement, while_statement, or assignment_statement");
+        fn if_statement() {
+            assert_eq!(
+                DefaultParser::parse("if").err().unwrap().to_string(),
+                " --> 1:3\n  |\n1 | if\n  |   ^---\n  |\n  = expected linear_polynomial"
+            );
+        }
+
+        #[test]
+        fn odds_statement() {
+            assert_eq!(
+                DefaultParser::parse("odds").err().unwrap().to_string(),
+                " --> 1:5\n  |\n1 | odds\n  |     ^---\n  |\n  = expected constant"
+            );
+        }
+
+        #[test]
+        fn choose_statement() {
+            assert_eq!(
+                DefaultParser::parse("choose").err().unwrap().to_string(),
+                " --> 1:7\n  |\n1 | choose\n  |       ^---\n  |\n  = expected choose_statement"
+            );
+        }
+
+        #[test]
+        fn while_statement() {
+            assert_eq!(
+                DefaultParser::parse("while").err().unwrap().to_string(),
+                " --> 1:6\n  |\n1 | while\n  |      ^---\n  |\n  = expected while_statement"
+            );
+        }
+
+        #[test]
+        fn assignment_statement() {
+            assert_eq!(
+                DefaultParser::parse("a =").err().unwrap().to_string(),
+                " --> 1:4\n  |\n1 | a =\n  |    ^---\n  |\n  = expected linear_polynomial"
+            );
         }
 
         #[test]
         fn branching_odds_sum_zero() {
             assert_eq!(
-                DefaultParser::parse("# 0>0\n  odds 0:0:0{\n#0<0\na=0\n}\n{\n#0<0\na=0\n}#0<0\n")
+                DefaultParser::parse("odds 0:0:0{\n#0<0\na=0\n}\n{\n#0<0\na=0\n}#0<0\n")
                     .err()
                     .unwrap()
                     .to_string(),
-                " --> 2:3\n  = the sum of odds cannot be zero\n"
+                " --> 1:6\n  = the sum of odds cannot be zero\n"
             );
         }
 
         #[test]
         fn while_odds_sum_zero() {
             assert_eq!(
-                DefaultParser::parse("# 0>0\n  while 0:0{\n#0<0\na=0\n}#0<0\n")
+                DefaultParser::parse("while 0:0{\n#0<0\na=0\n}#0<0\n")
                     .err()
                     .unwrap()
                     .to_string(),
-                " --> 2:9\n  = the sum of odds cannot be zero\n"
+                " --> 1:7\n  = the sum of odds cannot be zero\n"
             );
         }
     }

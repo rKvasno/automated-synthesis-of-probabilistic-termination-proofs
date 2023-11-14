@@ -2,15 +2,15 @@ Trivial program
 
 =======
 
-# 1 > 0
+[ 1 > 0 ]
 a = 1
-# 1 < 0
+[ 1 < 0 ]
 
 =======
 
 (program
-  (locations
-    (location
+  (statements
+    (statement
       (invariant
         (logic_condition
           (inequality

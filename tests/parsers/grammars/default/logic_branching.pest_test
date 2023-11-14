@@ -2,35 +2,23 @@ Logic branching
 
 =======
 
-# 0 >= 0
 if a >= b {
-  # a > a
+  [ a > a ]
   a = a
 }
 else if b <= c {
-  # a < a
   a = a
 }
 else {
-  # a > a
+  [ a > a ]
   a = a
 }
-# 0 >= 0
 
 =======
 
 (program
-  (locations
-    (location
-      (invariant
-        (logic_condition
-          (inequality
-            (linear_polynomial: "0")
-            (comparison_op: ">=")
-            (linear_polynomial: "0")
-          )
-        )
-      )
+  (statements
+    (statement
       (if_statement
         (logic_condition
           (inequality
@@ -39,8 +27,8 @@ else {
             (linear_polynomial: "b")
           )
         )
-        (locations
-          (location
+        (statements
+          (statement
             (invariant
               (logic_condition
                 (inequality
@@ -63,25 +51,16 @@ else {
             (linear_polynomial: "c")
           )
         )
-        (locations
-          (location
-            (invariant
-              (logic_condition
-                (inequality
-                  (linear_polynomial: "a")
-                  (comparison_op: "<")
-                  (linear_polynomial: "a")
-                )
-              )
-            )
+        (statements
+          (statement
             (assignment_statement
               (variable: "a")
               (linear_polynomial: "a")
             )
           )
         )
-        (locations
-          (location
+        (statements
+          (statement
             (invariant
               (logic_condition
                 (inequality
@@ -97,15 +76,6 @@ else {
             )
           )
         )
-      )
-    )
-  )
-  (invariant
-    (logic_condition
-      (inequality
-        (linear_polynomial: "0")
-        (comparison_op: ">=")
-        (linear_polynomial: "0")
       )
     )
   )
