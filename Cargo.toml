@@ -6,12 +6,13 @@ edition = "2021"
 [dependencies]
 dot = "0.1.4"
 indexmap = "2.0.2"
-pest = "2.5"
-pest_derive = "2.5"
+pest = "2.7.5"
+pest_derive = "2.7.5"
 minilp = "0.2.2"
+itertools = "0.11.0"
 
 [dev-dependencies]
 lazy_static = "1.4.0"
-pest-test = {git = "https://github.com/jdidion/pest-test.git"}
-pest-test-gen = {git = "https://github.com/jdidion/pest-test.git"}
+pest-test = "0.1.6"
+pest-test-gen = "0.1.7"
 pretty_assertions = "1.4.0"
