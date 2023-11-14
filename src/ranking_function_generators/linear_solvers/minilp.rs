@@ -12,16 +12,16 @@ use minilp::{
     Solution as MinilpCrateSolution, Variable as MinilpVariable,
 };
 
-struct Minilp();
+pub struct Minilp;
 
 #[derive(Debug, Clone)]
-struct MinilpSolution<V: Variable> {
+pub struct MinilpSolution<V: Variable> {
     variables: HashMap<V, MinilpVariable>,
     solution: MinilpCrateSolution,
 }
 
 #[derive(Debug)]
-struct MinilpIterator<V: Variable> {
+pub struct MinilpIterator<V: Variable> {
     variable_iter: IntoIter<V, MinilpVariable>,
     solution: MinilpCrateSolution,
 }
@@ -61,10 +61,10 @@ impl<V: Variable> Iterator for MinilpIterator<V> {
     }
 }
 
-impl<V: Variable> Solver<V> for Minilp {
+impl Solver for Minilp {
     type Error = MinilpError;
-    type Solution = MinilpSolution<V>;
-    fn solve(problem: Problem<V>) -> Result<Self::Solution, SolverError<Self::Error>> {
+    type Solution<V: Variable> = MinilpSolution<V>;
+    fn solve<V: Variable>(problem: Problem<V>) -> Result<Self::Solution<V>, SolverError<V>> {
         let (direction, function) = match problem.goal {
             Goal::Minimize(pol) => (OptimizationDirection::Minimize, pol),
             Goal::Maximize(pol) => (OptimizationDirection::Maximize, pol),
@@ -81,12 +81,7 @@ impl<V: Variable> Solver<V> for Minilp {
                         .cloned()
                         .unwrap_or_default()
                         .into(),
-                    problem
-                        .domains
-                        .get(var.borrow())
-                        .cloned()
-                        .unwrap_or_default()
-                        .into(),
+                    problem.domains.get(var).cloned().unwrap_or_default().into(),
                 ),
             );
         }
@@ -96,11 +91,11 @@ impl<V: Variable> Solver<V> for Minilp {
             for (var, coeff) in restriction.as_linear_polynomial() {
                 match var {
                     Some(v) => {
-                        let v = varmap.get(v.borrow()).cloned();
-                        if v.is_none() {
-                            return Err(SolverError::ForeignVariable);
+                        let orig_v = varmap.get(v).cloned();
+                        if orig_v.is_none() {
+                            return Err(SolverError::ForeignVariable(v.clone()));
                         }
-                        expr.add(v.unwrap(), coeff.clone().into())
+                        expr.add(orig_v.unwrap(), coeff.clone().into())
                     }
                     None => constant = coeff.clone().into(),
                 };
@@ -110,14 +105,17 @@ impl<V: Variable> Solver<V> for Minilp {
             } else if restriction.is_nonstrict_inequality() {
                 minilp::ComparisonOp::Le
             } else {
-                return Err(SolverError::InvalidRelationType);
+                return Err(SolverError::InvalidRelationType(restriction));
             };
             minilp.add_constraint(expr, comp, -constant)
         }
 
         let solution = match minilp.solve() {
             Ok(sol) => sol,
-            Err(e) => return Err(SolverError::Other(e)),
+            Err(e) => match e {
+                MinilpError::Unbounded => return Err(SolverError::Unbounded),
+                MinilpError::Infeasible => return Err(SolverError::Infeasible),
+            },
         };
 
         Ok(MinilpSolution::new(varmap, solution))
@@ -127,7 +125,7 @@ impl<V: Variable> Solver<V> for Minilp {
 #[cfg(test)]
 mod tests {
     use crate::{
-        domains,
+        domains, program_var,
         pts::{
             linear_polynomial::coefficient::Constant,
             variable::program_variable::{ProgramVariable, ProgramVariables},
@@ -139,7 +137,8 @@ mod tests {
     #[test]
     fn solve() {
         let mut variables: ProgramVariables = Default::default();
-        let domains = domains!(&mut variables, "b", 0.0, f64::INFINITY);
+        let var = program_var![&mut variables, "b"];
+        let domains = domains!(&mut variables, var, 0.0, f64::INFINITY);
         let restrictions = state_system!(
             &mut variables;
             "<=",

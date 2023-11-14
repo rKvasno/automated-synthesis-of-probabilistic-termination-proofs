@@ -1,7 +1,12 @@
 use core::fmt;
 use std::borrow::Cow;
 
-use crate::pts::{linear_polynomial::State, location::LocationHandle, variable::Variable, PTS};
+use crate::pts::{
+    invariant::Invariant, linear_polynomial::State, location::LocationHandle, system::StateSystem,
+    variable::Variable, PTS,
+};
+
+use self::linear_solvers::{Problem, Solution, Solver};
 
 #[cfg_attr(test, derive(PartialEq))]
 #[derive(Debug)]
@@ -34,8 +39,6 @@ impl RankingFunction {
     }
 }
 
-use self::linear_solvers::{Problem, Solution, Solver};
-
 pub mod farkas_based;
 pub mod linear_solvers;
 
@@ -46,14 +49,11 @@ pub struct RankedPTS {
     pub function: RankingFunction,
 }
 
-// write!(f, "f({}, ...) = {}\n", l, fun)?;
-
-// impl<'a> dot::Labeller<'a, LocationHandle, Edge> for PTS {}
-// impl<'a> dot::GraphWalk<'a, LocationHandle, Edge> for PTS {}
-
 #[derive(Debug)]
 pub enum GeneratorError {
     EpsIsZero,
+    PolyhedronIsEmpty(Invariant, StateSystem),
+    InvalidInvariant(Invariant),
 }
 
 impl std::error::Error for GeneratorError {}
@@ -62,13 +62,19 @@ impl fmt::Display for GeneratorError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             GeneratorError::EpsIsZero => write!(f, "no function was found"),
+            GeneratorError::PolyhedronIsEmpty(invariant, system) => {
+                write!(f, "polyhedron is empty: {system} in {invariant}")
+            }
+            GeneratorError::InvalidInvariant(invariant) => {
+                write!(f, "invariant contains invalid relations: {invariant}")
+            }
         }
     }
 }
 
 pub trait Generator {
     type VAR: Variable;
-    fn generate_problem<S: Solver<Self::VAR>>(pts: &PTS) -> Problem<Self::VAR>;
+    fn generate_problem<S: Solver>(pts: &PTS) -> Result<Problem<Self::VAR>, GeneratorError>;
     fn build_ranking_function<S: Solution<Self::VAR>>(
         pts: PTS,
         solution: S,
@@ -106,9 +112,7 @@ impl<'a> dot::Labeller<'a, LocationHandle, Edge> for RankedPTS {
 
     fn node_label(&'a self, n: &LocationHandle) -> dot::LabelText<'a> {
         // invariant
-        dot::LabelText::LabelStr(Cow::Owned(
-            self.function.get(n.to_owned()).unwrap().to_string(),
-        ))
+        dot::LabelText::LabelStr(Cow::Owned(self.function.get(*n).unwrap().to_string()))
     }
 
     fn edge_label(&'a self, e: &Edge) -> dot::LabelText<'a> {

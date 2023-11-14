@@ -1,6 +1,6 @@
 use super::{
     guard::{Guards, GuardsError},
-    invariant::{Invariant, InvariantError},
+    invariant::Invariant,
     system::StateSystem,
 };
 
@@ -107,21 +107,12 @@ impl Locations {
         Ok(())
     }
 
-    pub fn set_invariant(
-        &mut self,
-        location: LocationHandle,
-        invariant: Invariant,
-    ) -> Result<(), InvariantError> {
-        if invariant.is_empty() {
-            return Err(InvariantError::Empty);
-        };
-
+    pub fn set_invariant(&mut self, location: LocationHandle, invariant: Invariant) {
         if location.is_none() {
             self.terminating_invariant = invariant;
         } else {
             self.data[location.unwrap()].invariant = invariant;
         };
-        Ok(())
     }
 
     pub fn iter(&self) -> LocationIter {

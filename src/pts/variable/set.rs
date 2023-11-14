@@ -10,9 +10,9 @@ use super::Variable;
 macro_rules! variables{
     [ $( $x:expr ),+ $(,)?] => {
         {
-            let mut tmp = Default::default();
+            let mut tmp = $crate::pts::variable::set::VariableSet::default();
             $(
-                $crate::pts::variable::Variable::new(&mut tmp, $x);
+                tmp.insert($x);
             )+
             tmp
         }
@@ -61,7 +61,7 @@ impl<V: Variable, S: BuildHasher + Default> VariableSet<V, S> {
         // TODO uprade to Indexset::get_or_insert if it becomes stable
         let tmp: V = variable.into();
         self.insert(tmp.to_owned());
-        self.data.get(tmp.borrow()).unwrap().clone()
+        self.data.get(&tmp).unwrap().clone()
     }
 
     pub fn get<K>(&self, variable: &K) -> Option<&V>
@@ -130,27 +130,27 @@ impl<'a, V: Variable, S: BuildHasher> IntoIterator for &'a VariableSet<V, S> {
 mod tests {
     use std::rc::Rc;
 
-    use crate::pts::variable::program_variable::ProgramVariables;
+    use crate::{program_variables, pts::variable::program_variable::ProgramVariables};
 
     mod macros {
 
         mod variables {
             use std::{borrow::Borrow, collections::HashSet, rc::Rc};
 
-            use crate::pts::variable::{
-                program_variable::{ProgramVariable, ProgramVariables},
-                Variable,
+            use crate::{
+                program_var, program_variables,
+                pts::variable::program_variable::{ProgramVariable, ProgramVariables},
             };
 
             #[test]
             fn non_empty() {
                 let mut variables: ProgramVariables = ProgramVariables::default();
-                ProgramVariable::new(&mut variables, "test");
-                ProgramVariable::new(&mut variables, "apple");
-                ProgramVariable::new(&mut variables, "testington");
-                ProgramVariable::new(&mut variables, "apple");
-                ProgramVariable::new(&mut variables, "testington");
-                assert_eq!(variables, variables!("test", "apple", "testington"));
+                program_var!(&mut variables, "test");
+                program_var!(&mut variables, "apple");
+                program_var!(&mut variables, "testington");
+                program_var!(&mut variables, "apple");
+                program_var!(&mut variables, "testington");
+                assert_eq!(variables, program_variables!("test", "apple", "testington"));
 
                 let mut variables: ProgramVariables = HashSet::<ProgramVariable>::default().into();
                 variables.insert(Rc::<str>::from("testington"));
@@ -158,13 +158,13 @@ mod tests {
                 variables.insert(Rc::<str>::from("apple"));
                 assert_eq!(
                     &variables,
-                    variables!("test", "apple", "testington").borrow()
+                    program_variables!("test", "apple", "testington").borrow()
                 );
             }
 
             #[test]
             fn empty() {
-                let tmp: ProgramVariables = variables!();
+                let tmp: ProgramVariables = program_variables!();
                 assert_eq!(ProgramVariables::default(), tmp);
             }
         }
@@ -173,53 +173,53 @@ mod tests {
     #[test]
     fn insert() {
         let mut variables: ProgramVariables = ProgramVariables::default();
-        assert_eq!(variables, variables!());
+        assert_eq!(variables, program_variables!());
         assert!(variables.insert(Rc::<str>::from("testington")));
-        assert_eq!(variables, variables!("testington"));
+        assert_eq!(variables, program_variables!("testington"));
         assert!(!variables.insert(Rc::<str>::from("testington")));
-        assert_eq!(variables, variables!("testington"));
+        assert_eq!(variables, program_variables!("testington"));
         assert!(variables.insert(Rc::<str>::from("test")));
-        assert_eq!(variables, variables!("test", "testington"));
+        assert_eq!(variables, program_variables!("test", "testington"));
         assert!(variables.insert(Rc::<str>::from("apple")));
-        assert_eq!(variables, variables!("test", "apple", "testington"));
+        assert_eq!(variables, program_variables!("test", "apple", "testington"));
         assert!(!variables.insert(Rc::<str>::from("apple")));
-        assert_eq!(variables, variables!("test", "apple", "testington"));
+        assert_eq!(variables, program_variables!("test", "apple", "testington"));
     }
 
     #[test]
     fn get() {
-        let set: ProgramVariables = variables!();
+        let set: ProgramVariables = program_variables!();
         assert!(set.get("a").is_none());
         assert!(set.get("b").is_none());
 
-        let set: ProgramVariables = variables!("test", "x", "variable");
+        let set: ProgramVariables = program_variables!("test", "x", "variable");
         assert!(set.get("a").is_none());
         assert!(set.get("b").is_none());
 
-        let set: ProgramVariables = variables!("a");
+        let set: ProgramVariables = program_variables!("a");
         assert_eq!(&**set.get("a").unwrap(), "a");
         assert!(set.get("b").is_none());
 
-        let set: ProgramVariables = variables!("test", "b", "variable");
+        let set: ProgramVariables = program_variables!("test", "b", "variable");
         assert!(set.get("a").is_none());
         assert_eq!(&**set.get("b").unwrap(), "b");
     }
 
     #[test]
     fn contains() {
-        let set: ProgramVariables = variables!();
+        let set: ProgramVariables = program_variables!();
         assert!(!set.contains("a"));
         assert!(!set.contains("b"));
 
-        let set: ProgramVariables = variables!("test", "x", "variable");
+        let set: ProgramVariables = program_variables!("test", "x", "variable");
         assert!(!set.contains("a"));
         assert!(!set.contains("b"));
 
-        let set: ProgramVariables = variables!("a");
+        let set: ProgramVariables = program_variables!("a");
         assert!(set.contains("a"));
         assert!(!set.contains("b"));
 
-        let set: ProgramVariables = variables!("test", "b", "variable");
+        let set: ProgramVariables = program_variables!("test", "b", "variable");
         assert!(!set.contains("a"));
         assert!(set.contains("b"));
     }
@@ -227,32 +227,32 @@ mod tests {
     #[test]
     fn get_or_insert() {
         let mut variables: ProgramVariables = ProgramVariables::default();
-        assert_eq!(variables, variables!());
+        assert_eq!(variables, program_variables!());
         assert_eq!(
             variables.get_or_insert(Rc::<str>::from("testington")),
             Rc::<str>::from("testington").into()
         );
-        assert_eq!(variables, variables!("testington"));
+        assert_eq!(variables, program_variables!("testington"));
         assert_eq!(
             variables.get_or_insert(Rc::<str>::from("testington")),
             Rc::<str>::from("testington").into()
         );
         assert!(!variables.insert(Rc::<str>::from("testington")));
-        assert_eq!(variables, variables!("testington"));
+        assert_eq!(variables, program_variables!("testington"));
         assert_eq!(
             variables.get_or_insert(Rc::<str>::from("test")),
             Rc::<str>::from("test").into()
         );
-        assert_eq!(variables, variables!("test", "testington"));
+        assert_eq!(variables, program_variables!("test", "testington"));
         assert_eq!(
             variables.get_or_insert(Rc::<str>::from("apple")),
             Rc::<str>::from("apple").into()
         );
-        assert_eq!(variables, variables!("test", "apple", "testington"));
+        assert_eq!(variables, program_variables!("test", "apple", "testington"));
         assert_eq!(
             variables.get_or_insert(Rc::<str>::from("apple")),
             Rc::<str>::from("apple").into()
         );
-        assert_eq!(variables, variables!("test", "apple", "testington"));
+        assert_eq!(variables, program_variables!("test", "apple", "testington"));
     }
 }

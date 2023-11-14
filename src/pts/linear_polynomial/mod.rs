@@ -33,7 +33,7 @@ macro_rules! polynomial {
             let mut temp = $crate::pts::linear_polynomial::Polynomial::default();
             $(
                 $(
-                    temp.add_term($coeff, Some($crate::pts::variable::Variable::new($varset, $var)));
+                    temp.add_term($coeff, Some(($varset).get_or_insert($var)));
                 )*
             )?
             temp.add_term( $constant, None);
@@ -60,7 +60,7 @@ macro_rules! state {
                             $crate::pts::linear_polynomial::coefficient::Constant::from(
                                 $coeff
                             ),
-                            $var
+                            std::rc::Rc::from($var)
                         ), +
                     )?
                 )?
@@ -355,37 +355,26 @@ impl<V: Variable, C: Coefficient> Neg for Polynomial<V, C> {
 #[cfg(test)]
 mod tests {
     mod macros {
+
         use crate::{
+            program_var, program_variables,
             pts::{
                 linear_polynomial::{coefficient::Constant, State},
-                variable::{
-                    program_variable::{ProgramVariable, ProgramVariables},
-                    Variable,
-                },
+                variable::program_variable::ProgramVariables,
             },
-            variables,
         };
 
         #[test]
         fn state() {
-            let mut variables: ProgramVariables = variables!("a", "e", "i");
+            let mut variables: ProgramVariables = program_variables!("a", "e", "i");
             let data = vec![
                 (None, Constant(-5.0)),
-                (
-                    Some(ProgramVariable::new(&mut variables, "i")),
-                    Constant(1.0),
-                ),
-                (
-                    Some(ProgramVariable::new(&mut variables, "a")),
-                    Constant(0.0),
-                ),
-                (
-                    Some(ProgramVariable::new(&mut variables, "e")),
-                    Constant(90.0),
-                ),
+                (Some(program_var!(&mut variables, "i")), Constant(1.0)),
+                (Some(program_var!(&mut variables, "a")), Constant(0.0)),
+                (Some(program_var!(&mut variables, "e")), Constant(90.0)),
             ];
 
-            assert_eq!(variables, variables!("a", "e", "i"));
+            assert_eq!(variables, program_variables!("a", "e", "i"));
             assert_eq!(
                 state!(-5.0, &mut variables, 0.0, "a", 90.0, "e", 1.0, "i"),
                 State::from_iter(data)
@@ -410,21 +399,17 @@ mod tests {
 
     mod add {
 
+        use std::rc::Rc;
+
         use crate::{
-            pts::{
-                linear_polynomial::State,
-                variable::{
-                    program_variable::{ProgramVariable, ProgramVariables},
-                    Variable,
-                },
-            },
-            variables,
+            program_variables,
+            pts::{linear_polynomial::State, variable::program_variable::ProgramVariables},
         };
 
         #[test]
         fn variable() {
             let mut pol = State::default();
-            let mut variables: ProgramVariables = variables!("a", "b", "c");
+            let mut variables: ProgramVariables = program_variables!("a", "b", "c");
             let var = variables.get("b").unwrap().clone();
             pol.add_term(1.0, var.clone());
             assert_eq!(
@@ -446,7 +431,7 @@ mod tests {
         #[test]
         fn constant() {
             let mut pol = State::default();
-            let mut variables: ProgramVariables = variables!("a", "b", "c");
+            let mut variables: ProgramVariables = program_variables!("a", "b", "c");
             pol.add_term(1.0, None);
             assert_eq!(
                 pol,
@@ -462,18 +447,18 @@ mod tests {
         #[test]
         fn out_of_bounds() {
             let mut pol = State::default();
-            let mut variables: ProgramVariables = variables!("a", "b", "c");
-            pol.add_term(1.0, ProgramVariable::new(&mut variables, "e"));
+            let mut variables: ProgramVariables = program_variables!("a", "b", "c");
+            pol.add_term(1.0, variables.get_or_insert(Rc::from("e")));
             assert_eq!(pol, state!(0.0, &mut variables, 1.0, "e"));
         }
     }
 
     mod ops {
-        use crate::{pts::variable::program_variable::ProgramVariables, variables};
+        use crate::{program_variables, pts::variable::program_variable::ProgramVariables};
 
         #[test]
         fn add() {
-            let mut variables: ProgramVariables = variables!();
+            let mut variables: ProgramVariables = program_variables!();
             let mut lhs = state!(1.0, &mut variables, 2.0, "a", 3.0, "b", 4.0, "c");
             let rhs = state!(4.0, &mut variables, 3.0, "a", 2.0, "b", 1.0, "c");
             let sum = lhs.to_owned() + rhs.to_owned();
@@ -490,7 +475,7 @@ mod tests {
 
         #[test]
         fn sub() {
-            let mut variables: ProgramVariables = variables!();
+            let mut variables: ProgramVariables = program_variables!();
             let mut lhs = state!(2.0, &mut variables, 3.0, "a", 4.0, "b", 5.0, "c");
             let rhs = state!(1.0, &mut variables, 1.0, "a", 1.0, "b", 1.0, "c");
             let diff = lhs.to_owned() - rhs.to_owned();
@@ -507,7 +492,7 @@ mod tests {
 
         #[test]
         fn neg() {
-            let mut variables: ProgramVariables = variables!();
+            let mut variables: ProgramVariables = program_variables!();
             let lhs = state!(0.0, &mut variables, -3.0, "a", 4.0, "b", -5.0, "c");
             let lhs = -lhs;
             assert_eq!(
@@ -520,20 +505,19 @@ mod tests {
     mod fmt {
 
         use crate::{
+            program_variables,
             pts::{linear_polynomial::State, variable::program_variable::ProgramVariables},
-            variables,
         };
 
         mod term {
+            use std::rc::Rc;
+
             use crate::{
+                program_var, program_variables,
                 pts::{
                     linear_polynomial::{coefficient::Constant, fmt_term},
-                    variable::{
-                        program_variable::{ProgramVariable, ProgramVariables},
-                        Variable,
-                    },
+                    variable::program_variable::{ProgramVariable, ProgramVariables},
                 },
-                variables,
             };
 
             struct TestTermDisplay(Constant, Option<ProgramVariable>);
@@ -556,9 +540,9 @@ mod tests {
 
             #[test]
             fn coeff_var() {
-                let mut variables: ProgramVariables = variables!();
+                let mut variables: ProgramVariables = program_variables!();
                 assert_eq!(
-                    TestTermDisplay::new(50.0, ProgramVariable::new(&mut variables, "Test"))
+                    TestTermDisplay::new(50.0, variables.get_or_insert(Rc::from("Test")))
                         .to_string(),
                     "50Test"
                 );
@@ -566,50 +550,45 @@ mod tests {
 
             #[test]
             fn neg_coeff_var() {
-                let mut variables: ProgramVariables = variables!();
+                let mut variables: ProgramVariables = program_variables!();
                 assert_eq!(
-                    TestTermDisplay::new(-0.5, ProgramVariable::new(&mut variables, "a"))
-                        .to_string(),
+                    TestTermDisplay::new(-0.5, program_var!(&mut variables, "a")).to_string(),
                     "-0.5a"
                 );
             }
 
             #[test]
             fn neg_var() {
-                let mut variables: ProgramVariables = variables!();
+                let mut variables: ProgramVariables = program_variables!();
                 assert_eq!(
-                    TestTermDisplay::new(-1.0, ProgramVariable::new(&mut variables, "a"))
-                        .to_string(),
+                    TestTermDisplay::new(-1.0, program_var!(&mut variables, "a")).to_string(),
                     "-a"
                 );
             }
 
             #[test]
             fn pos_var() {
-                let mut variables: ProgramVariables = variables!();
+                let mut variables: ProgramVariables = program_variables!();
                 assert_eq!(
-                    TestTermDisplay::new(1.0, ProgramVariable::new(&mut variables, "a"))
-                        .to_string(),
+                    TestTermDisplay::new(1.0, program_var!(&mut variables, "a")).to_string(),
                     "a"
                 );
             }
 
             #[test]
             fn zero_coeff() {
-                let mut variables: ProgramVariables = variables!();
+                let mut variables: ProgramVariables = program_variables!();
                 assert_eq!(
-                    TestTermDisplay::new(0.0, ProgramVariable::new(&mut variables, "test"))
-                        .to_string(),
+                    TestTermDisplay::new(0.0, program_var!(&mut variables, "test")).to_string(),
                     ""
                 );
             }
 
             #[test]
             fn neg_zero_coeff() {
-                let mut variables: ProgramVariables = variables!();
+                let mut variables: ProgramVariables = program_variables!();
                 assert_eq!(
-                    TestTermDisplay::new(0.0, ProgramVariable::new(&mut variables, "test"))
-                        .to_string(),
+                    TestTermDisplay::new(0.0, program_var!(&mut variables, "test")).to_string(),
                     ""
                 );
             }
@@ -654,14 +633,14 @@ mod tests {
 
         #[test]
         fn variable() {
-            let mut variables: ProgramVariables = variables!("test");
+            let mut variables: ProgramVariables = program_variables!("test");
             let pol = state![0.0, &mut variables, 1.0, "test"];
             assert_eq!(pol.to_string(), "test");
         }
 
         #[test]
         fn starts_negative() {
-            let variables: ProgramVariables = variables!("a", "b", "c",);
+            let variables: ProgramVariables = program_variables!("a", "b", "c",);
             let mut pol = State::default();
 
             pol.add_term(-5.0, None);
@@ -674,7 +653,7 @@ mod tests {
 
         #[test]
         fn only_constant() {
-            let mut variables: ProgramVariables = variables!("a", "b", "c",);
+            let mut variables: ProgramVariables = program_variables!("a", "b", "c",);
             let pol = state!(-5.0, &mut variables, 0.0, "a", 0.0, "b", 0.0, "c");
 
             assert_eq!(pol.to_string(), "-5");

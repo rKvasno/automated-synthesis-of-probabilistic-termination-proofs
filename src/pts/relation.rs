@@ -57,6 +57,31 @@ macro_rules! relation {
     };
 }
 
+#[macro_export]
+macro_rules! state_relation {
+   [
+       $sign:literal,
+       $constant: expr $(
+           , $varset:expr $(,
+               $coeff:expr,
+               $var:expr
+            )*
+        )? $(,)?
+   ] => {
+       {
+           $crate::relation![
+               $sign,
+               $constant $(
+                   , $varset $(,
+                       $coeff,
+                       std::rc::Rc::from($var)
+                    )*
+               )?
+           ]
+       }
+   }
+}
+
 #[derive(Debug, PartialEq, Eq)]
 pub enum RelationSign {
     LT,
@@ -118,6 +143,19 @@ impl<V: Variable, C: Coefficient> Relation<V, C> {
 
     pub fn as_linear_polynomial<'b>(&'b self) -> &'b Polynomial<V, C> {
         &self.pol
+    }
+
+    pub fn get_relation_type(&self) -> &RelationType {
+        &self.relation_type
+    }
+
+    pub fn get_relation_sign(&self) -> RelationSign {
+        match self.relation_type {
+            RelationType::Equation => RelationSign::EQ,
+            RelationType::StrictInequality => RelationSign::LT,
+            RelationType::Inequation => RelationSign::NE,
+            RelationType::NonstrictInequality => RelationSign::LE,
+        }
     }
 
     pub fn is_strict_inequality(&self) -> bool {
@@ -285,7 +323,7 @@ mod tests {
                 relation_type: RelationType::StrictInequality,
                 pol: state!(1.0, &mut variables, -4.5, "c", 0.0, "a"),
             };
-            let b = relation!("<", 1.0, &mut variables, -4.5, "c", 0.0, "a");
+            let b = state_relation!("<", 1.0, &mut variables, -4.5, "c", 0.0, "a");
             assert_eq!(a, b)
         }
     }
@@ -366,7 +404,7 @@ mod tests {
         #[test]
         fn constant() {
             let mut variables: ProgramVariables = variables!();
-            let lhs = relation!("<=", 9.0, &mut variables, -3.0, "x", -5.0, "y", 4.0, "z");
+            let lhs = state_relation!("<=", 9.0, &mut variables, -3.0, "x", -5.0, "y", 4.0, "z");
             let (lhs, rhs) = lhs.split_constant();
             assert_eq!(
                 lhs,

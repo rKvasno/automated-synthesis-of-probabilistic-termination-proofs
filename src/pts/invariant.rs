@@ -19,7 +19,7 @@ macro_rules! invariant {
                 vec![
                     $($crate::system![
                         $(
-                            $crate::relation!
+                            $crate::state_relation!
                             [
                                 $sign,
                                 $constant,
@@ -121,24 +121,11 @@ impl std::fmt::Display for Invariant {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum InvariantError {
-    Empty,
-}
-
-impl std::fmt::Display for InvariantError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            InvariantError::Empty => write!(f, "invariant can't be empty"),
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use crate::{
         pts::{invariant::Invariant, variable::program_variable::ProgramVariables},
-        relation, system, variables,
+        state_relation, system, variables,
     };
 
     #[test]
@@ -147,7 +134,7 @@ mod tests {
         assert_eq!(
             Invariant {
                 data: vec![system!(
-                    relation!(
+                    state_relation!(
                         ">",
                         0.0,
                         &mut variables,
@@ -160,9 +147,9 @@ mod tests {
                         -0.0,
                         "d"
                     ),
-                    relation!("<=", -1.0, &mut variables, -2.4, "a"),
-                    relation!("=", 0.0, &mut variables, 0.0, "a", 0.0, "b", 0.0, "c"),
-                    relation!("!=", 111.111)
+                    state_relation!("<=", -1.0, &mut variables, -2.4, "a"),
+                    state_relation!("=", 0.0, &mut variables, 0.0, "a", 0.0, "b", 0.0, "c"),
+                    state_relation!("!=", 111.111)
                 )]
             },
             invariant!(

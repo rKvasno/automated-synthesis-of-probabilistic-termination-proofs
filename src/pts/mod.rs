@@ -136,8 +136,9 @@ mod tests {
                 TRIVIAL_PROGRAM, WHILE_LOGIC_PROGRAM, WHILE_NONDETERMINISTIC_PROGRAM,
                 WHILE_PROB_PROGRAM,
             },
+            program_variables,
             pts::{location::Locations, variable::program_variable::ProgramVariables, PTS},
-            state_system, transition, variables,
+            state_system, transition,
         };
 
         #[test]
@@ -145,7 +146,7 @@ mod tests {
             let mut string = Vec::<u8>::default();
             let pts = PTS {
                 locations: Locations::default(),
-                variables: variables!(),
+                variables: program_variables!(),
             };
             dot::render(&pts, &mut string).unwrap();
             let string = std::str::from_utf8(string.as_slice()).unwrap().to_string();
@@ -158,13 +159,11 @@ mod tests {
             let handle = locations.new_location();
             locations.initial = handle;
 
-            let mut variables: ProgramVariables = variables!("a");
+            let mut variables: ProgramVariables = program_variables!("a");
 
             // line #
             // 1
-            locations
-                .set_invariant(handle, invariant!(&mut variables, ["<", -1.0]))
-                .unwrap();
+            locations.set_invariant(handle, invariant!(&mut variables, ["<", -1.0]));
             // 2
             locations
                 .set_outgoing(
@@ -173,12 +172,10 @@ mod tests {
                 )
                 .unwrap();
             // 3
-            locations
-                .set_invariant(
-                    locations.get_terminating_location(),
-                    invariant!(&mut variables, ["<", 1.0, 0.0, "a"]),
-                )
-                .unwrap();
+            locations.set_invariant(
+                locations.get_terminating_location(),
+                invariant!(&mut variables, ["<", 1.0, 0.0, "a"]),
+            );
 
             let pts = PTS {
                 locations,
@@ -195,16 +192,14 @@ mod tests {
         fn dot_simple_program() {
             let mut locations = Locations::default();
             let mut locations_iter = locations.new_n_locations(3);
-            let mut variables: ProgramVariables = variables!("a");
+            let mut variables: ProgramVariables = program_variables!("a");
 
             let handle = locations_iter.next().unwrap();
             locations.initial = handle;
 
             // line #
             // 1
-            locations
-                .set_invariant(handle, invariant!(&mut variables, ["<", 0.0, -1.0, "a"]))
-                .unwrap();
+            locations.set_invariant(handle, invariant!(&mut variables, ["<", 0.0, -1.0, "a"]));
 
             // 2
             let next_location = locations_iter.next().unwrap();
@@ -219,15 +214,13 @@ mod tests {
 
             // 3
             let handle = next_location;
-            locations
-                .set_invariant(
-                    handle,
-                    invariant!(&mut variables, [
-                        "<=", 1.0, 0.0, "a", -1.0, "b";
-                        "<", 0.0, -1.0, "a", 0.0, "b"
-                    ]),
-                )
-                .unwrap();
+            locations.set_invariant(
+                handle,
+                invariant!(&mut variables, [
+                    "<=", 1.0, 0.0, "a", -1.0, "b";
+                    "<", 0.0, -1.0, "a", 0.0, "b"
+                ]),
+            );
 
             // 4
             let next_location = locations_iter.next().unwrap();
@@ -240,16 +233,14 @@ mod tests {
 
             // 5
             let handle = next_location;
-            locations
-                .set_invariant(
-                    handle,
-                    invariant!(&mut variables, [
-                        "<=", 1.0, 0.0, "a", -1.0, "b", 0.0, "c";
-                        "<", 0.0, -1.0, "a", 0.0, "b", 0.0, "c";
-                        "<", 1.0, 0.0, "a", 0.0, "b", -1.0, "c"
-                    ]),
-                )
-                .unwrap();
+            locations.set_invariant(
+                handle,
+                invariant!(&mut variables, [
+                    "<=", 1.0, 0.0, "a", -1.0, "b", 0.0, "c";
+                    "<", 0.0, -1.0, "a", 0.0, "b", 0.0, "c";
+                    "<", 1.0, 0.0, "a", 0.0, "b", -1.0, "c"
+                ]),
+            );
 
             // 6
             let next_location = locations.get_terminating_location();
@@ -264,16 +255,14 @@ mod tests {
 
             // 7
             let handle = next_location;
-            locations
-                .set_invariant(
-                    handle,
-                    invariant!(&mut variables, [
-                        "<", 1.0, 0.0, "a", -1.0, "b", 0.0, "c";
-                        "<", 0.0, -1.0, "a", 0.0, "b", 0.0, "c";
-                        "<", 1.0, 0.0, "a", 0.0, "b", -1.0, "c"
-                    ]),
-                )
-                .unwrap();
+            locations.set_invariant(
+                handle,
+                invariant!(&mut variables, [
+                    "<", 1.0, 0.0, "a", -1.0, "b", 0.0, "c";
+                    "<", 0.0, -1.0, "a", 0.0, "b", 0.0, "c";
+                    "<", 1.0, 0.0, "a", 0.0, "b", -1.0, "c"
+                ]),
+            );
 
             let pts = PTS {
                 locations,
@@ -291,16 +280,14 @@ mod tests {
         fn dot_simple_if_program() {
             let mut locations = Locations::default();
             let mut locations_iter = locations.new_n_locations(5);
-            let mut variables: ProgramVariables = variables!("a", "b", "c");
+            let mut variables: ProgramVariables = program_variables!("a", "b", "c");
 
             let start = locations_iter.next().unwrap();
             locations.initial = start;
 
             // line #
             // 1
-            locations
-                .set_invariant(start, invariant!(&mut variables, ["<", 0.0]))
-                .unwrap();
+            locations.set_invariant(start, invariant!(&mut variables, ["<", 0.0]));
 
             let junction = locations_iter.next().unwrap();
             let branch_1 = locations_iter.next().unwrap();
@@ -330,12 +317,10 @@ mod tests {
                 .unwrap();
 
             // 3
-            locations
-                .set_invariant(
-                    branch_1,
-                    invariant!(&mut variables, ["<", 0.0, 0.0, "a", 0.0, "b"]),
-                )
-                .unwrap();
+            locations.set_invariant(
+                branch_1,
+                invariant!(&mut variables, ["<", 0.0, 0.0, "a", 0.0, "b"]),
+            );
 
             // 4
             locations
@@ -346,12 +331,10 @@ mod tests {
                 .unwrap();
 
             // 7
-            locations
-                .set_invariant(
-                    branch_2,
-                    invariant!(&mut variables, ["<", 0.0, 0.0, "a", 0.0, "b", 0.0, "c"]),
-                )
-                .unwrap();
+            locations.set_invariant(
+                branch_2,
+                invariant!(&mut variables, ["<", 0.0, 0.0, "a", 0.0, "b", 0.0, "c"]),
+            );
 
             // 8
             locations
@@ -364,12 +347,10 @@ mod tests {
                 .unwrap();
 
             // 11
-            locations
-                .set_invariant(
-                    branch_3,
-                    invariant!(&mut variables, ["<", 0.0, 0.0, "a", 0.0, "b", 0.0, "c"]),
-                )
-                .unwrap();
+            locations.set_invariant(
+                branch_3,
+                invariant!(&mut variables, ["<", 0.0, 0.0, "a", 0.0, "b", 0.0, "c"]),
+            );
 
             // 12
             locations
@@ -382,12 +363,10 @@ mod tests {
                 .unwrap();
 
             // 14
-            locations
-                .set_invariant(
-                    junction,
-                    invariant!(&mut variables, ["<", 0.0, 0.0, "a", 0.0, "b", 0.0, "c"]),
-                )
-                .unwrap();
+            locations.set_invariant(
+                junction,
+                invariant!(&mut variables, ["<", 0.0, 0.0, "a", 0.0, "b", 0.0, "c"]),
+            );
 
             // 15
             locations
@@ -400,12 +379,10 @@ mod tests {
                 .unwrap();
 
             // 16
-            locations
-                .set_invariant(
-                    locations.get_terminating_location(),
-                    invariant!(&mut variables, ["<", 0.0, 0.0, "a", 0.0, "b", 0.0, "c"]),
-                )
-                .unwrap();
+            locations.set_invariant(
+                locations.get_terminating_location(),
+                invariant!(&mut variables, ["<", 0.0, 0.0, "a", 0.0, "b", 0.0, "c"]),
+            );
 
             let pts = PTS {
                 locations,
@@ -423,16 +400,14 @@ mod tests {
         fn dot_trivial_if_program() {
             let mut locations = Locations::default();
             let mut locations_iter = locations.new_n_locations(3);
-            let mut variables: ProgramVariables = variables!("a");
+            let mut variables: ProgramVariables = program_variables!("a");
 
             let start = locations_iter.next().unwrap();
             locations.initial = start;
 
             // line #
             // 1
-            locations
-                .set_invariant(start, invariant!(&mut variables, ["<", 0.0]))
-                .unwrap();
+            locations.set_invariant(start, invariant!(&mut variables, ["<", 0.0]));
             let junction = locations_iter.next().unwrap();
             let branch_1 = locations_iter.next().unwrap();
             locations
@@ -452,12 +427,10 @@ mod tests {
                 .unwrap();
 
             // 3
-            locations
-                .set_invariant(
-                    branch_1,
-                    invariant!(&mut variables, ["<", 0.0, 0.0, "a", 0.0, "b"]),
-                )
-                .unwrap();
+            locations.set_invariant(
+                branch_1,
+                invariant!(&mut variables, ["<", 0.0, 0.0, "a", 0.0, "b"]),
+            );
 
             // 4
             locations
@@ -468,12 +441,10 @@ mod tests {
                 .unwrap();
 
             // 6
-            locations
-                .set_invariant(
-                    junction,
-                    invariant!(&mut variables, ["<", 0.0, 0.0, "a", 0.0, "b"]),
-                )
-                .unwrap();
+            locations.set_invariant(
+                junction,
+                invariant!(&mut variables, ["<", 0.0, 0.0, "a", 0.0, "b"]),
+            );
 
             // 7
             locations
@@ -486,12 +457,10 @@ mod tests {
                 .unwrap();
 
             // 8
-            locations
-                .set_invariant(
-                    locations.get_terminating_location(),
-                    invariant!(&mut variables, ["<", 0.0, 0.0, "a", 0.0, "b"]),
-                )
-                .unwrap();
+            locations.set_invariant(
+                locations.get_terminating_location(),
+                invariant!(&mut variables, ["<", 0.0, 0.0, "a", 0.0, "b"]),
+            );
 
             let pts = PTS {
                 locations,
@@ -509,16 +478,14 @@ mod tests {
         fn dot_simple_odds_program() {
             let mut locations = Locations::default();
             let mut locations_iter = locations.new_n_locations(4);
-            let mut variables: ProgramVariables = variables!("a");
+            let mut variables: ProgramVariables = program_variables!("a");
 
             let start = locations_iter.next().unwrap();
             locations.initial = start;
 
             // line #
             // 1
-            locations
-                .set_invariant(start, invariant!(&mut variables, ["<", 0.0]))
-                .unwrap();
+            locations.set_invariant(start, invariant!(&mut variables, ["<", 0.0]));
 
             let junction = locations_iter.next().unwrap();
             let branch_1 = locations_iter.next().unwrap();
@@ -541,9 +508,7 @@ mod tests {
                 .unwrap();
 
             // 3
-            locations
-                .set_invariant(branch_1, invariant!(&mut variables, ["<", 0.0, 0.0, "a"]))
-                .unwrap();
+            locations.set_invariant(branch_1, invariant!(&mut variables, ["<", 0.0, 0.0, "a"]));
 
             // 4
             locations
@@ -554,12 +519,10 @@ mod tests {
                 .unwrap();
 
             // 7
-            locations
-                .set_invariant(
-                    branch_2,
-                    invariant!(&mut variables, ["<=", 0.0, 1.0, "a", -1.0, "b"]),
-                )
-                .unwrap();
+            locations.set_invariant(
+                branch_2,
+                invariant!(&mut variables, ["<=", 0.0, 1.0, "a", -1.0, "b"]),
+            );
 
             // 8
             locations
@@ -570,12 +533,10 @@ mod tests {
                 .unwrap();
 
             // 10
-            locations
-                .set_invariant(
-                    junction,
-                    invariant!(&mut variables, ["<", 0.0, 0.0, "a", 0.0, "b"]),
-                )
-                .unwrap();
+            locations.set_invariant(
+                junction,
+                invariant!(&mut variables, ["<", 0.0, 0.0, "a", 0.0, "b"]),
+            );
 
             // 11
             locations
@@ -588,12 +549,10 @@ mod tests {
                 .unwrap();
 
             // 12
-            locations
-                .set_invariant(
-                    locations.get_terminating_location(),
-                    invariant!(&mut variables, ["<", 0.0, 0.0, "a", 0.0, "b"]),
-                )
-                .unwrap();
+            locations.set_invariant(
+                locations.get_terminating_location(),
+                invariant!(&mut variables, ["<", 0.0, 0.0, "a", 0.0, "b"]),
+            );
 
             let pts = PTS {
                 locations,
@@ -611,16 +570,14 @@ mod tests {
         fn dot_trivial_odds_program() {
             let mut locations = Locations::default();
             let mut locations_iter = locations.new_n_locations(3);
-            let mut variables: ProgramVariables = variables!("a");
+            let mut variables: ProgramVariables = program_variables!("a");
 
             let start = locations_iter.next().unwrap();
             locations.initial = start;
 
             // line #
             // 1
-            locations
-                .set_invariant(start, invariant!(&mut variables, ["<", 0.0]))
-                .unwrap();
+            locations.set_invariant(start, invariant!(&mut variables, ["<", 0.0]));
 
             let junction = locations_iter.next().unwrap();
             let branch_1 = locations_iter.next().unwrap();
@@ -637,9 +594,7 @@ mod tests {
                 .unwrap();
 
             // 3
-            locations
-                .set_invariant(branch_1, invariant!(&mut variables, ["<", 0.0, 0.0, "a"]))
-                .unwrap();
+            locations.set_invariant(branch_1, invariant!(&mut variables, ["<", 0.0, 0.0, "a"]));
 
             // 4
             locations
@@ -650,9 +605,7 @@ mod tests {
                 .unwrap();
 
             // 6
-            locations
-                .set_invariant(junction, invariant!(&mut variables, ["<", 0.0, 0.0, "a"]))
-                .unwrap();
+            locations.set_invariant(junction, invariant!(&mut variables, ["<", 0.0, 0.0, "a"]));
 
             // 7
             locations
@@ -663,12 +616,10 @@ mod tests {
                 .unwrap();
 
             // 8
-            locations
-                .set_invariant(
-                    locations.get_terminating_location(),
-                    invariant!(&mut variables, ["<", 0.0, 0.0, "a"]),
-                )
-                .unwrap();
+            locations.set_invariant(
+                locations.get_terminating_location(),
+                invariant!(&mut variables, ["<", 0.0, 0.0, "a"]),
+            );
 
             let pts = PTS {
                 locations,
@@ -686,16 +637,14 @@ mod tests {
         fn dot_simple_nondet_program() {
             let mut locations = Locations::default();
             let mut locations_iter = locations.new_n_locations(5);
-            let mut variables: ProgramVariables = variables!("a");
+            let mut variables: ProgramVariables = program_variables!("a");
 
             let start = locations_iter.next().unwrap();
             locations.initial = start;
 
             // line #
             // 1
-            locations
-                .set_invariant(start, invariant!(&mut variables, ["<", 0.0]))
-                .unwrap();
+            locations.set_invariant(start, invariant!(&mut variables, ["<", 0.0]));
 
             let junction = locations_iter.next().unwrap();
             let branch_1 = locations_iter.next().unwrap();
@@ -716,9 +665,7 @@ mod tests {
                 .unwrap();
 
             // 3
-            locations
-                .set_invariant(branch_1, invariant!(&mut variables, ["<", 0.0, 0.0, "a"]))
-                .unwrap();
+            locations.set_invariant(branch_1, invariant!(&mut variables, ["<", 0.0, 0.0, "a"]));
 
             // 4
             locations
@@ -729,9 +676,7 @@ mod tests {
                 .unwrap();
 
             // 7
-            locations
-                .set_invariant(branch_2, invariant!(&mut variables, ["<", 0.0, 0.0, "a"]))
-                .unwrap();
+            locations.set_invariant(branch_2, invariant!(&mut variables, ["<", 0.0, 0.0, "a"]));
 
             // 8
             locations
@@ -742,9 +687,7 @@ mod tests {
                 .unwrap();
 
             // 11
-            locations
-                .set_invariant(branch_3, invariant!(&mut variables, ["<", 0.0, 0.0, "a"]))
-                .unwrap();
+            locations.set_invariant(branch_3, invariant!(&mut variables, ["<", 0.0, 0.0, "a"]));
 
             // 12
             locations
@@ -755,9 +698,7 @@ mod tests {
                 .unwrap();
 
             // 14
-            locations
-                .set_invariant(junction, invariant!(&mut variables, ["<", 0.0, 0.0, "a"]))
-                .unwrap();
+            locations.set_invariant(junction, invariant!(&mut variables, ["<", 0.0, 0.0, "a"]));
 
             // 15
             locations
@@ -768,12 +709,10 @@ mod tests {
                 .unwrap();
 
             // 16
-            locations
-                .set_invariant(
-                    locations.get_terminating_location(),
-                    invariant!(&mut variables, ["<", 0.0, 0.0, "a"]),
-                )
-                .unwrap();
+            locations.set_invariant(
+                locations.get_terminating_location(),
+                invariant!(&mut variables, ["<", 0.0, 0.0, "a"]),
+            );
 
             let pts = PTS {
                 locations,
@@ -791,16 +730,14 @@ mod tests {
         fn dot_trivial_nondet_program() {
             let mut locations = Locations::default();
             let mut locations_iter = locations.new_n_locations(3);
-            let mut variables: ProgramVariables = variables!("a");
+            let mut variables: ProgramVariables = program_variables!("a");
 
             let start = locations_iter.next().unwrap();
             locations.initial = start;
 
             // line #
             // 1
-            locations
-                .set_invariant(start, invariant!(&mut variables, ["<", 0.0]))
-                .unwrap();
+            locations.set_invariant(start, invariant!(&mut variables, ["<", 0.0]));
 
             let junction = locations_iter.next().unwrap();
             let branch_1 = locations_iter.next().unwrap();
@@ -817,9 +754,7 @@ mod tests {
                 .unwrap();
 
             // 3
-            locations
-                .set_invariant(branch_1, invariant!(&mut variables, ["<", 0.0, 0.0, "a"]))
-                .unwrap();
+            locations.set_invariant(branch_1, invariant!(&mut variables, ["<", 0.0, 0.0, "a"]));
 
             // 4
             locations
@@ -829,9 +764,7 @@ mod tests {
                 )
                 .unwrap();
             // 6
-            locations
-                .set_invariant(junction, invariant!(&mut variables, ["<", 0.0, 0.0, "a"]))
-                .unwrap();
+            locations.set_invariant(junction, invariant!(&mut variables, ["<", 0.0, 0.0, "a"]));
 
             // 7
             locations
@@ -842,12 +775,10 @@ mod tests {
                 .unwrap();
 
             // 8
-            locations
-                .set_invariant(
-                    locations.get_terminating_location(),
-                    invariant!(&mut variables, ["<", 0.0, 0.0, "a"]),
-                )
-                .unwrap();
+            locations.set_invariant(
+                locations.get_terminating_location(),
+                invariant!(&mut variables, ["<", 0.0, 0.0, "a"]),
+            );
 
             let pts = PTS {
                 locations,
@@ -865,16 +796,14 @@ mod tests {
         fn dot_logic_while_program() {
             let mut locations = Locations::default();
             let mut locations_iter = locations.new_n_locations(3);
-            let mut variables: ProgramVariables = variables!("a");
+            let mut variables: ProgramVariables = program_variables!("a");
 
             let start = locations_iter.next().unwrap();
             locations.initial = start;
 
             // line #
             // 1
-            locations
-                .set_invariant(start, invariant!(&mut variables, ["<", 0.0]))
-                .unwrap();
+            locations.set_invariant(start, invariant!(&mut variables, ["<", 0.0]));
 
             let junction = locations_iter.next().unwrap();
             let branch_1 = locations_iter.next().unwrap();
@@ -901,9 +830,7 @@ mod tests {
                 .unwrap();
 
             // 3
-            locations
-                .set_invariant(branch_1, invariant!(&mut variables, ["<", 0.0, 0.0, "a"]))
-                .unwrap();
+            locations.set_invariant(branch_1, invariant!(&mut variables, ["<", 0.0, 0.0, "a"]));
 
             // 4
             locations
@@ -914,12 +841,10 @@ mod tests {
                 .unwrap();
 
             // 6
-            locations
-                .set_invariant(
-                    junction,
-                    invariant!(&mut variables, ["<", 0.0, 0.0, "a", 0.0, "b"]),
-                )
-                .unwrap();
+            locations.set_invariant(
+                junction,
+                invariant!(&mut variables, ["<", 0.0, 0.0, "a", 0.0, "b"]),
+            );
 
             // 7
             locations
@@ -932,12 +857,10 @@ mod tests {
                 .unwrap();
 
             // 8
-            locations
-                .set_invariant(
-                    locations.get_terminating_location(),
-                    invariant!(&mut variables, ["<", 0.0, 0.0, "a", 0.0, "b"]),
-                )
-                .unwrap();
+            locations.set_invariant(
+                locations.get_terminating_location(),
+                invariant!(&mut variables, ["<", 0.0, 0.0, "a", 0.0, "b"]),
+            );
 
             let pts = PTS {
                 locations,
@@ -955,16 +878,14 @@ mod tests {
         fn dot_prob_while_program() {
             let mut locations = Locations::default();
             let mut locations_iter = locations.new_n_locations(3);
-            let mut variables: ProgramVariables = variables!("a");
+            let mut variables: ProgramVariables = program_variables!("a");
 
             let start = locations_iter.next().unwrap();
             locations.initial = start;
 
             // line #
             // 1
-            locations
-                .set_invariant(start, invariant!(&mut variables, ["<", 0.0]))
-                .unwrap();
+            locations.set_invariant(start, invariant!(&mut variables, ["<", 0.0]));
 
             let junction = locations_iter.next().unwrap();
             let branch_1 = locations_iter.next().unwrap();
@@ -983,9 +904,7 @@ mod tests {
                 .unwrap();
 
             // 3
-            locations
-                .set_invariant(branch_1, invariant!(&mut variables, ["<", 0.0, 0.0, "a"]))
-                .unwrap();
+            locations.set_invariant(branch_1, invariant!(&mut variables, ["<", 0.0, 0.0, "a"]));
 
             // 4
             locations
@@ -996,12 +915,10 @@ mod tests {
                 .unwrap();
 
             // 6
-            locations
-                .set_invariant(
-                    junction,
-                    invariant!(&mut variables, ["<", 0.0, 0.0, "a", 0.0, "b"]),
-                )
-                .unwrap();
+            locations.set_invariant(
+                junction,
+                invariant!(&mut variables, ["<", 0.0, 0.0, "a", 0.0, "b"]),
+            );
 
             // 7
             locations
@@ -1014,12 +931,10 @@ mod tests {
                 .unwrap();
 
             // 8
-            locations
-                .set_invariant(
-                    locations.get_terminating_location(),
-                    invariant!(&mut variables, ["<", 0.0, 0.0, "a", 0.0, "b"]),
-                )
-                .unwrap();
+            locations.set_invariant(
+                locations.get_terminating_location(),
+                invariant!(&mut variables, ["<", 0.0, 0.0, "a", 0.0, "b"]),
+            );
 
             let pts = PTS {
                 locations,
@@ -1037,16 +952,14 @@ mod tests {
         fn dot_nondet_while_program() {
             let mut locations = Locations::default();
             let mut locations_iter = locations.new_n_locations(3);
-            let mut variables: ProgramVariables = variables!("a");
+            let mut variables: ProgramVariables = program_variables!("a");
 
             let start = locations_iter.next().unwrap();
             locations.initial = start;
 
             // line #
             // 1
-            locations
-                .set_invariant(start, invariant!(&mut variables, ["<", 0.0]))
-                .unwrap();
+            locations.set_invariant(start, invariant!(&mut variables, ["<", 0.0]));
 
             let junction = locations_iter.next().unwrap();
             let branch_1 = locations_iter.next().unwrap();
@@ -1063,9 +976,7 @@ mod tests {
                 .unwrap();
 
             // 3
-            locations
-                .set_invariant(branch_1, invariant!(&mut variables, ["<", 0.0, 0.0, "a"]))
-                .unwrap();
+            locations.set_invariant(branch_1, invariant!(&mut variables, ["<", 0.0, 0.0, "a"]));
 
             // 4
             locations
@@ -1075,12 +986,10 @@ mod tests {
                 )
                 .unwrap();
             // 6
-            locations
-                .set_invariant(
-                    junction,
-                    invariant!(&mut variables, ["<", 0.0, 0.0, "a", 0.0, "b"]),
-                )
-                .unwrap();
+            locations.set_invariant(
+                junction,
+                invariant!(&mut variables, ["<", 0.0, 0.0, "a", 0.0, "b"]),
+            );
 
             // 7
             locations
@@ -1093,12 +1002,10 @@ mod tests {
                 .unwrap();
 
             // 8
-            locations
-                .set_invariant(
-                    locations.get_terminating_location(),
-                    invariant!(&mut variables, ["<", 0.0, 0.0, "a", 0.0, "b"]),
-                )
-                .unwrap();
+            locations.set_invariant(
+                locations.get_terminating_location(),
+                invariant!(&mut variables, ["<", 0.0, 0.0, "a", 0.0, "b"]),
+            );
 
             let pts = PTS {
                 locations,

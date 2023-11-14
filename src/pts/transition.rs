@@ -24,7 +24,7 @@ macro_rules! assignment {
     ] => {
         {
             $crate::pts::transition::Assignment::new(
-                $crate::pts::variable::Variable::new($varset, $assign_var),
+                $crate::var!($varset, $assign_var),
                 $crate::polynomial![
                     $constant,
                     $varset
@@ -37,6 +37,31 @@ macro_rules! assignment {
             )
         }
     };
+}
+#[macro_export]
+macro_rules! state_assignment {
+    [
+        $varset:expr,
+        $assign_var:expr,
+        $constant:expr
+        $(
+            ,
+            $coeff:expr,
+            $var:expr
+        )*
+        $(,)?
+    ] => {
+        $crate::assignment![
+            $varset,
+            std::rc::Rc::from($assign_var),
+            $constant
+            $(
+                ,
+                $coeff,
+                std::rc::Rc::from($var)
+            )*
+        ]
+    }
 }
 
 #[macro_export]
@@ -66,7 +91,7 @@ macro_rules! transition {
                 [
                     $(
                         $(
-                            $crate::assignment![
+                            $crate::state_assignment![
                                 $varset,
                                 $assign_var,
                                 $constant
@@ -87,6 +112,7 @@ macro_rules! transition {
 #[derive(Debug, Default, Clone)]
 pub struct Transition {
     pub target: LocationHandle,
+    // TODO make sure probabilistic and nondeterministic branches can have assignments
     pub assignments: Vec<StateAssignment>,
 }
 
@@ -126,22 +152,17 @@ mod tests {
     mod macros {
 
         use crate::{
-            pts::{
-                transition::Assignment,
-                variable::{
-                    program_variable::{ProgramVariable, ProgramVariables},
-                    Variable,
-                },
-            },
-            state, variables,
+            program_var, program_variables,
+            pts::{transition::Assignment, variable::program_variable::ProgramVariables},
+            state,
         };
 
         #[test]
-        fn assignment() {
-            let mut variables: ProgramVariables = variables!("test");
+        fn state_assignment() {
+            let mut variables: ProgramVariables = program_variables!("test");
             assert_eq!(
                 Assignment::new(
-                    ProgramVariable::new(&mut variables, "test"),
+                    program_var!(&mut variables, "test"),
                     state!(
                         6.8,
                         &mut variables,
@@ -155,7 +176,7 @@ mod tests {
                         "d"
                     )
                 ),
-                assignment!(
+                state_assignment!(
                     &mut variables,
                     "test",
                     6.8,
@@ -169,7 +190,7 @@ mod tests {
                     "d"
                 )
             );
-            assert_eq!(variables, variables!("test", "a", "b", "c", "d"))
+            assert_eq!(variables, program_variables!("test", "a", "b", "c", "d"))
         }
     }
 
@@ -180,7 +201,7 @@ mod tests {
         fn apply() {
             let mut variables: ProgramVariables = variables!();
             assert_eq!(
-                assignment!(
+                state_assignment!(
                     &mut variables,
                     "a",
                     6.8,
@@ -222,8 +243,26 @@ mod tests {
                     Transition {
                         target: Some(1234),
                         assignments: vec![
-                            assignment!(&mut variables, "b", -0.3, 5.0, "a", -0.0, "b", 0.0, "c"),
-                            assignment!(&mut variables, "a", 1234.5, 1111.0, "a", 15.151515, "b")
+                            state_assignment!(
+                                &mut variables,
+                                "b",
+                                -0.3,
+                                5.0,
+                                "a",
+                                -0.0,
+                                "b",
+                                0.0,
+                                "c"
+                            ),
+                            state_assignment!(
+                                &mut variables,
+                                "a",
+                                1234.5,
+                                1111.0,
+                                "a",
+                                15.151515,
+                                "b"
+                            )
                         ]
                     },
                     transition!(Some(1234), &mut variables; "b", -0.3, 5.0, "a", -0.0, "b", 0.0, "c"; "a", 1234.5, 1111.0, "a", 15.151515, "b")
@@ -237,8 +276,18 @@ mod tests {
                     Transition {
                         target: None,
                         assignments: vec![
-                            assignment!(&mut variables, "b", 0.3, -5.0, "a", 0.0, "b", 0.0, "c"),
-                            assignment!(&mut variables, "a", 0.0, -1.0, "a", 15.15, "b")
+                            state_assignment!(
+                                &mut variables,
+                                "b",
+                                0.3,
+                                -5.0,
+                                "a",
+                                0.0,
+                                "b",
+                                0.0,
+                                "c"
+                            ),
+                            state_assignment!(&mut variables, "a", 0.0, -1.0, "a", 15.15, "b")
                         ]
                     },
                     transition!(None, &mut variables; "b", 0.3, -5.0, "a", 0.0, "b", 0.0, "c"; "a", 0.0, -1.0, "a", 15.15, "b")
@@ -247,22 +296,22 @@ mod tests {
         }
     }
     mod label {
-        use crate::{pts::variable::program_variable::ProgramVariables, variables};
+        use crate::{program_variables, pts::variable::program_variable::ProgramVariables};
 
         #[test]
         fn one_var() {
-            let mut variables: ProgramVariables = variables!("test");
+            let mut variables: ProgramVariables = program_variables!("test");
             assert_eq!(
-                assignment!(&mut variables, "test", 0.0).to_string(),
+                state_assignment!(&mut variables, "test", 0.0).to_string(),
                 "test = 0"
             );
         }
 
         #[test]
         fn many_vars() {
-            let mut variables: ProgramVariables = variables!();
+            let mut variables: ProgramVariables = program_variables!();
             assert_eq!(
-                assignment!(&mut variables, "b", -5.0, -2.0, "a", 1.0, "b").to_string(),
+                state_assignment!(&mut variables, "b", -5.0, -2.0, "a", 1.0, "b").to_string(),
                 "b = -2a + b - 5"
             );
         }

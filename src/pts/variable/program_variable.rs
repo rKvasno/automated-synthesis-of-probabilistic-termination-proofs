@@ -1,6 +1,29 @@
-use std::{borrow::Borrow, hash::BuildHasher, ops::Deref, rc::Rc};
+use std::{borrow::Borrow, ops::Deref, rc::Rc};
 
 use super::{set::VariableSet, Variable};
+
+#[macro_export]
+macro_rules! program_var{
+    [$variables:expr, $name: expr $(,)?]=> {
+        {
+            $crate::var![$variables, std::rc::Rc::from($name)]
+        }
+    }
+}
+
+#[macro_export]
+macro_rules! program_variables{
+    [ $( $x:expr ),+ $(,)?] => {
+        {
+            $crate::variables![$(std::rc::Rc::from($x), )+]
+        }
+    };
+    [] => {
+        {
+            $crate::pts::variable::program_variable::ProgramVariables::default()
+        }
+    }
+}
 
 pub type ProgramVariables = VariableSet<ProgramVariable>;
 
@@ -9,17 +32,7 @@ pub struct ProgramVariable {
     ptr: Rc<str>,
 }
 
-impl Variable for ProgramVariable {
-    type DATA = str;
-    fn new<T: AsRef<Self::DATA> + ?Sized, S: BuildHasher + Default>(
-        variables: &mut crate::pts::variable::set::VariableSet<Self, S>,
-        data: &T,
-    ) -> Self {
-        variables.get_or_insert(Self {
-            ptr: Rc::from(data.as_ref().to_owned()),
-        })
-    }
-}
+impl Variable for ProgramVariable {}
 
 impl std::fmt::Display for ProgramVariable {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -55,5 +68,44 @@ impl From<Rc<str>> for ProgramVariable {
 impl Into<Rc<str>> for ProgramVariable {
     fn into(self) -> Rc<str> {
         self.ptr
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    mod macros {
+        use std::rc::Rc;
+
+        use crate::pts::variable::program_variable::{ProgramVariable, ProgramVariables};
+
+        #[test]
+        fn program_var() {
+            let mut variables: ProgramVariables = Default::default();
+            assert!(variables.len() == 0);
+            let var = program_var!(&mut variables, "a");
+            assert_eq!(var, ProgramVariable { ptr: Rc::from("a") });
+            assert!(variables.len() == 1);
+            let var = program_var!(&mut variables, "a");
+            assert_eq!(var, ProgramVariable { ptr: Rc::from("a") });
+            assert!(variables.len() == 1);
+            let var = program_var!(&mut variables, "b");
+            assert_eq!(var, ProgramVariable { ptr: Rc::from("b") });
+            assert!(variables.len() == 2);
+        }
+
+        #[test]
+        fn program_variables() {
+            assert_eq!(program_variables!(), Default::default());
+            let mut variables: ProgramVariables = Default::default();
+            variables.insert(ProgramVariable { ptr: Rc::from("a") });
+            assert!(variables.len() == 1);
+            assert_eq!(program_variables!("a"), variables);
+            variables.insert(ProgramVariable { ptr: Rc::from("a") });
+            assert!(variables.len() == 1);
+            assert_eq!(program_variables!("a"), variables);
+            variables.insert(ProgramVariable { ptr: Rc::from("b") });
+            assert!(variables.len() == 2);
+            assert_eq!(program_variables!("a", "b"), variables);
+        }
     }
 }

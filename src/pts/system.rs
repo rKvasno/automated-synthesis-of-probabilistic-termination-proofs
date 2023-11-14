@@ -46,7 +46,7 @@ macro_rules! state_system {
             let temp: $crate::pts::system::StateSystem = $crate::system!(
                 $(
                     $(
-                        $crate::relation!(
+                        $crate::state_relation!(
                             $sign,
                             $constant,
 $varset
@@ -81,8 +81,8 @@ pub struct System<V: Variable, C: Coefficient> {
 }
 
 impl<V: Variable, C: Coefficient> System<V, C> {
-    pub fn push(&mut self, inequality: Relation<V, C>) {
-        self.data.push(inequality);
+    pub fn push(&mut self, relation: Relation<V, C>) {
+        self.data.push(relation);
     }
 
     pub fn append(&mut self, system: &mut System<V, C>) {
@@ -91,6 +91,10 @@ impl<V: Variable, C: Coefficient> System<V, C> {
 
     pub fn len(&self) -> usize {
         self.data.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.data.is_empty()
     }
 
     pub fn get(&self, index: usize) -> Option<&Relation<V, C>> {
@@ -170,7 +174,7 @@ impl<V: Variable, C: Coefficient> Default for System<V, C> {
 
 impl<V: Variable + Display> std::fmt::Display for System<V, Constant> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        //ineq (\n ineq)*
+        //relation (\n relation)*
         let mut iter = self.data.iter();
         match iter.next() {
             Some(line) => write!(f, "{}", line)?,
@@ -197,16 +201,17 @@ mod tests {
 
     mod macros {
         use crate::{
+            program_variables,
             pts::{system::StateSystem, variable::program_variable::ProgramVariables},
-            relation, variables,
+            state_relation,
         };
 
         #[test]
         fn system() {
-            let mut variables: ProgramVariables = variables!();
+            let mut variables = program_variables!();
 
             let mut system = StateSystem::default();
-            system.push(relation!(
+            system.push(state_relation!(
                 ">",
                 0.0,
                 &mut variables,
@@ -220,9 +225,9 @@ mod tests {
                 "d",
             ));
 
-            system.push(relation!("<=", -1.0, &mut variables, -2.4, "a"));
+            system.push(state_relation!("<=", -1.0, &mut variables, -2.4, "a"));
 
-            system.push(relation!(
+            system.push(state_relation!(
                 "=",
                 0.0,
                 &mut variables,
@@ -234,12 +239,12 @@ mod tests {
                 "c"
             ));
 
-            system.push(relation!("!=", 111.111));
+            system.push(state_relation!("!=", 111.111));
 
             assert_eq!(
                 system,
                 system!(
-                    relation!(
+                    state_relation!(
                         ">",
                         0.0,
                         &mut variables,
@@ -252,18 +257,18 @@ mod tests {
                         -0.0,
                         "d"
                     ),
-                    relation!("<=", -1.0, &mut variables, -2.4, "a"),
-                    relation!("=", 0.0, &mut variables, 0.0, "a", 0.0, "b", 0.0, "c"),
-                    relation!("!=", 111.111)
+                    state_relation!("<=", -1.0, &mut variables, -2.4, "a"),
+                    state_relation!("=", 0.0, &mut variables, 0.0, "a", 0.0, "b", 0.0, "c"),
+                    state_relation!("!=", 111.111)
                 ),
             );
         }
 
         #[test]
         fn system_append() {
-            let mut variables: ProgramVariables = variables!();
+            let mut variables: ProgramVariables = program_variables!();
             let a: StateSystem = system!(
-                relation!(
+                state_relation!(
                     ">",
                     0.0,
                     &mut variables,
@@ -276,12 +281,12 @@ mod tests {
                     -0.0,
                     "d"
                 ),
-                relation!("<=", -1.0, &mut variables, -2.4, "a"),
-                relation!("=", 0.0, &mut variables, 0.0, "a", 0.0, "b", 0.0, "c"),
-                relation!("!=", 111.111)
+                state_relation!("<=", -1.0, &mut variables, -2.4, "a"),
+                state_relation!("=", 0.0, &mut variables, 0.0, "a", 0.0, "b", 0.0, "c"),
+                state_relation!("!=", 111.111)
             );
             let b = system_append!(
-                &mut system!(relation!(
+                &mut system!(state_relation!(
                     ">",
                     0.0,
                     &mut variables,
@@ -295,18 +300,18 @@ mod tests {
                     "d"
                 ),),
                 &mut system!(
-                    relation!("<=", -1.0, &mut variables, -2.4, "a"),
-                    relation!("=", 0.0, &mut variables, 0.0, "a", 0.0, "b", 0.0, "c"),
+                    state_relation!("<=", -1.0, &mut variables, -2.4, "a"),
+                    state_relation!("=", 0.0, &mut variables, 0.0, "a", 0.0, "b", 0.0, "c"),
                 ),
                 &mut system!(),
-                &mut system!(relation!("!=", 111.111))
+                &mut system!(state_relation!("!=", 111.111))
             );
             assert_eq!(a, b);
         }
 
         #[test]
         fn state_system() {
-            let mut variables: ProgramVariables = variables!();
+            let mut variables: ProgramVariables = program_variables!();
             assert_eq!(
                 state_system!(
                     &mut variables;
@@ -316,7 +321,7 @@ mod tests {
                     "!=", 111.111
                 ),
                 system!(
-                    relation!(
+                    state_relation!(
                         ">",
                         0.0,
                         &mut variables,
@@ -329,9 +334,9 @@ mod tests {
                         -0.0,
                         "d"
                     ),
-                    relation!("<=", -1.0, &mut variables, -2.4, "a"),
-                    relation!("=", 0.0, &mut variables, 0.0, "a", 0.0, "b", 0.0, "c"),
-                    relation!("!=", 111.111)
+                    state_relation!("<=", -1.0, &mut variables, -2.4, "a"),
+                    state_relation!("=", 0.0, &mut variables, 0.0, "a", 0.0, "b", 0.0, "c"),
+                    state_relation!("!=", 111.111)
                 ),
             );
         }
@@ -339,8 +344,9 @@ mod tests {
 
     mod label {
         use crate::{
+            program_variables,
             pts::{system::StateSystem, variable::program_variable::ProgramVariables},
-            relation, variables,
+            relation,
         };
 
         #[test]
@@ -350,7 +356,7 @@ mod tests {
         }
         #[test]
         fn vars() {
-            let mut variables: ProgramVariables = variables!("a");
+            let mut variables: ProgramVariables = program_variables!("a");
             let system = state_system!(&mut variables;
                 "<=", 0.0, 1.0, "a";
                 "<=", 0.0, -1.0, "a";
@@ -359,7 +365,7 @@ mod tests {
         }
         #[test]
         fn neg() {
-            let mut variables: ProgramVariables = variables!("test1", "test2", "test3",);
+            let mut variables: ProgramVariables = program_variables!("test1", "test2", "test3",);
             let system = state_system!(
                 &mut variables;
                 "<",

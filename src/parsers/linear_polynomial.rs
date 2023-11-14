@@ -1,9 +1,8 @@
-use crate::consume;
 use crate::parsers::INVARIANT_ERROR;
 use crate::pts::linear_polynomial::coefficient::Constant;
 use crate::pts::variable::program_variable::ProgramVariable;
-use crate::pts::variable::Variable;
 use crate::pts::{linear_polynomial::State, variable::program_variable::ProgramVariables};
+use crate::{consume, program_var};
 
 use super::default::Operation;
 use super::grammars::linear_polynomial::{PolynomialPestParser, Rule};
@@ -47,7 +46,7 @@ impl LinearPolynomialParser {
         variables: &mut ProgramVariables,
         input: &str,
     ) -> ProgramVariable {
-        ProgramVariable::new(variables, input)
+        program_var!(variables, input)
     }
 
     // assumes the input can be parsed as a singular Rule::constant nonterminal
@@ -146,12 +145,9 @@ mod tests {
             grammars::linear_polynomial::{PolynomialPestParser, Rule},
             linear_polynomial::LinearPolynomialParser,
         },
+        program_var,
         pts::{
-            linear_polynomial::coefficient::Constant,
-            variable::{
-                program_variable::{ProgramVariable, ProgramVariables},
-                Variable,
-            },
+            linear_polynomial::coefficient::Constant, variable::program_variable::ProgramVariables,
         },
         state, variables,
     };
@@ -159,7 +155,7 @@ mod tests {
     #[test]
     fn variable_sanity() {
         let mut variables: ProgramVariables = variables!();
-        let variable = ProgramVariable::new(&mut variables, "abc");
+        let variable = program_var!(&mut variables, "abc");
         let input = variable.to_string();
         let var = LinearPolynomialParser::parse_variable(&mut variables, input.as_str());
         assert_eq!(var.to_string(), variable.to_string());
@@ -251,6 +247,6 @@ mod tests {
             parse.next().unwrap().as_str(),
         );
         assert!(parse.next().is_none());
-        assert_eq!(&pol, &state!(5.0, &mut variables, -1.0, "a", -0.5, "b"));
+        assert_eq!(pol, state!(5.0, &mut variables, -1.0, "a", -0.5, "b"));
     }
 }
