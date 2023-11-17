@@ -43,7 +43,7 @@ fn odds_to_probabilities(odds: Vec<Constant>) -> Result<Vec<Constant>, ParserErr
     }
 }
 
-struct DefaultParser;
+pub struct DefaultParser;
 impl Parser for DefaultParser {
     fn parse(input: &str) -> Result<PTS, ParserError> {
         match DefaultPestParser::parse(Rule::program, input) {

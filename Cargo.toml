@@ -1,6 +1,6 @@
 [package]
 name = "automated_synthesis_of_probabilistic_termination_proofs"
-description = "A tool and a library providing static termination analysis of affine probabilistic programs with non-determinism"
+description = "Static termination analysis of affine probabilistic programs with non-determinism"
 authors = ["Radoslav Kvasňovský"]
 version = "0.1.0"
 keywords = ["termination", "proof", "analysis"]
@@ -8,14 +8,16 @@ categories = ["program-analysis"]
 edition = "2021"
 rust-version = "1.72.1"
 license = "MIT OR Apache-2.0"
+autobins = false
 
 [lib]
 name = "automated_synthesis_of_probabilistic_termination_proofs"
 path = "src/lib.rs"
 
 [[bin]]
-name = "automated_synthesis_of_probabilistic_termination_proofs"
+name = "asptp"
 path = "src/main.rs"
+required-features = ["cli"]
 
 
 [dependencies]
@@ -25,10 +27,15 @@ pest = "2.7.5"
 pest_derive = "2.7.5"
 minilp = "0.2.2"
 itertools = "0.11.0"
+clap = {version = "4.4.8", features = ["derive"], optional = true}
+clio = {version = "0.3.4", features = ["clap-parse"], optional = true}
 
 [dev-dependencies]
 lazy_static = "1.4.0"
 pest-test = "0.1.6"
 pest-test-gen = "0.1.7"
 pretty_assertions = "1.4.0"
+
+[features]
+cli = ["dep:clap", "dep:clio"]
 

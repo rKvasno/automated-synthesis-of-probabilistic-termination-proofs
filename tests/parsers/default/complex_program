@@ -11,7 +11,7 @@ quit = 0
 while quit <= 0.5 and bank > 0 and dealer_bank > 0 {
 
   [ quit <= 0.5 and bank > 0 and dealer_bank > 0 ]
-  nondet {
+  choose {
 
     [ quit <= 0.5 and bank > 0 and dealer_bank > 0 ]
     odds 1:1:0 {

@@ -514,6 +514,12 @@ impl Coefficient for Polynomial<TemplateVariable, Constant> {
 
 pub struct FarkasBasedGenerator;
 
+impl std::fmt::Display for TemplateVariable {
+    fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        unreachable!()
+    }
+}
+
 impl Generator for FarkasBasedGenerator {
     type VAR = TemplateVariable;
     fn generate_problem<S: super::linear_solvers::Solver>(
@@ -557,7 +563,7 @@ impl Generator for FarkasBasedGenerator {
                             polyhedron.clone(),
                         ))
                     }
-                    Err(SolverError::InvalidRelationType(_)) => {
+                    Err(SolverError::InvalidRelationType) => {
                         return Err(GeneratorError::InvalidInvariant(invariant.clone()))
                     }
                     _ => unreachable!(),
@@ -626,7 +632,7 @@ impl Generator for FarkasBasedGenerator {
             }
         }
         if !found_solution {
-            Err(GeneratorError::EpsIsZero)
+            Err(GeneratorError::InvalidSolution)
         } else {
             Ok(RankedPTS { pts, function: rf })
         }

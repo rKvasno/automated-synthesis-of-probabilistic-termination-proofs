@@ -1,4 +1,7 @@
-use std::collections::{hash_map::IntoIter, HashMap};
+use std::{
+    collections::{hash_map::IntoIter, HashMap},
+    fmt::Display,
+};
 
 use crate::{
     pts::{linear_polynomial::coefficient::Constant, variable::Variable},
@@ -63,8 +66,10 @@ impl<V: Variable> Iterator for MinilpIterator<V> {
 
 impl Solver for Minilp {
     type Error = MinilpError;
-    type Solution<V: Variable> = MinilpSolution<V>;
-    fn solve<V: Variable>(problem: Problem<V>) -> Result<Self::Solution<V>, SolverError<V>> {
+    type Solution<V: Variable + Display> = MinilpSolution<V>;
+    fn solve<V: Variable + Display>(
+        problem: Problem<V>,
+    ) -> Result<Self::Solution<V>, SolverError<V>> {
         let (direction, function) = match problem.goal {
             Goal::Minimize(pol) => (OptimizationDirection::Minimize, pol),
             Goal::Maximize(pol) => (OptimizationDirection::Maximize, pol),
@@ -105,7 +110,7 @@ impl Solver for Minilp {
             } else if restriction.is_nonstrict_inequality() {
                 minilp::ComparisonOp::Le
             } else {
-                return Err(SolverError::InvalidRelationType(restriction));
+                return Err(SolverError::InvalidRelationType);
             };
             minilp.add_constraint(expr, comp, -constant)
         }

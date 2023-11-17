@@ -1,5 +1,5 @@
 use core::fmt;
-use std::borrow::Cow;
+use std::{borrow::Cow, fmt::Display};
 
 use crate::pts::{
     invariant::Invariant, linear_polynomial::State, location::LocationHandle, system::StateSystem,
@@ -49,9 +49,10 @@ pub struct RankedPTS {
     pub function: RankingFunction,
 }
 
+#[cfg_attr(test, derive(PartialEq))]
 #[derive(Debug)]
 pub enum GeneratorError {
-    EpsIsZero,
+    InvalidSolution,
     PolyhedronIsEmpty(Invariant, StateSystem),
     InvalidInvariant(Invariant),
 }
@@ -61,19 +62,22 @@ impl std::error::Error for GeneratorError {}
 impl fmt::Display for GeneratorError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            GeneratorError::EpsIsZero => write!(f, "no function was found"),
+            GeneratorError::InvalidSolution => write!(f, "no solution found"),
             GeneratorError::PolyhedronIsEmpty(invariant, system) => {
-                write!(f, "polyhedron is empty: {system} in {invariant}")
+                write!(f, "polyhedron is empty:\n{system} in\n{invariant}")
             }
             GeneratorError::InvalidInvariant(invariant) => {
-                write!(f, "invariant contains invalid relations: {invariant}")
+                write!(
+                    f,
+                    "invariant is not valid for given algorithm:\n{invariant}"
+                )
             }
         }
     }
 }
 
 pub trait Generator {
-    type VAR: Variable;
+    type VAR: Variable + Display;
     fn generate_problem<S: Solver>(pts: &PTS) -> Result<Problem<Self::VAR>, GeneratorError>;
     fn build_ranking_function<S: Solution<Self::VAR>>(
         pts: PTS,

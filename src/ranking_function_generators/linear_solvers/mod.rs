@@ -85,13 +85,23 @@ impl<V: Variable> Clone for VariableWrapper<V> {
     }
 }
 
+impl<V: Variable> std::fmt::Display for VariableWrapper<V> {
+    fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        unreachable!()
+    }
+}
+
 impl<V: Variable + Debug> Variable for VariableWrapper<V> {}
 
 pub trait Solver {
     type Error: Error;
-    type Solution<V: Variable>: Solution<V>;
-    fn solve<V: Variable>(problem: Problem<V>) -> Result<Self::Solution<V>, SolverError<V>>;
-    fn is_empty<V: Variable>(polyhedron: &System<V, Constant>) -> Result<bool, SolverError<V>> {
+    type Solution<V: Variable + Display>: Solution<V>;
+    fn solve<V: Variable + Display>(
+        problem: Problem<V>,
+    ) -> Result<Self::Solution<V>, SolverError<V>>;
+    fn is_empty<V: Variable + Display>(
+        polyhedron: &System<V, Constant>,
+    ) -> Result<bool, SolverError<V>> {
         if polyhedron.is_empty() {
             return Ok(true);
         }
@@ -113,7 +123,7 @@ pub trait Solver {
         let mut wrapped_restrictions = System::<VariableWrapper<V>, Constant>::default();
         for halfspace in polyhedron {
             if !(halfspace.is_nonstrict_inequality() || halfspace.is_strict_inequality()) {
-                return Err(SolverError::InvalidRelationType(halfspace.clone()));
+                return Err(SolverError::InvalidRelationType);
             }
             let mut wrapped_polynomial = VariableWrapper::wrap_polynomial(
                 &mut wrapped_variables,
@@ -167,28 +177,24 @@ pub trait Solver {
     }
 }
 
-#[derive(Debug, PartialEq)]
-pub enum SolverError<V: Variable> {
-    InvalidRelationType(Relation<V, Constant>),
+#[cfg_attr(test, derive(PartialEq))]
+#[derive(Debug)]
+pub enum SolverError<V: Variable + Display> {
+    InvalidRelationType,
     ForeignVariable(V),
     Unbounded,
     Infeasible,
 }
 
-impl<V: Variable> std::fmt::Display for SolverError<V>
-where
-    V: Display,
-    Relation<V, Constant>: Display,
-{
+impl<V: Variable + Display> std::error::Error for SolverError<V> {}
+
+impl<V: Variable + Display> std::fmt::Display for SolverError<V> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::InvalidRelationType(rel) => {
-                write!(
-                    f,
-                    "{rel} is invalid, only equations and nonstrict inequalities are allowed"
-                )
+            Self::InvalidRelationType => {
+                write!(f, "only equations and nonstrict inequalities are allowed")
             }
-            Self::ForeignVariable(var) => write!(f, "{var} is not in variable set"),
+            Self::ForeignVariable(var) => write!(f, "{var} is not a recognized variable"),
             Self::Unbounded => write!(f, "objective function is unbounded"),
             Self::Infeasible => write!(f, "given problem is infeasible"),
         }
@@ -237,7 +243,7 @@ mod tests {
             program_variables,
             pts::variable::program_variable::ProgramVariables,
             ranking_function_generators::linear_solvers::{minilp::Minilp, Solver, SolverError},
-            state_relation, state_system,
+            state_system,
         };
 
         #[test]
@@ -319,13 +325,7 @@ mod tests {
             ))
             .err()
             .unwrap();
-            let rhs = SolverError::InvalidRelationType(state_relation!(
-                "==",
-                -10.0,
-                &mut variables,
-                1.0,
-                "a"
-            ));
+            let rhs = SolverError::InvalidRelationType;
             assert_eq!(variables, program_variables!("a", "b"));
             assert_eq!(lhs, rhs);
         }
