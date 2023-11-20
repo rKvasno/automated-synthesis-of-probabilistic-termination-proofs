@@ -543,18 +543,6 @@ impl Generator for FarkasBasedGenerator {
         for location in pts.locations.iter() {
             let invariant = pts.locations.get_invariant(location).unwrap();
             for polyhedron in invariant.iter() {
-                let mut has_nonstrict = false;
-                for halfspace in polyhedron.iter() {
-                    if halfspace.is_nonstrict_inequality() {
-                        has_nonstrict = true;
-                        break;
-                    }
-                }
-
-                if !has_nonstrict {
-                    return Err(GeneratorError::InvalidInvariant(invariant.clone()));
-                }
-
                 match S::is_empty(polyhedron) {
                     Ok(false) => (),
                     Ok(true) => {

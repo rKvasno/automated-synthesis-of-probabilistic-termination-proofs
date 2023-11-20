@@ -100,19 +100,19 @@ fn synthetize_proof(
         Algorithm::FarkasBased => {
             with_solver::<FarkasBasedGenerator>(solver_arg, pts).map_err(|err| match err {
                 LibraryError::AlgorithmError(e) => match e {
-                    GeneratorError::InvalidSolution => {
-                        CliError(format!("chosen algorithm failed to find a ranking function"))
-                    }
-                    GeneratorError::InvalidInvariant(invariant) => CliError(format!("invariant must contain only inequalities and at least one non-strict inequality:\n{invariant}")),
-                    gen_err => {
-                        CliError(gen_err.to_string())
-                    }
+                    GeneratorError::InvalidSolution => CliError(format!(
+                        "chosen algorithm failed to find a ranking function"
+                    )),
+                    GeneratorError::InvalidInvariant(invariant) => CliError(format!(
+                        "invariant must consist of only inequalities:\n{invariant}"
+                    )),
+                    gen_err => CliError(gen_err.to_string()),
                 },
                 LibraryError::SolverError(e) => match e {
                     SolverError::Unbounded => CliError(Default::default()),
-                    SolverError::Infeasible => {
-                        CliError(format!("chosen algorithm failed to find a ranking function"))
-                    }
+                    SolverError::Infeasible => CliError(format!(
+                        "chosen algorithm failed to find a ranking function"
+                    )),
                     // variable error and relation type errors should be handledby the programmer
                     solver_err => panic!("{solver_err}"),
                 },
