@@ -1,5 +1,5 @@
 # Default language
-The default supported language is an imperative language without functions capable of representing affine probabilistic programs with non-determinism and invariants. See [examples](/../tests/parsers/default).
+The default supported language is an imperative language without functions capable of representing affine probabilistic programs with non-determinism and invariants. See [examples](/tests/parsers/default).
 
 ## Statements
 The default language uses five types of statements, some of which use semantics of common imperative languages:
