@@ -529,7 +529,7 @@ impl Generator for FarkasBasedGenerator {
         let mut domains = template_domains!(
             &mut template_variables,
             TemplateVariableData::Eps,
-            0.0,
+            1.0,
             f64::INFINITY,
             TemplateVariableData::UpperBound,
             f64::NEG_INFINITY,
@@ -593,7 +593,7 @@ impl Generator for FarkasBasedGenerator {
             &mut restrictions,
         );
 
-        let goal = Goal::Maximize({
+        let goal = Goal::Minimize({
             let mut temp = Polynomial::default();
             temp.add_term(
                 1.0,
