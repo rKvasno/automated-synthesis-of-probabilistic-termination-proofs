@@ -2,7 +2,7 @@
 name = "automated_synthesis_of_probabilistic_termination_proofs"
 description = "Static termination analysis of affine probabilistic programs with non-determinism"
 authors = ["Radoslav Kvasňovský"]
-version = "0.1.0"
+version = "0.1.1"
 keywords = ["termination", "proof", "analysis"]
 categories = ["program-analysis"]
 edition = "2021"
