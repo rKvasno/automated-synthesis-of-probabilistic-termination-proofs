@@ -3,8 +3,7 @@ statement = { invariant? ~ statement_helper }
 
 invariant = { ("[" ~ NEWLINE* ~ logic_condition ~ NEWLINE* ~ "]" ~ NEWLINE* )+ }
 
-statements = { NEWLINE* ~ statement ~ (NEWLINE+ ~ statement)* ~ NEWLINE* | 
-               NEWLINE* ~ statement ~ NEWLINE*                           }
+statements = { NEWLINE* ~ statement? ~ (NEWLINE+ ~ statement)* ~ NEWLINE* }
 
 block = _{ NEWLINE? ~ "{" ~ statements ~ "}" }
 

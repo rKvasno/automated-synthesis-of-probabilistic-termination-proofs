@@ -167,8 +167,7 @@ fn parse_locations<'parse>(
         .new_n_locations(parse_locations.len())
         .peekable();
 
-    // locations nonterminal always has atleast one location
-    start_transition.target = pts_locations.peek().unwrap().to_owned();
+    start_transition.target = pts_locations.peek().unwrap_or(&end).to_owned();
 
     for ((local_start, local_end), pair) in std::iter::zip(
         std::iter::zip(
@@ -1418,19 +1417,11 @@ mod tests {
         use crate::parsers::{default::DefaultParser, Parser};
 
         #[test]
-        fn empty() {
-            // this error is awful, but it only appears when the input contains only whitespace
-            assert_eq!(
-                DefaultParser::parse("").err().unwrap().to_string(),
-                " --> 1:1\n  |\n1 | \n  | ^---\n  |\n  = expected statement"
-            );
-        }
-
-        #[test]
-        fn statement() {
+        fn garbage() {
+            // not a very good error
             assert_eq!(
                 DefaultParser::parse("test").err().unwrap().to_string(),
-                " --> 1:1\n  |\n1 | test\n  | ^---\n  |\n  = expected statement"
+                " --> 1:1\n  |\n1 | test\n  | ^---\n  |\n  = expected program"
             );
         }
 
