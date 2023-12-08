@@ -149,15 +149,13 @@ impl<'a> Iterator for TransitionsIterator<'a> {
     type Item = GuardedTransition<'a>;
     fn next(&mut self) -> Option<Self::Item> {
         let item = match self.0 {
-            &Guards::Logic(ref branches) => {
-                branches.get(self.1).map(|x| GuardedTransition::Logic(x))
+            &Guards::Logic(ref branches) => branches.get(self.1).map(GuardedTransition::Logic),
+            &Guards::Probabilistic(ref branches) => {
+                branches.get(self.1).map(GuardedTransition::Probabilistic)
             }
-            &Guards::Probabilistic(ref branches) => branches
-                .get(self.1)
-                .map(|x| GuardedTransition::Probabilistic(x)),
             &Guards::Nondeterministic(ref branches) => branches
                 .get(self.1)
-                .map(|x| GuardedTransition::Nondeterministic(x)),
+                .map(GuardedTransition::Nondeterministic),
             &Guards::Unguarded(ref boxed_transition) => {
                 if self.1 == 0 {
                     Some(GuardedTransition::Unguarded(boxed_transition))

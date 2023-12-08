@@ -2,8 +2,8 @@ use core::fmt;
 use std::{borrow::Cow, fmt::Display};
 
 use crate::pts::{
-    invariant::Invariant, linear_polynomial::State, location::LocationHandle, system::StateSystem,
-    variable::Variable, PTS,
+    guard::TransitionID, invariant::Invariant, linear_polynomial::State, location::LocationHandle,
+    system::StateSystem, variable::Variable, PTS,
 };
 
 use self::linear_solvers::{Problem, Solution, Solver};
@@ -85,7 +85,7 @@ pub trait Generator {
     ) -> Result<RankedPTS, GeneratorError>;
 }
 
-type Edge = (LocationHandle, LocationHandle);
+type Edge = (LocationHandle, TransitionID);
 
 impl<'a> dot::GraphWalk<'a, LocationHandle, Edge> for RankedPTS {
     fn nodes(&'a self) -> dot::Nodes<'a, LocationHandle> {
@@ -97,11 +97,11 @@ impl<'a> dot::GraphWalk<'a, LocationHandle, Edge> for RankedPTS {
     }
 
     fn source(&'a self, edge: &Edge) -> LocationHandle {
-        edge.0
+        self.pts.source(edge)
     }
 
     fn target(&'a self, edge: &Edge) -> LocationHandle {
-        edge.1
+        self.pts.target(edge)
     }
 }
 

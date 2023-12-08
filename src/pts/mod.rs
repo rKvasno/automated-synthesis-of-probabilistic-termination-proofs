@@ -1,6 +1,7 @@
 use std::{borrow::Cow, collections::hash_map::RandomState, hash::BuildHasher};
 
 use self::{
+    guard::TransitionID,
     location::{LocationHandle, Locations},
     variable::{program_variable::ProgramVariable, set::VariableSet},
 };
@@ -35,7 +36,7 @@ impl PartialEq for PTS {
     }
 }
 
-type Edge = (LocationHandle, LocationHandle);
+type Edge = (LocationHandle, TransitionID);
 
 impl<'a> dot::GraphWalk<'a, LocationHandle, Edge> for PTS {
     fn nodes(&self) -> dot::Nodes<'a, LocationHandle> {
@@ -48,8 +49,8 @@ impl<'a> dot::GraphWalk<'a, LocationHandle, Edge> for PTS {
             match self.locations.get_outgoing(loc) {
                 None => (),
                 Some(guard) => {
-                    for branch in guard.iter() {
-                        edges.push((loc, branch.as_transition().target));
+                    for (id, _) in guard.iter_with_ids() {
+                        edges.push((loc, id));
                     }
                 }
             }
@@ -62,7 +63,16 @@ impl<'a> dot::GraphWalk<'a, LocationHandle, Edge> for PTS {
     }
 
     fn target(&'a self, edge: &Edge) -> LocationHandle {
-        edge.1
+        // TODO implement get for guard using GuardedTransition
+        self.locations
+            .get_outgoing(edge.0)
+            .unwrap()
+            .iter()
+            .skip(edge.1)
+            .next()
+            .unwrap()
+            .as_transition()
+            .target
     }
 }
 
@@ -96,7 +106,8 @@ impl<'a> dot::Labeller<'a, LocationHandle, Edge> for PTS {
             .get_outgoing(e.0)
             .unwrap()
             .iter()
-            .find(|x| x.as_transition().target == e.1);
+            .skip(e.1)
+            .next();
 
         dot::LabelText::LabelStr(Cow::Owned(
             transition
