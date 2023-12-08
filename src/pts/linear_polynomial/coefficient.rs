@@ -27,8 +27,14 @@ pub trait Coefficient:
 }
 
 // HINT: if something goes horribly wrong, it might just be -0.0
-#[derive(Debug, Default, PartialEq, PartialOrd, Clone, Copy)]
+#[derive(Default, PartialEq, PartialOrd, Clone, Copy)]
 pub struct Constant(pub f64);
+
+impl std::fmt::Debug for Constant {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Debug::fmt(&self.0, f)
+    }
+}
 
 impl Constant {
     pub const ONE: Self = Constant(1.0);

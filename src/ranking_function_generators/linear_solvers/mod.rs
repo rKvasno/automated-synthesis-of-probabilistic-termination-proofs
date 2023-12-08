@@ -224,7 +224,7 @@ impl Into<(f64, f64)> for Interval {
 
 pub type DomainMap<V> = HashMap<V, Interval>;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Problem<V: Variable> {
     // assumes every variable is in "variables"
     // HashMap has constant next() on its iterator and good insert/update time

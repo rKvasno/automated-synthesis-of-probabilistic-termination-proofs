@@ -53,7 +53,7 @@ pub type TemplateDomains = DomainMap<TemplateVariable>;
 
 pub type TemplateVariables = VariableSet<TemplateVariable>;
 
-#[derive(Hash, Clone, Debug, PartialEq, Eq)]
+#[derive(Hash, Clone, PartialEq, Eq)]
 pub enum TemplateVariableData {
     Eps,
     UpperBound,
@@ -66,6 +66,39 @@ pub enum TemplateVariableData {
         RelationID,
         Option<TransitionID>,
     ),
+}
+
+fn option_debug_string<T: std::fmt::Display>(opt: &Option<T>) -> String {
+    match opt {
+        Some(x) => x.to_string(),
+        None => "∅".to_string(),
+    }
+}
+
+impl std::fmt::Debug for TemplateVariableData {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            TemplateVariableData::Eps => write!(f, "ɛ"),
+            TemplateVariableData::UpperBound => write!(f, "K'"),
+            TemplateVariableData::LowerBound => write!(f, "K"),
+            TemplateVariableData::FarkasVariable(a, b, c, d) => {
+                write!(
+                    f,
+                    "x_{}_{}_{}_{}_x",
+                    option_debug_string(a),
+                    b,
+                    c,
+                    option_debug_string(d)
+                )
+            }
+            TemplateVariableData::RankingCoefficient(a, var) => {
+                write!(f, "a_{}_{}_a", option_debug_string(a), var)
+            }
+            TemplateVariableData::RankingConstant(a) => {
+                write!(f, "b_{}_b", option_debug_string(a))
+            }
+        }
+    }
 }
 
 #[derive(Hash, Clone, Debug, PartialEq, Eq)]
@@ -515,8 +548,8 @@ impl Coefficient for Polynomial<TemplateVariable, Constant> {
 pub struct FarkasBasedGenerator;
 
 impl std::fmt::Display for TemplateVariable {
-    fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        unreachable!()
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Debug::fmt(&self.ptr, f)
     }
 }
 
