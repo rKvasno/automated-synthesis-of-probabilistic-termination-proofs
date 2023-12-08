@@ -349,19 +349,21 @@ fn probabilistic_martingale_difference<'a, I, S: BuildHasher + Default>(
     for (polyhedron_id, polyhedron) in invariant.iter_with_ids() {
         let mut lhs: Template = Default::default();
         for (_, (probability, transition)) in branches.clone() {
-            let mut template = generate_template(
-                template_variables,
-                &pts.variables,
-                // handl is valid => unwrap
-                transition.target,
-            );
+            if !probability.is_zero() {
+                let mut template = generate_template(
+                    template_variables,
+                    &pts.variables,
+                    // handl is valid => unwrap
+                    transition.target,
+                );
 
-            for assignment in transition.assignments.iter() {
-                template = assignment.apply(template);
+                for assignment in transition.assignments.iter() {
+                    template = assignment.apply(template);
+                }
+
+                template.mul_by_constant(probability.to_owned());
+                lhs += template;
             }
-
-            template.mul_by_constant(probability.to_owned());
-            lhs += template;
         }
 
         let rhs = generate_template(template_variables, &pts.variables, location);
@@ -375,7 +377,7 @@ fn probabilistic_martingale_difference<'a, I, S: BuildHasher + Default>(
             template_variables,
             location,
             polyhedron_id,
-            None,
+            Some(0),
             polyhedron,
             Relation::new(lhs, RelationSign::LE, rhs),
             domains,
