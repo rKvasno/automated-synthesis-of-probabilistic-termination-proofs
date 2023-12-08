@@ -1128,7 +1128,7 @@ mod tests {
                         None,
                         program_var!(&mut pts.variables, "a")
                     ),
-                    TemplateVariableData::FarkasVariable(Some(0), 0, 0, None),
+                    TemplateVariableData::FarkasVariable(Some(0), 0, 0, Some(0)),
                     TemplateVariableData::RankingConstant(Some(0)),
                     TemplateVariableData::RankingConstant(Some(1)),
                     TemplateVariableData::RankingConstant(None),
@@ -1140,7 +1140,7 @@ mod tests {
                 domains,
                 template_domains!(
                     &mut template_variables,
-                    TemplateVariableData::FarkasVariable(Some(0), 0, 0, None),
+                    TemplateVariableData::FarkasVariable(Some(0), 0, 0, Some(0)),
                     0.0,
                     f64::INFINITY
                 )
@@ -1158,14 +1158,14 @@ mod tests {
                     -0.75,
                     TemplateVariableData::RankingCoefficient(None, program_var!(&mut pts.variables, "a")),
                     -2.0,
-                    TemplateVariableData::FarkasVariable(Some(0), 0, 0, None);
+                    TemplateVariableData::FarkasVariable(Some(0), 0, 0, Some(0));
 
                     "<=",
                     0.0,
                     0.75,
                     TemplateVariableData::RankingCoefficient(Some(1), program_var!(&mut pts.variables, "a")),
                     -5.0,
-                    TemplateVariableData::FarkasVariable(Some(0), 0, 0, None),
+                    TemplateVariableData::FarkasVariable(Some(0), 0, 0, Some(0)),
                     -1.0,
                     TemplateVariableData::RankingConstant(Some(0)),
                     0.25,
