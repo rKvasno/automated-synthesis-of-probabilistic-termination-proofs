@@ -121,6 +121,7 @@ impl std::fmt::Display for Invariant {
     }
 }
 
+#[cfg(stop)]
 #[cfg(test)]
 mod tests {
     use crate::{

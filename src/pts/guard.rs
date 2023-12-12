@@ -135,8 +135,8 @@ impl<'a> std::fmt::Display for GuardedTransition<'a> {
             Self::Probabilistic((probability, _)) => write!(f, "{}", probability)?,
             _ => (),
         };
-        for assign in self.as_transition().assignments.iter() {
-            write!(f, "\n{}", assign)?;
+        for op in self.as_transition().update_function.iter() {
+            write!(f, "\n{}", op)?;
         }
         Ok(())
     }
@@ -181,18 +181,22 @@ mod tests {
                     guard::Guards, linear_polynomial::coefficient::Constant,
                     variable::program_variable::ProgramVariables,
                 },
-                state_system, transition,
+                state_assignment, state_system, transition,
             };
             #[test]
             fn unguarded() {
                 let mut variables: ProgramVariables = program_variables!();
                 assert_eq!(
-                    guards!(
-                        transition!(Some(23), &mut variables; "a", 2.4, 1.3, "a"; "b", 1.0, -1.0, "a")
-                    ),
-                    Guards::Unguarded(std::boxed::Box::new(
-                        transition!(Some(23), &mut variables; "a", 2.4, 1.3, "a"; "b", 1.0, -1.0, "a")
-                    ))
+                    guards!(transition!(
+                        Some(23),
+                        state_assignment!(&mut variables, "a", 2.4, 1.3, "a"),
+                        state_assignment!(&mut variables, "b", 1.0, -1.0, "a")
+                    )),
+                    Guards::Unguarded(std::boxed::Box::new(transition!(
+                        Some(23),
+                        state_assignment!(&mut variables, "a", 2.4, 1.3, "a"),
+                        state_assignment!(&mut variables, "b", 1.0, -1.0, "a")
+                    )))
                 );
             }
 
@@ -201,14 +205,38 @@ mod tests {
                 let mut variables: ProgramVariables = program_variables!();
                 assert_eq!(
                     guards!(
-                        transition!(Some(23), &mut variables; "a", 2.4, 1.3, "a"; "b", 1.0, -1.0, "a"),
-                        transition!(None, &mut variables; "a", 1.3, 2.4, "a"; "b", 13.0, -1.8, "a"),
-                        transition!(Some(21), &mut variables; "a", -20.4, 1.3, "a"; "b", 0.0, 0.0, "a")
+                        transition!(
+                            Some(23),
+                            state_assignment!(&mut variables, "a", 2.4, 1.3, "a"),
+                            state_assignment!(&mut variables, "b", 1.0, -1.0, "a")
+                        ),
+                        transition!(
+                            None,
+                            state_assignment!(&mut variables, "a", 1.3, 2.4, "a"),
+                            state_assignment!(&mut variables, "b", 13.0, -1.8, "a")
+                        ),
+                        transition!(
+                            Some(21),
+                            state_assignment!(&mut variables, "a", -20.4, 1.3, "a"),
+                            state_assignment!(&mut variables, "b", 0.0, 0.0, "a")
+                        )
                     ),
                     Guards::Nondeterministic(vec![
-                        transition!(Some(23), &mut variables; "a", 2.4, 1.3, "a"; "b", 1.0, -1.0, "a"),
-                        transition!(None, &mut variables; "a", 1.3, 2.4, "a"; "b", 13.0, -1.8, "a"),
-                        transition!(Some(21), &mut variables; "a", -20.4, 1.3, "a"; "b", 0.0, 0.0, "a")
+                        transition!(
+                            Some(23),
+                            state_assignment!(&mut variables, "a", 2.4, 1.3, "a"),
+                            state_assignment!(&mut variables, "b", 1.0, -1.0, "a")
+                        ),
+                        transition!(
+                            None,
+                            state_assignment!(&mut variables, "a", 1.3, 2.4, "a"),
+                            state_assignment!(&mut variables, "b", 13.0, -1.8, "a")
+                        ),
+                        transition!(
+                            Some(21),
+                            state_assignment!(&mut variables, "a", -20.4, 1.3, "a"),
+                            state_assignment!(&mut variables, "b", 0.0, 0.0, "a")
+                        )
                     ])
                 );
             }
@@ -219,30 +247,42 @@ mod tests {
                 assert_eq!(
                     guards!(L:
                         state_system!(&mut variables; ">", 0.1, -2.3, "a"),
-                        transition!(Some(23), &mut variables; "a", 2.4, 1.3, "a"; "b", 1.0, -1.0, "a"),
+                        transition!(Some(23), state_assignment!(&mut variables, "a", 2.4, 1.3, "a"),state_assignment!(&mut variables,  "b", 1.0, -1.0, "a")),
                         state_system!(&mut variables;
                             "<=", -0.1, 2.3, "a";
                             ">=", 0.0, 3.8, "a"
                         ),
-                        transition!(None, &mut variables; "a", 1.3, 2.4, "a"; "b", 13.0, -1.8, "a"),
+                        transition!(None, state_assignment!(&mut variables, "a", 1.3, 2.4, "a"),state_assignment!(&mut variables, "b", 13.0, -1.8, "a")),
                         state_system!(&mut variables;
                             "<=", -0.1, 2.3, "a";
                             "<", 0.0, -3.8, "a"
                         ),
-                        transition!(Some(21), &mut variables; "a", -20.4, 1.3, "a"; "b", 0.0, 0.0, "a")
+                        transition!(Some(21), state_assignment!(&mut variables, "a", -20.4, 1.3, "a"),state_assignment!(&mut variables, "b", 0.0, 0.0, "a"))
                     ),
                     Guards::Logic(vec![
                         (
                             state_system!(&mut variables;">", 0.1, -2.3, "a"),
-                            transition!(Some(23), &mut variables; "a", 2.4, 1.3, "a"; "b", 1.0, -1.0, "a")
+                            transition!(
+                                Some(23),
+                                state_assignment!(&mut variables, "a", 2.4, 1.3, "a"),
+                                state_assignment!(&mut variables, "b", 1.0, -1.0, "a")
+                            )
                         ),
                         (
                             state_system!(&mut variables;"<=", -0.1, 2.3, "a"; ">=", 0.0, 3.8, "a"),
-                            transition!(None, &mut variables; "a", 1.3, 2.4, "a"; "b", 13.0, -1.8, "a")
+                            transition!(
+                                None,
+                                state_assignment!(&mut variables, "a", 1.3, 2.4, "a"),
+                                state_assignment!(&mut variables, "b", 13.0, -1.8, "a")
+                            )
                         ),
                         (
                             state_system!(&mut variables;"<=", -0.1, 2.3, "a"; "<", 0.0, -3.8, "a"),
-                            transition!(Some(21), &mut variables; "a", -20.4, 1.3, "a"; "b", 0.0, 0.0, "a")
+                            transition!(
+                                Some(21),
+                                state_assignment!(&mut variables, "a", -20.4, 1.3, "a"),
+                                state_assignment!(&mut variables, "b", 0.0, 0.0, "a")
+                            )
                         )
                     ])
                 );
@@ -254,24 +294,36 @@ mod tests {
                 assert_eq!(
                     guards!(P:
                         0.0,
-                        transition!(Some(23), &mut variables; "a", 2.4, 1.3, "a"; "b", 1.0, -1.0, "a"),
+                        transition!(Some(23), state_assignment!(&mut variables, "a", 2.4, 1.3, "a"), state_assignment!(&mut variables, "b", 1.0, -1.0, "a")),
                         0.3,
-                        transition!(None, &mut variables; "a", 1.3, 2.4, "a"; "b", 13.0, -1.8, "a"),
+                        transition!(None, state_assignment!(&mut variables, "a", 1.3, 2.4, "a"), state_assignment!(&mut variables, "b", 13.0, -1.8, "a")),
                         0.7,
-                        transition!(Some(21), &mut variables; "a", -20.4, 1.3, "a"; "b", 0.0, 0.0, "a")
+                        transition!(Some(21), state_assignment!(&mut variables, "a", -20.4, 1.3, "a"), state_assignment!(&mut variables, "b", 0.0, 0.0, "a"))
                     ),
                     Guards::Probabilistic(vec![
                         (
                             Constant(0.0),
-                            transition!(Some(23), &mut variables; "a", 2.4, 1.3, "a"; "b", 1.0, -1.0, "a")
+                            transition!(
+                                Some(23),
+                                state_assignment!(&mut variables, "a", 2.4, 1.3, "a"),
+                                state_assignment!(&mut variables, "b", 1.0, -1.0, "a")
+                            )
                         ),
                         (
                             Constant(0.3),
-                            transition!(None, &mut variables; "a", 1.3, 2.4, "a"; "b", 13.0, -1.8, "a")
+                            transition!(
+                                None,
+                                state_assignment!(&mut variables, "a", 1.3, 2.4, "a"),
+                                state_assignment!(&mut variables, "b", 13.0, -1.8, "a")
+                            )
                         ),
                         (
                             Constant(0.7),
-                            transition!(Some(21), &mut variables; "a", -20.4, 1.3, "a"; "b", 0.0, 0.0, "a")
+                            transition!(
+                                Some(21),
+                                state_assignment!(&mut variables, "a", -20.4, 1.3, "a"),
+                                state_assignment!(&mut variables, "b", 0.0, 0.0, "a")
+                            )
                         )
                     ])
                 );
@@ -286,7 +338,7 @@ mod tests {
                 guard::GuardedTransition, linear_polynomial::coefficient::Constant,
                 variable::program_variable::ProgramVariables,
             },
-            relation, state_system, system, transition,
+            relation, state_assignment, state_system, system, transition,
         };
 
         #[test]
@@ -302,7 +354,7 @@ mod tests {
                     "<=", 0.0, 1.0, "a";
                     "<", 1.0, 2.0, "a", 1.0, "len"
                 ),
-                transition!(None, &mut variables; "a", 0.0),
+                transition!(None, state_assignment!(&mut variables, "a", 0.0)),
             );
             let guarded_transition = GuardedTransition::Logic(&data);
             assert_eq!(
@@ -316,10 +368,11 @@ mod tests {
             let mut variables: ProgramVariables = program_variables!("a", "b", "c",);
             let data = (
                 Constant(0.0),
-                transition!(None, &mut variables;
-                    "a", 0.0, 0.0, "a";
-                    "b", 2.0, 1.0, "a", 2.0, "b", 0.0, "c";
-                    "a", -4.0, 0.0, "a", 0.0, "b", 1.0, "c"
+                transition!(
+                    None,
+                    state_assignment!(&mut variables, "a", 0.0, 0.0, "a"),
+                    state_assignment!(&mut variables, "b", 2.0, 1.0, "a", 2.0, "b", 0.0, "c"),
+                    state_assignment!(&mut variables, "a", -4.0, 0.0, "a", 0.0, "b", 1.0, "c")
                 ),
             );
             let guarded_transition = GuardedTransition::Probabilistic(&data);

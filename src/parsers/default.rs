@@ -13,7 +13,7 @@ use crate::pts::linear_polynomial::State;
 use crate::pts::location::LocationHandle;
 use crate::pts::relation::{RelationSign, StateRelation};
 use crate::pts::system::StateSystem;
-use crate::pts::transition::{Assignment, StateAssignment, Transition};
+use crate::pts::transition::{Assignment, StateAssignment, Transition, UpdateOperation};
 use crate::pts::variable::program_variable::ProgramVariables;
 use crate::pts::PTS;
 
@@ -216,7 +216,10 @@ fn parse_assign<'parse>(
         .set_outgoing(
             start,
             Guards::Unguarded(Box::new(Transition {
-                assignments: vec![parse_assignment(&mut pts.variables, parse)],
+                update_function: vec![UpdateOperation::Assignment(parse_assignment(
+                    &mut pts.variables,
+                    parse,
+                ))],
                 target: end,
             })), // can unwrap here, since local_start can't be None and parse_assignment always returns
         )
@@ -239,7 +242,7 @@ fn parse_condition<'parse>(
                 (
                     !loop_condition,
                     Transition {
-                        assignments: Default::default(),
+                        update_function: Default::default(),
                         target: end,
                     },
                 ),
@@ -262,7 +265,7 @@ fn parse_condition<'parse>(
                 (
                     probabilities[1],
                     Transition {
-                        assignments: Default::default(),
+                        update_function: Default::default(),
                         target: end,
                     },
                 ),
@@ -272,7 +275,7 @@ fn parse_condition<'parse>(
             // default gets replaced
             Default::default(),
             Transition {
-                assignments: Default::default(),
+                update_function: Default::default(),
                 target: end,
             },
         ])),
@@ -331,7 +334,7 @@ fn parse_nondet<'parse>(
     // if theres just one block, the choice is between executing and skipping it
     if transitions.len() == 1 {
         transitions.push(Transition {
-            assignments: Default::default(),
+            update_function: Default::default(),
             target: end,
         })
     }
@@ -371,7 +374,7 @@ fn parse_if<'parse>(
     conditions.push(else_condition);
     if conditions.len() > transitions.len() {
         transitions.push(Transition {
-            assignments: Default::default(),
+            update_function: Default::default(),
             target: end,
         });
     }
@@ -442,7 +445,7 @@ fn parse_odds<'parse>(
     guards.push((
         prob_iter.next().unwrap(),
         Transition {
-            assignments: Default::default(),
+            update_function: Default::default(),
             target: end,
         },
     ));
@@ -474,7 +477,10 @@ mod tests {
             Parser,
         },
         program_variables,
-        pts::{location::Locations, variable::program_variable::ProgramVariables, PTS},
+        pts::{
+            location::Locations, transition::UpdateOperation,
+            variable::program_variable::ProgramVariables, PTS,
+        },
         state_assignment, state_relation, state_system, transition,
     };
 
@@ -486,7 +492,7 @@ mod tests {
         let assign = parse_assignment(&mut variables, parse.next().unwrap());
         assert!(parse.next().is_none());
         assert_eq!(
-            assign,
+            UpdateOperation::Assignment(assign),
             state_assignment!(
                 &mut variables,
                 "x",
@@ -569,7 +575,10 @@ mod tests {
         locations
             .set_outgoing(
                 handle,
-                guards!(transition![None, &mut variables; "a", 0.0, 1.0, "a", 0.0,"b"]),
+                guards!(transition![
+                    None,
+                    state_assignment![&mut variables, "a", 0.0, 1.0, "a", 0.0, "b"]
+                ]),
             )
             .unwrap();
         // 3
@@ -613,7 +622,10 @@ mod tests {
         locations
             .set_outgoing(
                 handle,
-                guards!(transition!(next_location, &mut variables; "b", 1.0, 0.0, "a", 0.0, "b")),
+                guards!(transition!(
+                    next_location,
+                    state_assignment!(&mut variables, "b", 1.0, 0.0, "a", 0.0, "b")
+                )),
             )
             .unwrap();
         // 3
@@ -632,7 +644,10 @@ mod tests {
         locations
             .set_outgoing(
                 handle,
-                guards!(transition!(next_location, &mut variables; "c", 0.0, 1.0, "a", 1.0, "b", 0.0, "c")),
+                guards!(transition!(
+                    next_location,
+                    state_assignment!(&mut variables, "c", 0.0, 1.0, "a", 1.0, "b", 0.0, "c")
+                )),
             )
             .unwrap();
 
@@ -652,7 +667,10 @@ mod tests {
         locations
             .set_outgoing(
                 handle,
-                guards!(transition!(next_location, &mut variables; "b", 0.0, 2.0, "a", 0.0, "b", 1.0, "c")),
+                guards!(transition!(
+                    next_location,
+                    state_assignment!(&mut variables, "b", 0.0, 2.0, "a", 0.0, "b", 1.0, "c")
+                )),
             )
             .unwrap();
         // 7
@@ -693,7 +711,10 @@ mod tests {
         locations
             .set_outgoing(
                 handle,
-                guards!(transition![None,&mut variables; "a", 1.0, 0.0, "a"]),
+                guards!(transition![
+                    None,
+                    state_assignment!(&mut variables, "a", 1.0, 0.0, "a")
+                ]),
             )
             .unwrap();
         // 3
@@ -764,7 +785,10 @@ mod tests {
         locations
             .set_outgoing(
                 branch_1,
-                guards!(transition!(junction, &mut variables; "a", 0.0, 1.0, "a", 0.0, "b")),
+                guards!(transition!(
+                    junction,
+                    state_assignment!(&mut variables, "a", 0.0, 1.0, "a", 0.0, "b")
+                )),
             )
             .unwrap();
 
@@ -772,9 +796,10 @@ mod tests {
         locations
             .set_outgoing(
                 branch_2,
-                guards!(
-                    transition!(junction, &mut variables; "a", 0.0, 1.0, "a", 0.0, "b", 0.0, "c")
-                ),
+                guards!(transition!(
+                    junction,
+                    state_assignment!(&mut variables, "a", 0.0, 1.0, "a", 0.0, "b", 0.0, "c")
+                )),
             )
             .unwrap();
 
@@ -782,9 +807,10 @@ mod tests {
         locations
             .set_outgoing(
                 branch_3,
-                guards!(
-                    transition!(junction, &mut variables; "a", 0.0, 1.0, "a", 0.0, "b", 0.0, "c")
-                ),
+                guards!(transition!(
+                    junction,
+                    state_assignment!(&mut variables, "a", 0.0, 1.0, "a", 0.0, "b", 0.0, "c")
+                )),
             )
             .unwrap();
 
@@ -792,7 +818,10 @@ mod tests {
         locations
             .set_outgoing(
                 junction,
-                guards!(transition!(locations.get_terminating_location(), &mut variables; "a", 0.0, 1.0, "a", 0.0, "b", 0.0, "c")),
+                guards!(transition!(
+                    locations.get_terminating_location(),
+                    state_assignment!(&mut variables, "a", 0.0, 1.0, "a", 0.0, "b", 0.0, "c")
+                )),
             )
             .unwrap();
 
@@ -853,7 +882,10 @@ mod tests {
         locations
             .set_outgoing(
                 branch_1,
-                guards!(transition!(junction, &mut variables; "a", 0.0, 1.0, "a", 0.0, "b")),
+                guards!(transition!(
+                    junction,
+                    state_assignment!(&mut variables, "a", 0.0, 1.0, "a", 0.0, "b")
+                )),
             )
             .unwrap();
 
@@ -868,8 +900,9 @@ mod tests {
             .set_outgoing(
                 junction,
                 guards!(transition!(
-                    locations.get_terminating_location(), &mut variables;
-                    "a", 0.0, 1.0, "a", 0.0, "b")),
+                    locations.get_terminating_location(),
+                    state_assignment!(&mut variables, "a", 0.0, 1.0, "a", 0.0, "b")
+                )),
             )
             .unwrap();
 
@@ -932,7 +965,10 @@ mod tests {
         locations
             .set_outgoing(
                 branch_1,
-                guards!(transition!(junction, &mut variables; "a", 0.0, 1.0, "a")),
+                guards!(transition!(
+                    junction,
+                    state_assignment!(&mut variables, "a", 0.0, 1.0, "a")
+                )),
             )
             .unwrap();
 
@@ -940,7 +976,10 @@ mod tests {
         locations
             .set_outgoing(
                 branch_2,
-                guards!(transition!(junction, &mut variables; "b", 0.0, 1.0, "a", 0.0, "b")),
+                guards!(transition!(
+                    junction,
+                    state_assignment!(&mut variables, "b", 0.0, 1.0, "a", 0.0, "b")
+                )),
             )
             .unwrap();
 
@@ -948,7 +987,10 @@ mod tests {
         locations
             .set_outgoing(
                 junction,
-                guards!(transition!(locations.get_terminating_location(), &mut variables; "a", 0.0, 1.0, "a", 0.0, "b")),
+                guards!(transition!(
+                    locations.get_terminating_location(),
+                    state_assignment!(&mut variables, "a", 0.0, 1.0, "a", 0.0, "b")
+                )),
             )
             .unwrap();
         locations.set_invariant(
@@ -1003,7 +1045,10 @@ mod tests {
         locations
             .set_outgoing(
                 branch_1,
-                guards!(transition!(junction, &mut variables; "a", 0.0, 1.0, "a")),
+                guards!(transition!(
+                    junction,
+                    state_assignment!(&mut variables, "a", 0.0, 1.0, "a")
+                )),
             )
             .unwrap();
 
@@ -1015,10 +1060,8 @@ mod tests {
             .set_outgoing(
                 junction,
                 guards!(transition!(
-                    locations.get_terminating_location(), &mut variables;
-                    "a",
-                    0.0,
-                    1.0, "a"
+                    locations.get_terminating_location(),
+                    state_assignment!(&mut variables, "a", 0.0, 1.0, "a")
                 )),
             )
             .unwrap();
@@ -1078,7 +1121,10 @@ mod tests {
         locations
             .set_outgoing(
                 branch_1,
-                guards!(transition!(junction,&mut variables ; "a", 0.0, 1.0, "a")),
+                guards!(transition!(
+                    junction,
+                    state_assignment!(&mut variables, "a", 0.0, 1.0, "a")
+                )),
             )
             .unwrap();
 
@@ -1086,7 +1132,10 @@ mod tests {
         locations
             .set_outgoing(
                 branch_2,
-                guards!(transition!(junction, &mut variables; "a", 0.0, 1.0, "a")),
+                guards!(transition!(
+                    junction,
+                    state_assignment!(&mut variables, "a", 0.0, 1.0, "a")
+                )),
             )
             .unwrap();
 
@@ -1094,7 +1143,10 @@ mod tests {
         locations
             .set_outgoing(
                 branch_3,
-                guards!(transition!(junction, &mut variables; "a", 0.0, 1.0, "a")),
+                guards!(transition!(
+                    junction,
+                    state_assignment!(&mut variables, "a", 0.0, 1.0, "a")
+                )),
             )
             .unwrap();
 
@@ -1102,10 +1154,10 @@ mod tests {
         locations
             .set_outgoing(
                 junction,
-                guards!(
-                    transition!(locations.get_terminating_location(), &mut variables;
-                    "a", 0.0, 1.0, "a")
-                ),
+                guards!(transition!(
+                    locations.get_terminating_location(),
+                    state_assignment!(&mut variables, "a", 0.0, 1.0, "a")
+                )),
             )
             .unwrap();
         locations.set_invariant(
@@ -1159,7 +1211,10 @@ mod tests {
         locations
             .set_outgoing(
                 branch_1,
-                guards!(transition!(junction, &mut variables; "a", 0.0, 1.0, "a")),
+                guards!(transition!(
+                    junction,
+                    state_assignment!(&mut variables, "a", 0.0, 1.0, "a")
+                )),
             )
             .unwrap();
         // 6
@@ -1169,9 +1224,9 @@ mod tests {
         locations
             .set_outgoing(
                 junction,
-                guards!(transition!(locations.get_terminating_location(),
-                    &mut variables;
-                    "a", 0.0, 1.0, "a"
+                guards!(transition!(
+                    locations.get_terminating_location(),
+                    state_assignment!(&mut variables, "a", 0.0, 1.0, "a")
                 )),
             )
             .unwrap();
@@ -1235,7 +1290,10 @@ mod tests {
         locations
             .set_outgoing(
                 branch_1,
-                guards!(transition!(start, &mut variables; "a", 0.0, 0.0, "a", 1.0, "b")),
+                guards!(transition!(
+                    start,
+                    state_assignment!(&mut variables, "a", 0.0, 0.0, "a", 1.0, "b")
+                )),
             )
             .unwrap();
         // 6
@@ -1248,11 +1306,10 @@ mod tests {
         locations
             .set_outgoing(
                 junction,
-                guards!(
-                    transition!(locations.get_terminating_location(), &mut variables;
-                            "a", 0.0, 0.0, "a", 1.0, "b"
-                    )
-                ),
+                guards!(transition!(
+                    locations.get_terminating_location(),
+                    state_assignment!(&mut variables, "a", 0.0, 0.0, "a", 1.0, "b")
+                )),
             )
             .unwrap();
 
@@ -1310,7 +1367,10 @@ mod tests {
         locations
             .set_outgoing(
                 branch_1,
-                guards!(transition!(start, &mut variables; "a", 0.0, 0.0, "a", 1.0, "b")),
+                guards!(transition!(
+                    start,
+                    state_assignment!(&mut variables, "a", 0.0, 0.0, "a", 1.0, "b")
+                )),
             )
             .unwrap();
 
@@ -1325,8 +1385,8 @@ mod tests {
             .set_outgoing(
                 junction,
                 guards!(transition!(
-                    locations.get_terminating_location(), &mut variables;
-                    "a", 0.0, 0.0, "a", 1.0, "b"
+                    locations.get_terminating_location(),
+                    state_assignment!(&mut variables, "a", 0.0, 0.0, "a", 1.0, "b")
                 )),
             )
             .unwrap();
@@ -1378,7 +1438,10 @@ mod tests {
         locations
             .set_outgoing(
                 branch_1,
-                guards!(transition!(start, &mut variables; "a", 0.0, 0.0, "a", 1.0, "b")),
+                guards!(transition!(
+                    start,
+                    state_assignment!(&mut variables, "a", 0.0, 0.0, "a", 1.0, "b")
+                )),
             )
             .unwrap();
         // 6
@@ -1392,8 +1455,8 @@ mod tests {
             .set_outgoing(
                 junction,
                 guards!(transition!(
-                    locations.get_terminating_location(), &mut variables;
-                    "a", 0.0, 0.0, "a", 1.0, "b"
+                    locations.get_terminating_location(),
+                    state_assignment!(&mut variables, "a", 0.0, 0.0, "a", 1.0, "b")
                 )),
             )
             .unwrap();

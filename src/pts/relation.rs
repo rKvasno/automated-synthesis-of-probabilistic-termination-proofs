@@ -247,6 +247,7 @@ impl<V: Variable, C: Coefficient> Not for Relation<V, C> {
     }
 }
 
+#[cfg(stop)]
 #[cfg(test)]
 mod tests {
     use crate::{

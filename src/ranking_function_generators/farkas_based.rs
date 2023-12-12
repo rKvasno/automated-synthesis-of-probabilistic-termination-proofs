@@ -11,7 +11,7 @@ use crate::{
         location::LocationHandle,
         relation::{Relation, RelationSign},
         system::{RelationID, StateSystem, System},
-        transition::Transition,
+        transition::{Transition, UpdateOperation},
         variable::{program_variable::ProgramVariable, set::VariableSet, Variable},
         PTS,
     },
@@ -357,8 +357,15 @@ fn probabilistic_martingale_difference<'a, I, S: BuildHasher + Default>(
                     transition.target,
                 );
 
-                for assignment in transition.assignments.iter() {
-                    template = assignment.apply(template);
+                for op in transition.update_function.iter() {
+                    match op {
+                        UpdateOperation::Assignment(assignment) => {
+                            template = assignment.apply(template)
+                        }
+                        UpdateOperation::Sampling(sampling) => {
+                            template = sampling.expectation().apply(template)
+                        }
+                    }
                 }
 
                 template.mul_by_constant(probability.to_owned());
@@ -409,8 +416,15 @@ fn logic_martingale_difference<'a, I, S: BuildHasher + Default>(
                 transition.target,
             );
 
-            for assignment in transition.assignments.iter() {
-                template = assignment.apply(template);
+            for op in transition.update_function.iter() {
+                match op {
+                    UpdateOperation::Assignment(assignment) => {
+                        template = assignment.apply(template)
+                    }
+                    UpdateOperation::Sampling(sampling) => {
+                        template = sampling.expectation().apply(template)
+                    }
+                }
             }
 
             lhs += template;
@@ -464,8 +478,15 @@ fn nondeterministic_martingale_difference<'a, I, S: BuildHasher + Default>(
                 transition.target,
             );
 
-            for assignment in transition.assignments.iter() {
-                template = assignment.apply(template);
+            for op in transition.update_function.iter() {
+                match op {
+                    UpdateOperation::Assignment(assignment) => {
+                        template = assignment.apply(template)
+                    }
+                    UpdateOperation::Sampling(sampling) => {
+                        template = sampling.expectation().apply(template)
+                    }
+                }
             }
 
             lhs += template;
@@ -677,7 +698,7 @@ mod tests {
             linear_solvers::{minilp::Minilp, Solution},
             Generator, RankedPTS, RankingFunction,
         },
-        transition,
+        state_assignment, transition,
     };
 
     use super::{FarkasBasedGenerator, TemplateVariable};
@@ -748,7 +769,7 @@ mod tests {
                 start_location,
                 guards!(P:
                         0.25,
-                        transition!(intermediate_location, &mut pts.variables; "a", 3.0, 7.0, "a"),
+                        transition!(intermediate_location, state_assignment!(&mut pts.variables, "a", 3.0, 7.0, "a")),
                         0.75,
                         transition!(None)
                 ),
@@ -772,7 +793,7 @@ mod tests {
                 start_location,
                 guards!(P:
                         0.25,
-                        transition!(intermediate_location, &mut pts.variables; "a", 3.0, 7.0, "a"),
+                        transition!(intermediate_location, state_assignment!(&mut pts.variables, "a", 3.0, 7.0, "a")),
                         0.75,
                         transition!(None)
                 ),
@@ -1077,7 +1098,7 @@ mod tests {
             ranking_function_generators::farkas_based::{
                 martingale_difference, TemplateVariableData,
             },
-            state_system, transition,
+            state_assignment, state_system, transition,
         };
         use pretty_assertions::assert_eq;
         use std::{collections::hash_map::DefaultHasher, hash::BuildHasherDefault};
@@ -1096,7 +1117,8 @@ mod tests {
                     start_location,
                     guards!(P:
                             0.25,
-                            transition!(intermediate_location, &mut pts.variables; "a", 3.0, 7.0, "a"),
+                            transition!(intermediate_location,
+                                        state_assignment!(&mut pts.variables, "a", 3.0, 7.0, "a") ),
                             0.75,
                             transition!(None)
                     ),
@@ -1192,7 +1214,7 @@ mod tests {
                     start_location,
                     guards!(L:
                             state_system!(&mut pts.variables; "<=", 11.0, -1.0, "a"),
-                            transition!(intermediate_location, &mut pts.variables; "a", 3.0, 7.0, "a"),
+                            transition!(intermediate_location,state_assignment!( &mut pts.variables, "a", 3.0, 7.0, "a")),
                             state_system!(&mut pts.variables; ">", 11.0, -1.0, "a"),
                             transition!(None)
                     ),
@@ -1392,7 +1414,10 @@ mod tests {
                 .set_outgoing(
                     start_location,
                     guards!(
-                        transition!(intermediate_location, &mut pts.variables; "a", 3.0, 7.0, "a"),
+                        transition!(
+                            intermediate_location,
+                            state_assignment!(&mut pts.variables, "a", 3.0, 7.0, "a")
+                        ),
                         transition!(None)
                     ),
                 )
@@ -1505,9 +1530,10 @@ mod tests {
             pts.locations
                 .set_outgoing(
                     start_location,
-                    guards!(
-                        transition!(intermediate_location, &mut pts.variables; "a", 3.0, 7.0, "a"),
-                    ),
+                    guards!(transition!(
+                        intermediate_location,
+                        state_assignment!(&mut pts.variables, "a", 3.0, 7.0, "a")
+                    ),),
                 )
                 .unwrap();
 

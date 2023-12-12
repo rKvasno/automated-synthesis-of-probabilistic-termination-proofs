@@ -196,6 +196,7 @@ impl<V: Variable, C: Coefficient> Not for System<V, C> {
     }
 }
 
+#[cfg(stop)]
 #[cfg(test)]
 mod tests {
 

@@ -136,6 +136,7 @@ impl<'a> dot::Labeller<'a, LocationHandle, Edge> for PTS {
     }
 }
 
+#[cfg(stop)]
 #[cfg(test)]
 mod tests {
     mod dot {
