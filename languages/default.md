@@ -24,7 +24,7 @@ else {}
 ```
 
 ### While statements
-Extend traditional semantics. They execute their content in a loop. There's three types of while loops:
+Extend traditional semantics. They execute their content in a loop. There are three types of while loops:
     - logical
     - probabilistic
     - non-deterministic
@@ -49,10 +49,17 @@ while * {}
 
 
 ### Odds statements
-They are used for probabilistic branching. Based on the evaluation of odds provided, exactly one or zero branches are executed. For example when given the odds 1:1:1 the probability of execution of any of its two branches is the same as the probability of not executing either.
+They are used for probabilistic branching. Based on the evaluation of odds provided, exactly one or zero branches are executed. For example when given the odds 1:1:1 the probability of execution of each of its two branches is the same as the probability of not executing either.
 ```
 odds <n>:...:<m> {} ...
 ```
+
+### Sampling statements
+Sampling is used to assign a random value to the variable. The minimum, maximum and expected value are set as arguments.
+```
+<variable> = random(<min>, <max>, <E>)
+```
+
 
 ### Choose statements
 They have two distinct semantics based on the number of branches.

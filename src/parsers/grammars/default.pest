@@ -11,6 +11,7 @@ statement_helper = _{ "if" ~ if_statement         |
                       "odds" ~ odds_statement     | 
                       "choose" ~ choose_statement |
                       "while" ~ while_statement   |
+                      sampling_statement          |
                       assignment_statement        }
 
 if_statement = { if_helper }
@@ -23,6 +24,7 @@ odds_helper = _{ constant ~ ":" ~ ( odds_helper | constant ) ~ block }
 
 choose_statement = { block ~ ( NEWLINE? ~ "or" ~  block )*}
 while_statement = { condition ~ block }
+sampling_statement = { variable ~ "=" ~ "random(" ~ constant ~ "," ~ constant ~ "," ~ constant ~ ")" }
 assignment_statement = { variable ~ "=" ~ linear_polynomial}
 
 condition = _{ logic_condition     |

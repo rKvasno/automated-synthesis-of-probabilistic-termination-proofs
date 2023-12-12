@@ -7,12 +7,9 @@ if a >= b {
   a = a
 }
 else if b <= c {
-  a = a
+  a = random(0, 1, 0.5)
 }
-else {
-  [ a > a ]
-  a = a
-}
+else {}
 
 =======
 
@@ -53,29 +50,15 @@ else {
         )
         (statements
           (statement
-            (assignment_statement
+            (sampling_statement
               (variable: "a")
-              (linear_polynomial: "a")
+              (constant: "0")
+              (constant: "1")
+              (constant: "0.5")
             )
           )
         )
-        (statements
-          (statement
-            (invariant
-              (logic_condition
-                (inequality
-                  (linear_polynomial: "a")
-                  (comparison_op: ">")
-                  (linear_polynomial: "a")
-                )
-              )
-            )
-            (assignment_statement
-              (variable: "a")
-              (linear_polynomial: "a")
-            )
-          )
-        )
+        (statements)
       )
     )
   )
