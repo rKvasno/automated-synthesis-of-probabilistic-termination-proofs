@@ -14,7 +14,7 @@ use crate::pts::location::LocationHandle;
 use crate::pts::relation::{RelationSign, StateRelation};
 use crate::pts::system::StateSystem;
 use crate::pts::transition::{Assignment, StateAssignment, Transition, UpdateOperation};
-use crate::pts::variable::program_variable::ProgramVariables;
+use crate::pts::variable::program_variable::{ProgramVariable, ProgramVariables};
 use crate::pts::PTS;
 
 use super::grammars::default::{DefaultPestParser, Rule};
@@ -43,6 +43,11 @@ fn odds_to_probabilities(odds: Vec<Constant>) -> Result<Vec<Constant>, ParserErr
     }
 }
 
+fn is_keyword(var: &ProgramVariable) -> bool {
+    vec!["if", "else", "while", "odds", "choose", "random", "and"]
+        .contains(&var.to_string().as_str())
+}
+
 pub struct DefaultParser;
 impl Parser for DefaultParser {
     fn parse(input: &str) -> Result<PTS, ParserError> {
@@ -52,8 +57,18 @@ impl Parser for DefaultParser {
                 let mut pts = Default::default();
                 parse_program(&mut pts, parse.next().unwrap())?;
                 assert_eq!(parse.next(), None);
-                pts.finalize();
-                Ok(pts)
+                if (&pts.variables)
+                    .into_iter()
+                    .map(is_keyword)
+                    .fold(false, |acc, x| acc || x)
+                {
+                    Err(ParserError {
+                        message: "keywords cannot be used as variable names".to_string(),
+                    })
+                } else {
+                    pts.finalize();
+                    Ok(pts)
+                }
             }
         }
     }
@@ -1485,6 +1500,14 @@ mod tests {
             assert_eq!(
                 DefaultParser::parse("test").err().unwrap().to_string(),
                 " --> 1:1\n  |\n1 | test\n  | ^---\n  |\n  = expected program"
+            );
+        }
+
+        #[test]
+        fn variable_name_keyword() {
+            assert_eq!(
+                DefaultParser::parse("x = if").err().unwrap().to_string(),
+                "keywords cannot be used as variable names"
             );
         }
 
