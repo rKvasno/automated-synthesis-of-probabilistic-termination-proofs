@@ -108,7 +108,7 @@ impl<V: Variable, C: Coefficient> Polynomial<V, C> {
         Option<V>: Borrow<K>,
         K: Hash + Eq,
     {
-        self.data.remove_entry(variable)
+        self.data.shift_remove_entry(variable)
     }
 
     pub fn get_coefficient<K>(&self, variable: &K) -> Option<&C>
