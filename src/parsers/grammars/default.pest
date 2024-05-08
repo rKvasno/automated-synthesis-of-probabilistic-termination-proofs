@@ -19,8 +19,8 @@ if_helper = _{ logic_condition ~ block ~ ( NEWLINE? ~ "else" ~ NEWLINE? ~ else)?
 else =  _{ "if " ~ if_helper |
            block             }
 
-odds_statement = { odds_helper }
-odds_helper = _{ constant ~ ":" ~ ( odds_helper | constant ) ~ block }
+odds_statement = { constant ~ odds_helper ~ block }
+odds_helper = _{ ":" ~ constant ~ (  odds_helper )? ~ block }
 
 choose_statement = { block ~ ( NEWLINE? ~ "or" ~  block )+}
 while_statement = { condition ~ block }

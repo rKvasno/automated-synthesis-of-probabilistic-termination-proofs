@@ -3,7 +3,7 @@ Probabilistic branching
 =======
 
 [ 0 >= 0 ]
-odds 0:1:0 {
+odds 0:1 {
  [ a < a ]
  a = a
 }
@@ -30,7 +30,6 @@ odds 0:1:0 {
       (odds_statement
         (constant: "0")
         (constant: "1")
-        (constant: "0")
         (statements
           (statement
             (invariant

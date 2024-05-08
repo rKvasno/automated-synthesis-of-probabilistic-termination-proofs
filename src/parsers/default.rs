@@ -448,14 +448,6 @@ fn parse_odds<'parse>(
 
         parse_locations(pts, locations_parse, &mut guards.last_mut().unwrap().1, end)?
     }
-    // assert!(prob_iter.peek().is_some());
-    guards.push((
-        prob_iter.next().unwrap(),
-        Transition {
-            update_function: Default::default(),
-            target: end,
-        },
-    ));
     // assert!(prob_iter.peek().is_none());
 
     // start cannot be None, see parse_locations, guards cannot be empty, see grammar
@@ -961,9 +953,6 @@ mod tests {
                     // 4
                     1.0,
                     transition!(branch_2),
-                    // 6
-                    0.0,
-                    transition!(junction),
                 ),
             )
             .unwrap();
@@ -1546,7 +1535,7 @@ mod tests {
         #[test]
         fn branching_odds_sum_zero() {
             assert_eq!(
-                DefaultParser::parse("odds 0:0:0{\n#0<0\na=0\n}\n{\n#0<0\na=0\n}#0<0\n")
+                DefaultParser::parse("odds 0:0{\n#0<0\na=0\n}\n{\n#0<0\na=0\n}#0<0\n")
                     .err()
                     .unwrap()
                     .to_string(),

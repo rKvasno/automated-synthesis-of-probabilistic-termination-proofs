@@ -20,7 +20,7 @@ while quit <= 0.5 and
   choose {
 
     [ quit <= 0.5 and bank > 0 and dealer_bank > 0 ]
-    odds 1:1:0 {
+    odds 1:1 {
       [ quit <= 0.5 and bank > 0 and dealer_bank > 0 ]
       bank = bank + 1
 
@@ -166,7 +166,6 @@ while quit <= 0.5 and
                   (odds_statement
                     (constant: "1")
                     (constant: "1")
-                    (constant: "0")
                     (statements
                       (statement
                         (invariant
