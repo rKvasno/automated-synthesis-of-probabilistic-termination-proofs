@@ -49,7 +49,7 @@ while * {}
 
 
 ### Odds statements
-They are used for probabilistic branching. Based on the evaluation of odds provided, exactly one or zero branches are executed. For example when given the odds 1:1:1 the probability of execution of each of its two branches is the same as the probability of not executing either.
+They are used for probabilistic branching, selecting a branch based on the odds. For example when given the odds 1:1 the probability of execution of each of its two branches is the same.
 ```
 odds <n>:...:<m> {} ...
 ```
@@ -62,15 +62,6 @@ Sampling is used to assign a random value to the variable. The minimum, maximum 
 
 
 ### Choose statements
-They have two distinct semantics based on the number of branches.
-
-#### With one branch
-At the start of the branch it is non-deterministically chosen whether its contents should execute or be skipped.
-```
-choose {}
-```
-
-#### With multiple branches
 They non-deterministically choose exactly one of their branches to execute.
 ```
 choose {} or ... or {}
