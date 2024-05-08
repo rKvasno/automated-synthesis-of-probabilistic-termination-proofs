@@ -22,7 +22,7 @@ else =  _{ "if " ~ if_helper |
 odds_statement = { odds_helper }
 odds_helper = _{ constant ~ ":" ~ ( odds_helper | constant ) ~ block }
 
-choose_statement = { block ~ ( NEWLINE? ~ "or" ~  block )*}
+choose_statement = { block ~ ( NEWLINE? ~ "or" ~  block )+}
 while_statement = { condition ~ block }
 sampling_statement = { variable ~ "=" ~ "random(" ~ constant ~ "," ~ constant ~ "," ~ constant ~ ")" }
 assignment_statement = { variable ~ "=" ~ linear_polynomial}
