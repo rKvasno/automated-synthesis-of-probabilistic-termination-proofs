@@ -13,7 +13,7 @@ use crate::pts::linear_polynomial::State;
 use crate::pts::location::LocationHandle;
 use crate::pts::relation::{RelationSign, StateRelation};
 use crate::pts::system::StateSystem;
-use crate::pts::transition::{Assignment, StateAssignment, Transition, UpdateOperation};
+use crate::pts::transition::{Assignment, StateSampling, Sampling, StateAssignment, Transition, UpdateOperation};
 use crate::pts::variable::program_variable::{ProgramVariable, ProgramVariables};
 use crate::pts::PTS;
 
@@ -94,6 +94,25 @@ fn parse_assignment<'parse>(
     let var = LinearPolynomialParser::parse_variable(variables, pairs.next().unwrap().as_str());
     let pol: State = parse_linear_polynomial(variables, pairs.next().unwrap());
     Assignment::new(var, pol)
+}
+
+// assumes the parses rule is Rule::sampling_statement
+fn parse_sampling<'parse>(
+    variables: &mut ProgramVariables,
+    parse: Pair<'parse, Rule>,
+) -> Result<StateSampling, ParserError> {
+    assert_eq!(parse.to_owned().as_rule(), Rule::sampling_statement);
+    let mut pairs = parse.into_inner();
+    let var = LinearPolynomialParser::parse_variable(variables, pairs.next().unwrap().as_str());
+    let min = LinearPolynomialParser::parse_constant(pairs.next().unwrap().as_str());
+    let max = LinearPolynomialParser::parse_constant(pairs.next().unwrap().as_str());
+    let expected_value = LinearPolynomialParser::parse_constant(pairs.next().unwrap().as_str());
+    match Sampling::new(var, min, max, expected_value){
+        Some(x) => Ok(x),
+        None => Err(ParserError {
+            message: "incorrect bounds".to_string(),
+        })
+    }
 }
 
 // assumes the parses rule is Rule::comparison_op
@@ -210,8 +229,8 @@ fn parse_locations<'parse>(
             Rule::odds_statement => parse_odds(pts, instruction_parse, local_start, local_end)?,
             Rule::choose_statement => parse_nondet(pts, instruction_parse, local_start, local_end)?,
             Rule::while_statement => parse_while(pts, instruction_parse, local_start, local_end)?,
-            Rule::assignment_statement => {
-                parse_assign(pts, instruction_parse, local_start, local_end)
+            Rule::assignment_statement | Rule::sampling_statement => {
+                parse_assign(pts, instruction_parse, local_start, local_end)?
             }
             _ => panic!("{}", INVARIANT_ERROR),
         };
@@ -219,26 +238,45 @@ fn parse_locations<'parse>(
     Ok(())
 }
 
-// assumes the parses rule is Rule::assignment_statement
+// assumes the parses rule is Rule::assignment_statement or Rule::sampling_statement
 fn parse_assign<'parse>(
     pts: &mut PTS,
     parse: Pair<'parse, Rule>,
     start: LocationHandle,
     end: LocationHandle,
-) {
-    assert_eq!(parse.to_owned().as_rule(), Rule::assignment_statement);
-    pts.locations
-        .set_outgoing(
-            start,
-            Guards::Unguarded(Box::new(Transition {
-                update_function: vec![UpdateOperation::Assignment(parse_assignment(
-                    &mut pts.variables,
-                    parse,
-                ))],
-                target: end,
-            })), // can unwrap here, since local_start can't be None and parse_assignment always returns
-        )
-        .unwrap()
+) -> Result<(), ParserError>{
+    match parse.to_owned().as_rule(){
+        Rule::assignment_statement => {
+            pts.locations
+                .set_outgoing(
+                    start,
+                    Guards::Unguarded(Box::new(Transition {
+                        update_function: vec![UpdateOperation::Assignment(parse_assignment(
+                            &mut pts.variables,
+                            parse,
+                        ))],
+                        target: end,
+                    })), // can unwrap here, since local_start can't be None and parse_assignment always returns
+                )
+                .unwrap()
+        }
+        Rule::sampling_statement => {
+            pts.locations
+                .set_outgoing(
+                    start,
+                    Guards::Unguarded(Box::new(Transition {
+                        update_function: vec![UpdateOperation::Sampling(parse_sampling(
+                            &mut pts.variables,
+                            parse,
+                        )?)],
+                        target: end,
+                    })), 
+                )
+                .unwrap()
+        }
+        _ => panic!("{}", INVARIANT_ERROR),
+    }
+    Ok(())
 }
 
 // assumes the parses rule is Rule::*_condition or Rule::nondeterminism_sign
