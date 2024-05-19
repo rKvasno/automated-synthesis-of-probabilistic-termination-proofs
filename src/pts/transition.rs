@@ -40,6 +40,7 @@ macro_rules! assignment {
         }
     };
 }
+
 #[macro_export]
 macro_rules! state_assignment {
     [

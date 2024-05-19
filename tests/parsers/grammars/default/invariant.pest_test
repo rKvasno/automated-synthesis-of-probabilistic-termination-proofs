@@ -1,12 +1,12 @@
-invariant
+disjunction
 
 =======
 
 [ a < 4
- and b > 3 ]
-[ b > a and
-  b >= 4 ]
-[ a < b 
+ and b > 3 or
+ b > a and
+  b >= 4 
+or a < b 
 and
 a > 0 ]
 a = c
@@ -14,16 +14,16 @@ a = c
   1 < a and
   c > a and
   b > 0
-]
-[ c < 2 and c < a and b < c ]
+or
+c < 2 and c < a and b < c ]
 
 =======
 
 (program
   (statements
     (statement
-      (invariant
-        (logic_condition
+      (disjunction
+        (conjunction
           (inequality
             (linear_polynomial: "a")
             (comparison_op: "<")
@@ -35,7 +35,7 @@ a = c
             (linear_polynomial: "3")
           )
         )
-        (logic_condition
+        (conjunction
           (inequality
             (linear_polynomial: "b")
             (comparison_op: ">")
@@ -47,7 +47,7 @@ a = c
             (linear_polynomial: "4")
           )
         )
-        (logic_condition
+        (conjunction
           (inequality
             (linear_polynomial: "a")
             (comparison_op: "<")
@@ -66,8 +66,8 @@ a = c
       )
     )
   )
-  (invariant
-    (logic_condition
+  (disjunction
+    (conjunction
       (inequality
         (linear_polynomial: "1")
         (comparison_op: "<")
@@ -84,7 +84,7 @@ a = c
         (linear_polynomial: "0")
       )
     )
-    (logic_condition
+    (conjunction
       (inequality
         (linear_polynomial: "c")
         (comparison_op: "<")

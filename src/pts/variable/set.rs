@@ -58,7 +58,6 @@ impl<V: Variable, S: BuildHasher + Default> VariableSet<V, S> {
     where
         K: Into<V> + ToOwned + ?Sized,
     {
-        // TODO uprade to Indexset::get_or_insert if it becomes stable
         let tmp: V = variable.into();
         self.insert(tmp.to_owned());
         self.data.get(&tmp).unwrap().clone()

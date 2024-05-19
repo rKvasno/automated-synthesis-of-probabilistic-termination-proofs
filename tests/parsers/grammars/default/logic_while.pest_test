@@ -13,8 +13,8 @@ while a > a and a < a {
 (program
   (statements
     (statement
-      (invariant
-        (logic_condition
+      (disjunction
+        (conjunction
           (inequality
             (linear_polynomial: "0")
             (comparison_op: ">=")
@@ -23,18 +23,20 @@ while a > a and a < a {
         )
       )
       (while_statement
-        (logic_condition
-          (inequality
-            (linear_polynomial: "a")
-            (comparison_op: ">")
-            (linear_polynomial: "a")
-          )
-          (inequality
-            (linear_polynomial: "a")
-            (comparison_op: "<")
-            (linear_polynomial: "a")
-          )
-        )
+        (disjunction
+          (conjunction
+            (inequality
+              (linear_polynomial: "a")
+              (comparison_op: ">")
+              (linear_polynomial: "a")
+            )
+            (inequality
+              (linear_polynomial: "a")
+              (comparison_op: "<")
+              (linear_polynomial: "a")
+            )
+	  )
+	)
         (statements
           (statement
             (assignment_statement
@@ -46,8 +48,8 @@ while a > a and a < a {
       )
     )
   )
-  (invariant
-    (logic_condition
+  (disjunction
+    (conjunction
       (inequality
         (linear_polynomial: "0")
         (comparison_op: ">=")

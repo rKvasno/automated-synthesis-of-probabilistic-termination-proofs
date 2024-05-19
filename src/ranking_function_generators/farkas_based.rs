@@ -3,7 +3,7 @@ use std::{borrow::Borrow, hash::BuildHasher, ops::Deref, rc::Rc};
 use crate::{
     pts::{
         guard::{Guards, TransitionID},
-        invariant::PolyhedronID,
+        invariant::{Invariant, PolyhedronID},
         linear_polynomial::{
             coefficient::{Coefficient, Constant},
             Polynomial,
@@ -401,53 +401,48 @@ fn logic_martingale_difference<'a, I, S: BuildHasher + Default>(
     domains: &mut TemplateDomains,
     restrictions: &mut Predicate,
 ) where
-    I: Iterator<Item = (TransitionID, &'a (StateSystem, Transition))> + Clone,
+    I: Iterator<Item = (TransitionID, &'a (Invariant, Transition))> + Clone,
 {
     let invariant = pts.locations.get_invariant(location).unwrap();
     assert!(!invariant.is_empty());
 
-    for (polyhedron_id, polyhedron) in invariant.iter_with_ids() {
-        for (transition_id, (system, transition)) in branches.clone() {
-            let mut lhs: Template = Default::default();
-            let mut template = generate_template(
-                template_variables,
-                &pts.variables,
-                // handl is valid => unwrap
-                transition.target,
-            );
+    for (transition_id, (guards_invariant, transition)) in branches.clone() {
+        let mut lhs: Template = Default::default();
+        let mut template = generate_template(
+            template_variables,
+            &pts.variables,
+            // handl is valid => unwrap
+            transition.target,
+        );
 
-            for op in transition.update_function.iter() {
-                match op {
-                    UpdateOperation::Assignment(assignment) => {
-                        template = assignment.apply(template)
-                    }
-                    UpdateOperation::Sampling(sampling) => {
-                        template = sampling.expectation().apply(template)
-                    }
+        for op in transition.update_function.iter() {
+            match op {
+                UpdateOperation::Assignment(assignment) => template = assignment.apply(template),
+                UpdateOperation::Sampling(sampling) => {
+                    template = sampling.expectation().apply(template)
                 }
             }
+        }
 
-            lhs += template;
+        lhs += template;
 
-            let rhs = generate_template(template_variables, &pts.variables, location);
-            lhs.add_term(
-                generate_template_expression(template_variables, TemplateVariableData::Eps),
-                None,
-            );
-            let mut conditioned_polyhedron = polyhedron.to_owned();
+        let rhs = generate_template(template_variables, &pts.variables, location);
+        lhs.add_term(
+            generate_template_expression(template_variables, TemplateVariableData::Eps),
+            None,
+        );
 
-            conditioned_polyhedron.append(&mut system.to_owned());
+        let conditioned_polyhedra = invariant.clone() * &guards_invariant;
 
-            // TODO check for empty conditioned_polyhedra, skip them, since theyre dead branches?
-
+        for (id, conditioned_polyhedron) in conditioned_polyhedra.iter_with_ids() {
             farkas_assertion(
                 &pts.variables,
                 template_variables,
                 location,
-                polyhedron_id,
+                id,
                 Some(transition_id),
-                &conditioned_polyhedron,
-                Relation::new(lhs, RelationSign::LE, rhs),
+                conditioned_polyhedron,
+                Relation::new(lhs.clone(), RelationSign::LE, rhs.clone()),
                 domains,
                 restrictions,
             )
@@ -1098,7 +1093,7 @@ mod tests {
             ranking_function_generators::farkas_based::{
                 martingale_difference, TemplateVariableData,
             },
-            state_assignment, state_system, transition,
+            state_assignment, transition,
         };
         use pretty_assertions::assert_eq;
         use std::{collections::hash_map::DefaultHasher, hash::BuildHasherDefault};
@@ -1213,9 +1208,9 @@ mod tests {
                 .set_outgoing(
                     start_location,
                     guards!(L:
-                            state_system!(&mut pts.variables; "<=", 11.0, -1.0, "a"),
-                            transition!(intermediate_location,state_assignment!( &mut pts.variables, "a", 3.0, 7.0, "a")),
-                            state_system!(&mut pts.variables; ">", 11.0, -1.0, "a"),
+                            invariant!(&mut pts.variables,[ "<=", 11.0, -1.0, "a"]),
+                            transition!(intermediate_location, state_assignment!( &mut pts.variables, "a", 3.0, 7.0, "a")),
+                            invariant!(&mut pts.variables,[ ">", 11.0, -1.0, "a"]),
                             transition!(None)
                     ),
                 )
@@ -1325,32 +1320,6 @@ mod tests {
                     0.0,
                     1.0,
                     TemplateVariableData::RankingCoefficient(Some(0), program_var!(&mut pts.variables, "a")),
-                    -1.0,
-                    TemplateVariableData::RankingCoefficient(None, program_var!(&mut pts.variables, "a")),
-                    -2.0,
-                    TemplateVariableData::FarkasVariable(Some(0), 0, 0, Some(1)),
-                    1.0,
-                    TemplateVariableData::FarkasVariable(Some(0), 0, 1, Some(1));
-
-                    "<=",
-                    0.0,
-                    -5.0,
-                    TemplateVariableData::FarkasVariable(Some(0), 0, 0, Some(1)),
-                    11.0,
-                    TemplateVariableData::FarkasVariable(Some(0), 0, 1, Some(1)),
-                    -1.0,
-                    TemplateVariableData::RankingConstant(Some(0)),
-                    1.0,
-                    TemplateVariableData::RankingConstant(None),
-                    1.0,
-                    TemplateVariableData::Eps;
-
-                    ////////////////////////////////////////////////////////////
-
-                    "==",
-                    0.0,
-                    1.0,
-                    TemplateVariableData::RankingCoefficient(Some(0), program_var!(&mut pts.variables, "a")),
                     -7.0,
                     TemplateVariableData::RankingCoefficient(Some(1), program_var!(&mut pts.variables, "a")),
                     0.0,
@@ -1373,6 +1342,32 @@ mod tests {
                     TemplateVariableData::RankingConstant(Some(1)),
                     1.0,
                     TemplateVariableData::Eps;
+
+                    ////////////////////////////////////////////////////////////
+                    "==",
+                    0.0,
+                    1.0,
+                    TemplateVariableData::RankingCoefficient(Some(0), program_var!(&mut pts.variables, "a")),
+                    -1.0,
+                    TemplateVariableData::RankingCoefficient(None, program_var!(&mut pts.variables, "a")),
+                    -2.0,
+                    TemplateVariableData::FarkasVariable(Some(0), 0, 0, Some(1)),
+                    1.0,
+                    TemplateVariableData::FarkasVariable(Some(0), 0, 1, Some(1));
+
+                    "<=",
+                    0.0,
+                    -5.0,
+                    TemplateVariableData::FarkasVariable(Some(0), 0, 0, Some(1)),
+                    11.0,
+                    TemplateVariableData::FarkasVariable(Some(0), 0, 1, Some(1)),
+                    -1.0,
+                    TemplateVariableData::RankingConstant(Some(0)),
+                    1.0,
+                    TemplateVariableData::RankingConstant(None),
+                    1.0,
+                    TemplateVariableData::Eps;
+
 
                     "==",
                     0.0,

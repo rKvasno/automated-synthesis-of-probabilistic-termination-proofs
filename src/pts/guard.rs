@@ -1,5 +1,5 @@
 use super::{
-    linear_polynomial::coefficient::Constant, system::StateSystem, transition::Transition,
+    invariant::Invariant, linear_polynomial::coefficient::Constant, transition::Transition,
 };
 
 #[macro_export]
@@ -36,7 +36,7 @@ pub enum Guards {
     // it is the programmers responsibility to make sure probabilities are non-negative and their
     // sum is 1.0 (as close to 1.0 as f64 allows)
     Probabilistic(Vec<(Probability, Transition)>),
-    Logic(Vec<(StateSystem, Transition)>),
+    Logic(Vec<(Invariant, Transition)>),
     Nondeterministic(Vec<Transition>),
     Unguarded(Box<Transition>),
 }
@@ -73,8 +73,8 @@ impl From<Vec<(Probability, Transition)>> for Guards {
     }
 }
 
-impl From<Vec<(StateSystem, Transition)>> for Guards {
-    fn from(value: Vec<(StateSystem, Transition)>) -> Self {
+impl From<Vec<(Invariant, Transition)>> for Guards {
+    fn from(value: Vec<(Invariant, Transition)>) -> Self {
         Self::Logic(value)
     }
 }
@@ -111,7 +111,7 @@ impl std::fmt::Display for GuardsError {
 #[cfg_attr(test, derive(PartialEq))]
 #[derive(Debug)]
 pub enum GuardedTransition<'a> {
-    Logic(&'a (StateSystem, Transition)),
+    Logic(&'a (Invariant, Transition)),
     Probabilistic(&'a (Probability, Transition)),
     Nondeterministic(&'a Transition),
     Unguarded(&'a Transition),
@@ -176,12 +176,12 @@ mod tests {
 
         mod guards {
             use crate::{
-                program_variables,
+                invariant, program_variables,
                 pts::{
                     guard::Guards, linear_polynomial::coefficient::Constant,
                     variable::program_variable::ProgramVariables,
                 },
-                state_assignment, state_system, transition,
+                state_assignment, transition,
             };
             #[test]
             fn unguarded() {
@@ -246,22 +246,22 @@ mod tests {
                 let mut variables: ProgramVariables = program_variables!();
                 assert_eq!(
                     guards!(L:
-                        state_system!(&mut variables; ">", 0.1, -2.3, "a"),
+                        invariant!(&mut variables,[ ">", 0.1, -2.3, "a"]),
                         transition!(Some(23), state_assignment!(&mut variables, "a", 2.4, 1.3, "a"),state_assignment!(&mut variables,  "b", 1.0, -1.0, "a")),
-                        state_system!(&mut variables;
+                        invariant!(&mut variables,[
                             "<=", -0.1, 2.3, "a";
-                            ">=", 0.0, 3.8, "a"
+                            ">=", 0.0, 3.8, "a"]
                         ),
                         transition!(None, state_assignment!(&mut variables, "a", 1.3, 2.4, "a"),state_assignment!(&mut variables, "b", 13.0, -1.8, "a")),
-                        state_system!(&mut variables;
+                        invariant!(&mut variables,[
                             "<=", -0.1, 2.3, "a";
-                            "<", 0.0, -3.8, "a"
+                            "<", 0.0, -3.8, "a"]
                         ),
                         transition!(Some(21), state_assignment!(&mut variables, "a", -20.4, 1.3, "a"),state_assignment!(&mut variables, "b", 0.0, 0.0, "a"))
                     ),
                     Guards::Logic(vec![
                         (
-                            state_system!(&mut variables;">", 0.1, -2.3, "a"),
+                            invariant!(&mut variables, [">", 0.1, -2.3, "a"]),
                             transition!(
                                 Some(23),
                                 state_assignment!(&mut variables, "a", 2.4, 1.3, "a"),
@@ -269,7 +269,7 @@ mod tests {
                             )
                         ),
                         (
-                            state_system!(&mut variables;"<=", -0.1, 2.3, "a"; ">=", 0.0, 3.8, "a"),
+                            invariant!(&mut variables,["<=", -0.1, 2.3, "a"; ">=", 0.0, 3.8, "a"]),
                             transition!(
                                 None,
                                 state_assignment!(&mut variables, "a", 1.3, 2.4, "a"),
@@ -277,7 +277,7 @@ mod tests {
                             )
                         ),
                         (
-                            state_system!(&mut variables;"<=", -0.1, 2.3, "a"; "<", 0.0, -3.8, "a"),
+                            invariant!(&mut variables,["<=", -0.1, 2.3, "a"; "<", 0.0, -3.8, "a"]),
                             transition!(
                                 Some(21),
                                 state_assignment!(&mut variables, "a", -20.4, 1.3, "a"),
@@ -333,26 +333,26 @@ mod tests {
     mod label {
 
         use crate::{
-            program_variables,
+            invariant, program_variables,
             pts::{
                 guard::GuardedTransition, linear_polynomial::coefficient::Constant,
                 variable::program_variable::ProgramVariables,
             },
-            relation, state_assignment, state_system, system, transition,
+            state_assignment, transition,
         };
 
         #[test]
         fn logic() {
-            let data = (system![relation!("<", 1.0)], transition!(None));
+            let data = (invariant!(unreachable!(), ["<", 1.0]), transition!(None));
             let guarded_transition = GuardedTransition::Logic(&data);
             assert_eq!(guarded_transition.to_string(), "0 < -1");
 
             let mut variables: ProgramVariables = program_variables!();
 
             let data = (
-                state_system!(&mut variables;
+                invariant!(&mut variables,[
                     "<=", 0.0, 1.0, "a";
-                    "<", 1.0, 2.0, "a", 1.0, "len"
+                    "<", 1.0, 2.0, "a", 1.0, "len"]
                 ),
                 transition!(None, state_assignment!(&mut variables, "a", 0.0)),
             );

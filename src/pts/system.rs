@@ -1,7 +1,7 @@
 use std::{
     borrow::{Borrow, BorrowMut},
     fmt::Display,
-    ops::Not,
+    //ops::Not,
 };
 
 use super::{
@@ -77,36 +77,36 @@ pub type StateSystem = System<ProgramVariable, Constant>;
 #[cfg_attr(test, derive(PartialEq))]
 #[derive(Debug, Clone)]
 pub struct System<V: Variable, C: Coefficient> {
-    data: Vec<Relation<V, C>>,
+    conjunction: Vec<Relation<V, C>>,
 }
 
 impl<V: Variable, C: Coefficient> System<V, C> {
     pub fn push(&mut self, relation: Relation<V, C>) {
-        self.data.push(relation);
+        self.conjunction.push(relation);
     }
 
     pub fn append(&mut self, system: &mut System<V, C>) {
-        self.data.append(&mut system.data);
+        self.conjunction.append(&mut system.conjunction);
     }
 
     pub fn len(&self) -> usize {
-        self.data.len()
+        self.conjunction.len()
     }
 
     pub fn is_empty(&self) -> bool {
-        self.data.is_empty()
+        self.conjunction.is_empty()
     }
 
     pub fn get(&self, index: usize) -> Option<&Relation<V, C>> {
-        self.data.get(index)
+        self.conjunction.get(index)
     }
 
     pub fn get_mut(&mut self, index: usize) -> Option<&mut Relation<V, C>> {
-        self.data.get_mut(index)
+        self.conjunction.get_mut(index)
     }
 
     pub fn iter(&self) -> RelationIterator<V, C> {
-        self.data.iter()
+        self.conjunction.iter()
     }
 
     pub fn iter_with_ids(&self) -> RelationWithIDIterator<V, C> {
@@ -116,26 +116,26 @@ impl<V: Variable, C: Coefficient> System<V, C> {
 
 impl<V: Variable, C: Coefficient> Borrow<Vec<Relation<V, C>>> for System<V, C> {
     fn borrow(&self) -> &Vec<Relation<V, C>> {
-        &self.data
+        &self.conjunction
     }
 }
 
 impl<V: Variable, C: Coefficient> BorrowMut<Vec<Relation<V, C>>> for System<V, C> {
     fn borrow_mut(&mut self) -> &mut Vec<Relation<V, C>> {
-        &mut self.data
+        &mut self.conjunction
     }
 }
 
 impl<V: Variable, C: Coefficient> From<Vec<Relation<V, C>>> for System<V, C> {
     fn from(value: Vec<Relation<V, C>>) -> Self {
-        Self { data: value }
+        Self { conjunction: value }
     }
 }
 
 impl<V: Variable, C: Coefficient> FromIterator<Relation<V, C>> for System<V, C> {
     fn from_iter<T: IntoIterator<Item = Relation<V, C>>>(iter: T) -> Self {
         Self {
-            data: Vec::<Relation<V, C>>::from_iter(iter),
+            conjunction: Vec::<Relation<V, C>>::from_iter(iter),
         }
     }
 }
@@ -144,7 +144,7 @@ impl<V: Variable, C: Coefficient> IntoIterator for System<V, C> {
     type IntoIter = std::vec::IntoIter<Self::Item>;
     type Item = Relation<V, C>;
     fn into_iter(self) -> Self::IntoIter {
-        self.data.into_iter()
+        self.conjunction.into_iter()
     }
 }
 
@@ -152,7 +152,7 @@ impl<'a, V: Variable, C: Coefficient> IntoIterator for &'a System<V, C> {
     type IntoIter = std::slice::Iter<'a, Relation<V, C>>;
     type Item = &'a Relation<V, C>;
     fn into_iter(self) -> Self::IntoIter {
-        self.data.iter()
+        self.conjunction.iter()
     }
 }
 
@@ -160,14 +160,14 @@ impl<'a, V: Variable, C: Coefficient> IntoIterator for &'a mut System<V, C> {
     type IntoIter = std::slice::IterMut<'a, Relation<V, C>>;
     type Item = &'a mut Relation<V, C>;
     fn into_iter(self) -> Self::IntoIter {
-        self.data.iter_mut()
+        self.conjunction.iter_mut()
     }
 }
 
 impl<V: Variable, C: Coefficient> Default for System<V, C> {
     fn default() -> Self {
         Self {
-            data: Default::default(),
+            conjunction: Default::default(),
         }
     }
 }
@@ -175,7 +175,7 @@ impl<V: Variable, C: Coefficient> Default for System<V, C> {
 impl<V: Variable + Display> std::fmt::Display for System<V, Constant> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         //relation (\n relation)*
-        let mut iter = self.data.iter();
+        let mut iter = self.conjunction.iter();
         match iter.next() {
             Some(line) => write!(f, "{}", line)?,
             _ => (),
@@ -187,16 +187,6 @@ impl<V: Variable + Display> std::fmt::Display for System<V, Constant> {
     }
 }
 
-impl<V: Variable, C: Coefficient> Not for System<V, C> {
-    type Output = Self;
-    fn not(self) -> Self::Output {
-        System {
-            data: self.data.into_iter().map(|x| !x).collect(),
-        }
-    }
-}
-
-#[cfg(stop)]
 #[cfg(test)]
 mod tests {
 

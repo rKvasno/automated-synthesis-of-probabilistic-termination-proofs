@@ -1,7 +1,7 @@
 program = { SOI ~ statements ~ invariant? ~ NEWLINE* ~ EOI }
 statement = { invariant? ~ statement_helper }
 
-invariant = { ("[" ~ NEWLINE* ~ logic_condition ~ NEWLINE* ~ "]" ~ NEWLINE* )+ }
+invariant = _{ ("[" ~ NEWLINE* ~ disjunction ~ NEWLINE* ~ "]" ~ NEWLINE* ) }
 
 statements = { NEWLINE* ~ statement? ~ (NEWLINE+ ~ statement)* ~ NEWLINE* }
 
@@ -15,7 +15,7 @@ statement_helper = _{ "if" ~ if_statement         |
                       assignment_statement        }
 
 if_statement = { if_helper }
-if_helper = _{ logic_condition ~ block ~ ( NEWLINE? ~ "else" ~ NEWLINE? ~ else)? }
+if_helper = _{ disjunction ~ block ~ ( NEWLINE? ~ "else" ~ NEWLINE? ~ else)? }
 else =  _{ "if " ~ if_helper |
            block             }
 
@@ -27,10 +27,11 @@ while_statement = { condition ~ block }
 sampling_statement = { variable ~ "=" ~ "random(" ~ constant ~ "," ~ constant ~ "," ~ constant ~ ")" }
 assignment_statement = { variable ~ "=" ~ linear_polynomial}
 
-condition = _{ logic_condition     |
+condition = _{ disjunction         |
                odds_condition      |
                nondeterminism_sign }
-logic_condition = { inequality ~ ( NEWLINE? ~ "and" ~ NEWLINE? ~ inequality )* }
+conjunction = { inequality ~ ( NEWLINE? ~ "and" ~ NEWLINE? ~ inequality )* }
+disjunction = { conjunction ~ ( NEWLINE? ~ "or" ~ NEWLINE? ~ conjunction )* }
 odds_condition = { constant ~ ":" ~ constant }
 nondeterminism_sign = @{ "*" }
 

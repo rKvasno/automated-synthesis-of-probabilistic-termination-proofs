@@ -247,18 +247,8 @@ impl<V: Variable, C: Coefficient> Not for Relation<V, C> {
     }
 }
 
-#[cfg(stop)]
 #[cfg(test)]
 mod tests {
-    use crate::{
-        pts::{
-            linear_polynomial::State,
-            relation::{Relation, RelationSign},
-            variable::program_variable::ProgramVariables,
-        },
-        state, system, variables,
-    };
-
     mod macros {
         use crate::{
             pts::{
@@ -474,37 +464,6 @@ mod tests {
             assert!(!rel.is_strict_inequality());
             assert!(!rel.is_nonstrict_inequality());
         }
-    }
-
-    #[test]
-    fn not() {
-        let mut variables: ProgramVariables = variables!();
-        let mut system = system!(
-            Relation::new(
-                state!(4.0, &mut variables, -5.0, "a", 3.0, "b", -2.0, "c",),
-                RelationSign::LE,
-                State::default(),
-            ),
-            Relation::new(
-                state!(1.0, &mut variables, 0.0, "a", 2.0, "b", -2.0, "c",),
-                RelationSign::LT,
-                State::default(),
-            )
-        );
-
-        system = !system;
-
-        assert_eq!(
-            system.get(0).unwrap().as_linear_polynomial(),
-            &state!(-4.0, &mut variables, 5.0, "a", -3.0, "b", 2.0, "c")
-        );
-        assert_eq!(
-            system.get(1).unwrap().as_linear_polynomial(),
-            &state!(-1.0, &mut variables, 0.0, "a", -2.0, "b", 2.0, "c")
-        );
-
-        assert!(&system.get(0).unwrap().is_strict_inequality());
-        assert!(!&system.get(1).unwrap().is_strict_inequality());
     }
 
     mod label {

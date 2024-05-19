@@ -17,17 +17,19 @@ else {}
   (statements
     (statement
       (if_statement
-        (logic_condition
-          (inequality
-            (linear_polynomial: "a")
-            (comparison_op: ">=")
-            (linear_polynomial: "b")
+        (disjunction
+          (conjunction
+            (inequality
+              (linear_polynomial: "a")
+              (comparison_op: ">=")
+              (linear_polynomial: "b")
+            )
           )
-        )
+	)
         (statements
           (statement
-            (invariant
-              (logic_condition
+            (disjunction
+              (conjunction
                 (inequality
                   (linear_polynomial: "a")
                   (comparison_op: ">")
@@ -41,13 +43,15 @@ else {}
             )
           )
         )
-        (logic_condition
-          (inequality
-            (linear_polynomial: "b")
-            (comparison_op: "<=")
-            (linear_polynomial: "c")
+	(disjunction
+          (conjunction
+            (inequality
+              (linear_polynomial: "b")
+              (comparison_op: "<=")
+              (linear_polynomial: "c")
+            )
           )
-        )
+	)
         (statements
           (statement
             (sampling_statement

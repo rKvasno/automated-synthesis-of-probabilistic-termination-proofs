@@ -13,7 +13,9 @@ use crate::pts::linear_polynomial::State;
 use crate::pts::location::LocationHandle;
 use crate::pts::relation::{RelationSign, StateRelation};
 use crate::pts::system::StateSystem;
-use crate::pts::transition::{Assignment, StateSampling, Sampling, StateAssignment, Transition, UpdateOperation};
+use crate::pts::transition::{
+    Assignment, Sampling, StateAssignment, StateSampling, Transition, UpdateOperation,
+};
 use crate::pts::variable::program_variable::{ProgramVariable, ProgramVariables};
 use crate::pts::PTS;
 
@@ -107,11 +109,11 @@ fn parse_sampling<'parse>(
     let min = LinearPolynomialParser::parse_constant(pairs.next().unwrap().as_str());
     let max = LinearPolynomialParser::parse_constant(pairs.next().unwrap().as_str());
     let expected_value = LinearPolynomialParser::parse_constant(pairs.next().unwrap().as_str());
-    match Sampling::new(var, min, max, expected_value){
+    match Sampling::new(var, min, max, expected_value) {
         Some(x) => Ok(x),
         None => Err(ParserError {
             message: "incorrect bounds".to_string(),
-        })
+        }),
     }
 }
 
@@ -139,7 +141,7 @@ fn parse_inequality_system<'parse>(
     variables: &mut ProgramVariables,
     parse: Pair<'parse, Rule>,
 ) -> StateSystem {
-    assert!(parse.to_owned().as_rule() == Rule::logic_condition);
+    assert!(parse.to_owned().as_rule() == Rule::conjunction);
     let mut system = StateSystem::default();
     for pair in parse.into_inner() {
         system.push(parse_inequality(variables, pair));
@@ -147,12 +149,12 @@ fn parse_inequality_system<'parse>(
     system
 }
 
-// assumes the parses rule is Rule::invariant
-fn parse_invariant<'parse>(
+// assumes the parses rule is Rule::disjunction
+fn parse_disjunction<'parse>(
     variables: &mut ProgramVariables,
     parse: Pair<'parse, Rule>,
 ) -> Invariant {
-    assert!(parse.to_owned().as_rule() == Rule::invariant);
+    assert!(parse.to_owned().as_rule() == Rule::disjunction);
     let iter = parse.into_inner();
     let mut assertions = Vec::with_capacity(iter.len());
     for pair in iter {
@@ -176,14 +178,14 @@ fn parse_program<'parse>(pts: &mut PTS, parse: Pair<'parse, Rule>) -> Result<(),
     pts.locations.initial = transition.target;
     let invariant_parse = iter.next().unwrap();
     // invariant_parse can be EOI or Invariant
-    let invariant = if invariant_parse.as_rule() == Rule::invariant {
-        parse_invariant(&mut pts.variables, invariant_parse)
+    let invariant = if invariant_parse.as_rule() == Rule::disjunction {
+        parse_disjunction(&mut pts.variables, invariant_parse)
     } else {
         invariant!(&mut pts.variables, ["<=", 0.0])
     };
 
     pts.locations
-        .set_invariant(pts.locations.get_terminating_location(), invariant); // can unwrap because parse_invariant never returns an invalid invariant
+        .set_invariant(pts.locations.get_terminating_location(), invariant); // can unwrap because parse_disjunction never returns an invalid invariant
     Ok(())
 }
 
@@ -215,13 +217,13 @@ fn parse_locations<'parse>(
         let mut instruction_parse = location_iter.next();
 
         let invariant = if instruction_parse.is_some() {
-            parse_invariant(&mut pts.variables, invariant_parse.unwrap())
+            parse_disjunction(&mut pts.variables, invariant_parse.unwrap())
         } else {
             instruction_parse = invariant_parse;
             invariant!(&mut pts.variables, ["<=", 0.0])
         };
 
-        pts.locations.set_invariant(local_start, invariant); // can unwrap because parse_invariant never returns an invalid invariant
+        pts.locations.set_invariant(local_start, invariant); // can unwrap because parse_disjunction never returns an invalid invariant
 
         let instruction_parse = instruction_parse.unwrap();
         match instruction_parse.as_rule() {
@@ -244,8 +246,8 @@ fn parse_assign<'parse>(
     parse: Pair<'parse, Rule>,
     start: LocationHandle,
     end: LocationHandle,
-) -> Result<(), ParserError>{
-    match parse.to_owned().as_rule(){
+) -> Result<(), ParserError> {
+    match parse.to_owned().as_rule() {
         Rule::assignment_statement => {
             pts.locations
                 .set_outgoing(
@@ -260,20 +262,19 @@ fn parse_assign<'parse>(
                 )
                 .unwrap()
         }
-        Rule::sampling_statement => {
-            pts.locations
-                .set_outgoing(
-                    start,
-                    Guards::Unguarded(Box::new(Transition {
-                        update_function: vec![UpdateOperation::Sampling(parse_sampling(
-                            &mut pts.variables,
-                            parse,
-                        )?)],
-                        target: end,
-                    })), 
-                )
-                .unwrap()
-        }
+        Rule::sampling_statement => pts
+            .locations
+            .set_outgoing(
+                start,
+                Guards::Unguarded(Box::new(Transition {
+                    update_function: vec![UpdateOperation::Sampling(parse_sampling(
+                        &mut pts.variables,
+                        parse,
+                    )?)],
+                    target: end,
+                })),
+            )
+            .unwrap(),
         _ => panic!("{}", INVARIANT_ERROR),
     }
     Ok(())
@@ -287,8 +288,8 @@ fn parse_condition<'parse>(
 ) -> Result<Guards, ParserError> {
     let line_col = parse.as_span().start_pos().line_col();
     match parse.to_owned().as_rule() {
-        Rule::logic_condition => {
-            let loop_condition = parse_inequality_system(&mut pts.variables, parse);
+        Rule::disjunction => {
+            let loop_condition = parse_disjunction(&mut pts.variables, parse);
             Ok(Guards::Logic(vec![
                 // default gets replaced
                 (loop_condition.to_owned(), Default::default()),
@@ -346,10 +347,9 @@ fn parse_while<'parse>(
     assert_eq!(parse.to_owned().as_rule(), Rule::while_statement);
     // condition ~ locations
     let mut parse_iter = parse.into_inner();
-    // save the condition parse for later
-    let condition = parse_iter.next().unwrap();
+    // parse conditions
+    let mut guards: Guards = parse_condition(pts, parse_iter.next().unwrap(), end)?;
     // parse locations
-    let mut guards: Guards = parse_condition(pts, condition, end)?;
     match guards {
         Guards::Logic(ref mut vector) => {
             parse_locations(pts, parse_iter.next().unwrap(), &mut vector[0].1, start)?
@@ -399,13 +399,13 @@ fn parse_if<'parse>(
     end: LocationHandle,
 ) -> Result<(), ParserError> {
     assert_eq!(parse.to_owned().as_rule(), Rule::if_statement);
-    let mut else_condition = StateSystem::default();
-    let mut conditions: Vec<StateSystem> = vec![];
+    let mut else_condition = Invariant::one();
+    let mut conditions: Vec<Invariant> = vec![];
     let mut transitions: Vec<Transition> = vec![];
 
     for pair in parse.into_inner() {
         match pair.as_rule() {
-            Rule::logic_condition => {
+            Rule::disjunction => {
                 parse_if_condition(pts, pair, &mut conditions, &mut else_condition)
             }
             Rule::statements => {
@@ -439,15 +439,15 @@ fn parse_if<'parse>(
 fn parse_if_condition<'parse>(
     pts: &mut PTS,
     parse: Pair<'parse, Rule>,
-    conditions: &mut Vec<StateSystem>,
-    negation_acc: &mut StateSystem,
+    conditions: &mut Vec<Invariant>,
+    negation_acc: &mut Invariant,
 ) {
-    assert_eq!(parse.to_owned().as_rule(), Rule::logic_condition);
-    let mut new_cond = parse_inequality_system(&mut pts.variables, parse);
+    assert_eq!(parse.to_owned().as_rule(), Rule::disjunction);
+    let new_cond: Invariant = parse_disjunction(&mut pts.variables, parse);
     conditions.push(negation_acc.to_owned());
-    let pushed_cond = conditions.last_mut().unwrap();
-    negation_acc.append(&mut !new_cond.to_owned());
-    pushed_cond.append(&mut new_cond);
+    let pushed_cond: &mut Invariant = conditions.last_mut().unwrap();
+    *pushed_cond *= &new_cond;
+    *negation_acc *= &!new_cond;
 }
 
 // assumes the parses rule is Rule::odds_statement
@@ -518,7 +518,7 @@ mod tests {
             location::Locations, transition::UpdateOperation,
             variable::program_variable::ProgramVariables, PTS,
         },
-        state_assignment, state_relation, state_system, transition,
+        state_assignment, state_relation, transition,
     };
 
     #[test]
@@ -562,11 +562,9 @@ mod tests {
     #[test]
     fn inequality_system_sanity() {
         let mut variables: ProgramVariables = program_variables!("a", "b", "c");
-        let mut parse = DefaultPestParser::parse(
-            Rule::logic_condition,
-            "- 2b - 4 < - a and 0 >= 0 and a >= 0",
-        )
-        .unwrap();
+        let mut parse =
+            DefaultPestParser::parse(Rule::conjunction, "- 2b - 4 < - a and 0 >= 0 and a >= 0")
+                .unwrap();
         let system = parse_inequality_system(&mut variables, parse.next().unwrap());
         assert!(parse.next().is_none());
         let cond = system.get(0).unwrap();
@@ -799,19 +797,19 @@ mod tests {
                 start,
                 guards!(L:
                     // 1
-                    state_system!(&mut variables
-                                 ;">=", 0.0, 1.0, "a", -1.0, "b"),
+                    invariant!(&mut variables,[
+                                 ">=", 0.0, 1.0, "a", -1.0, "b"]),
                     transition!(branch_1),
                     // 4
-                    state_system!(&mut variables;
+                    invariant!(&mut variables,[
                         "<", 0.0, 1.0, "a", -1.0, "b";
-                        "<=", 0.0, 0.0, "a", 1.0, "b", -1.0, "c"
+                        "<=", 0.0, 0.0, "a", 1.0, "b", -1.0, "c"]
                     ),
                     transition!(branch_2),
                     // 7
-                    state_system!(&mut variables;
+                    invariant!(&mut variables,[
                         "<", 0.0, 1.0, "a", -1.0, "b";
-                        ">", 0.0, 0.0, "a", 1.0, "b", -1.0, "c"
+                        ">", 0.0, 0.0, "a", 1.0, "b", -1.0, "c"]
                     ),
                     transition!(branch_3),
                 ),
@@ -898,11 +896,11 @@ mod tests {
                 start,
                 guards!(L:
                     // 2
-                    state_system!(&mut variables; ">=", 0.0, 1.0, "a", -1.0, "b"),
+                    invariant!(&mut variables,[ ">=", 0.0, 1.0, "a", -1.0, "b"]),
                     transition!(branch_1),
 
                     // 5
-                    state_system!(&mut variables; "<", 0.0, 1.0, "a", -1.0, "b")
+                    invariant!(&mut variables,[ "<", 0.0, 1.0, "a", -1.0, "b"])
                     ,
                     transition!(junction)
                 ),
@@ -1302,15 +1300,15 @@ mod tests {
                 start,
                 guards!(L:
                     // 2
-                    state_system!(&mut variables;
+                    invariant!(&mut variables,[
                         ">", 0.0, 0.0, "a";
-                        "<", 0.0, 0.0, "a"
+                        "<", 0.0, 0.0, "a"]
                     ),
                     transition!(branch_1),
                     // 5
-                    state_system!(&mut variables;
-                        "<=", 0.0, 0.0, "a";
-                        ">=", 0.0, 0.0, "a"
+                    invariant!(&mut variables,
+                               ["<=", 0.0, 0.0, "a"],
+                               [">=", 0.0, 0.0, "a"]
                     ),
                     transition!(junction),
                 ),

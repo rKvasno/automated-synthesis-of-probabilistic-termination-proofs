@@ -18,8 +18,8 @@ odds 0:1 {
 (program
   (statements
     (statement
-      (invariant
-        (logic_condition
+      (disjunction
+        (conjunction
           (inequality
             (linear_polynomial: "0")
             (comparison_op: ">=")
@@ -32,8 +32,8 @@ odds 0:1 {
         (constant: "1")
         (statements
           (statement
-            (invariant
-              (logic_condition
+            (disjunction
+              (conjunction
                 (inequality
                   (linear_polynomial: "a")
                   (comparison_op: "<")
@@ -49,8 +49,8 @@ odds 0:1 {
         )
         (statements
           (statement
-            (invariant
-              (logic_condition
+            (disjunction
+              (conjunction
                 (inequality
                   (linear_polynomial: "b")
                   (comparison_op: ">=")
@@ -67,8 +67,8 @@ odds 0:1 {
       )
     )
   )
-  (invariant
-    (logic_condition
+  (disjunction
+    (conjunction
       (inequality
         (linear_polynomial: "0")
         (comparison_op: ">=")

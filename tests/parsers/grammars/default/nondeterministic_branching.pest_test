@@ -18,8 +18,8 @@ or {
 (program
   (statements
     (statement
-      (invariant
-        (logic_condition
+      (disjunction
+        (conjunction
           (inequality
             (linear_polynomial: "0")
             (comparison_op: ">=")
@@ -30,8 +30,8 @@ or {
       (choose_statement
         (statements
           (statement
-            (invariant
-              (logic_condition
+            (disjunction
+              (conjunction
                 (inequality
                   (linear_polynomial: "a")
                   (comparison_op: ">")
@@ -59,8 +59,8 @@ or {
       )
     )
   )
-  (invariant
-    (logic_condition
+  (disjunction
+    (conjunction
       (inequality
         (linear_polynomial: "0")
         (comparison_op: ">=")
