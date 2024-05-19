@@ -2,15 +2,15 @@ use std::{borrow::Borrow, hash::BuildHasher, ops::Deref, rc::Rc};
 
 use crate::{
     pts::{
-        guard::{Guards, TransitionID},
-        invariant::{Invariant, PolyhedronID},
+        guard::Guards,
+        invariant::Invariant,
         linear_polynomial::{
             coefficient::{Coefficient, Constant},
             Polynomial,
         },
         location::LocationHandle,
         relation::{Relation, RelationSign},
-        system::{RelationID, StateSystem, System},
+        system::{StateSystem, System},
         transition::{Transition, UpdateOperation},
         variable::{program_variable::ProgramVariable, set::VariableSet, Variable},
         PTS,
@@ -60,13 +60,20 @@ pub enum TemplateVariableData {
     LowerBound,
     RankingCoefficient(LocationHandle, ProgramVariable),
     RankingConstant(LocationHandle),
-    FarkasVariable(
-        LocationHandle,
-        PolyhedronID,
-        RelationID,
-        Option<TransitionID>,
-    ),
+    FarkasVariable(usize),
 }
+
+impl TemplateVariableData
+{
+    fn unique_farkas_variable(seed: &mut usize) -> Self{
+        let result = TemplateVariableData::FarkasVariable(seed.clone());
+        *seed += 1;
+        result
+    }
+}
+
+
+
 
 fn option_debug_string<T: std::fmt::Display>(opt: &Option<T>) -> String {
     match opt {
@@ -81,14 +88,11 @@ impl std::fmt::Debug for TemplateVariableData {
             TemplateVariableData::Eps => write!(f, "ɛ"),
             TemplateVariableData::UpperBound => write!(f, "K'"),
             TemplateVariableData::LowerBound => write!(f, "K"),
-            TemplateVariableData::FarkasVariable(a, b, c, d) => {
+            TemplateVariableData::FarkasVariable(id) => {
                 write!(
                     f,
-                    "x_{}_{}_{}_{}_x",
-                    option_debug_string(a),
-                    b,
-                    c,
-                    option_debug_string(d)
+                    "x_{}_x",
+                    id,
                 )
             }
             TemplateVariableData::RankingCoefficient(a, var) => {
@@ -129,30 +133,26 @@ type Predicate = System<TemplateVariable, Constant>;
 fn farkas_assertion<S: BuildHasher + Default>(
     program_variables: &VariableSet<ProgramVariable, S>,
     template_variables: &mut TemplateVariables,
-    location: LocationHandle,
-    polyhedron_id: PolyhedronID,
-    transition_id: Option<TransitionID>,
     polyhedron: &StateSystem,
     template: Relation<ProgramVariable, Polynomial<TemplateVariable, Constant>>,
     domains: &mut TemplateDomains,
     restrictions: &mut Predicate,
+    seed: &mut usize
 ) {
     assert!(template.is_nonstrict_inequality());
     // this splitting is not necessary, but this way its closer to standard farkas lemma notation
     let (c, d) = template.split_constant();
 
     let mut acc: Template = Default::default();
-    for (halfspace_id, halfspace) in polyhedron.iter_with_ids() {
+    for halfspace in polyhedron.iter() {
         // can be strict or non-strict due to conditional branching
         assert!(halfspace.is_nonstrict_inequality() || halfspace.is_strict_inequality());
         let (a, b) = halfspace.clone().split_constant();
         let y = template_var!(
             template_variables,
-            TemplateVariableData::FarkasVariable(
-                location,
-                polyhedron_id,
-                halfspace_id,
-                transition_id,
+            
+            TemplateVariableData::unique_farkas_variable(
+                seed
             )
         );
         domains.insert(y.clone(), Interval(0.0, f64::INFINITY));
@@ -203,13 +203,14 @@ fn terminating_negativity<S: BuildHasher + Default>(
     template_variables: &mut TemplateVariables,
     domains: &mut TemplateDomains,
     restrictions: &mut Predicate,
+    seed: &mut usize
 ) {
     let invariant = pts.locations.get_invariant(None).unwrap();
     assert!(!invariant.is_empty());
     let location = pts.locations.get_terminating_location();
 
     // location is valid => unwrap()
-    for (polyhedron_id, polyhedron) in invariant.iter_with_ids() {
+    for polyhedron in invariant.iter() {
         //upper
         let template = Relation::new(
             generate_template(template_variables, &pts.variables, location),
@@ -219,13 +220,11 @@ fn terminating_negativity<S: BuildHasher + Default>(
         farkas_assertion(
             &pts.variables,
             template_variables,
-            location,
-            polyhedron_id,
-            None,
             polyhedron,
             template,
             domains,
             restrictions,
+            seed
         );
 
         // lower
@@ -237,13 +236,11 @@ fn terminating_negativity<S: BuildHasher + Default>(
         farkas_assertion(
             &pts.variables,
             template_variables,
-            location,
-            polyhedron_id,
-            None,
             polyhedron,
             template,
             domains,
             restrictions,
+            seed
         );
     }
 }
@@ -254,6 +251,7 @@ fn non_terminating_non_negativity<S: BuildHasher + Default>(
     location: LocationHandle,
     domains: &mut TemplateDomains,
     restrictions: &mut Predicate,
+            seed:&mut usize
 ) {
     let invariant = pts.locations.get_invariant(location).unwrap();
     assert!(!invariant.is_empty());
@@ -261,7 +259,7 @@ fn non_terminating_non_negativity<S: BuildHasher + Default>(
     assert!(pts.locations.is_nonterminating_location(location));
 
     // location is valid => unwrap()
-    for (polyhedron_id, polyhedron) in invariant.iter_with_ids() {
+    for polyhedron in invariant.iter() {
         let template = Relation::new(
             generate_template(template_variables, &pts.variables, location),
             RelationSign::GE,
@@ -270,13 +268,11 @@ fn non_terminating_non_negativity<S: BuildHasher + Default>(
         farkas_assertion(
             &pts.variables,
             template_variables,
-            location,
-            polyhedron_id,
-            None,
             polyhedron,
             template,
             domains,
             restrictions,
+            seed
         );
     }
 }
@@ -287,7 +283,7 @@ fn martingale_difference<S: BuildHasher + Default>(
     location: LocationHandle,
     domains: &mut TemplateDomains,
     restrictions: &mut Predicate,
-) {
+    seed: &mut usize) {
     assert!(!pts.locations.is_terminating_location(location));
 
     let guard = pts.locations.get_outgoing(location).unwrap();
@@ -299,36 +295,40 @@ fn martingale_difference<S: BuildHasher + Default>(
             template_variables,
             location,
             // handle is valid => unwrap
-            transitions.iter().enumerate(),
+            transitions.iter(),
             domains,
             restrictions,
+            seed
         ),
         Guards::Unguarded(boxed_transition) => nondeterministic_martingale_difference(
             pts,
             template_variables,
             location,
             // handle is valid => unwrap
-            std::iter::once(&(**boxed_transition)).enumerate(),
+            std::iter::once(&(**boxed_transition)),
             domains,
             restrictions,
+            seed
         ),
         Guards::Probabilistic(transitions) => probabilistic_martingale_difference(
             pts,
             template_variables,
             location,
             // handle is valid => unwrap
-            transitions.iter().enumerate(),
+            transitions.iter(),
             domains,
             restrictions,
+            seed
         ),
         Guards::Nondeterministic(transitions) => nondeterministic_martingale_difference(
             pts,
             template_variables,
             location,
             // handle is valid => unwrap
-            transitions.iter().enumerate(),
+            transitions.iter(),
             domains,
             restrictions,
+            seed
         ),
     }
 }
@@ -340,15 +340,16 @@ fn probabilistic_martingale_difference<'a, I, S: BuildHasher + Default>(
     branches: I,
     domains: &mut TemplateDomains,
     restrictions: &mut Predicate,
+    seed: &mut usize
 ) where
-    I: Iterator<Item = (TransitionID, &'a (Constant, Transition))> + Clone,
+    I: Iterator<Item = &'a (Constant, Transition)> + Clone,
 {
     let invariant = pts.locations.get_invariant(location).unwrap();
     assert!(!invariant.is_empty());
 
-    for (polyhedron_id, polyhedron) in invariant.iter_with_ids() {
+    for polyhedron in invariant.iter() {
         let mut lhs: Template = Default::default();
-        for (_, (probability, transition)) in branches.clone() {
+        for (probability, transition) in branches.clone() {
             if !probability.is_zero() {
                 let mut template = generate_template(
                     template_variables,
@@ -382,13 +383,11 @@ fn probabilistic_martingale_difference<'a, I, S: BuildHasher + Default>(
         farkas_assertion(
             &pts.variables,
             template_variables,
-            location,
-            polyhedron_id,
-            Some(0),
             polyhedron,
             Relation::new(lhs, RelationSign::LE, rhs),
             domains,
             restrictions,
+            seed
         )
     }
 }
@@ -400,13 +399,14 @@ fn logic_martingale_difference<'a, I, S: BuildHasher + Default>(
     branches: I,
     domains: &mut TemplateDomains,
     restrictions: &mut Predicate,
+    seed: &mut usize
 ) where
-    I: Iterator<Item = (TransitionID, &'a (Invariant, Transition))> + Clone,
+    I: Iterator<Item = &'a (Invariant, Transition)> + Clone,
 {
     let invariant = pts.locations.get_invariant(location).unwrap();
     assert!(!invariant.is_empty());
 
-    for (transition_id, (guards_invariant, transition)) in branches.clone() {
+    for (guards_invariant, transition) in branches.clone() {
         let mut lhs: Template = Default::default();
         let mut template = generate_template(
             template_variables,
@@ -434,17 +434,15 @@ fn logic_martingale_difference<'a, I, S: BuildHasher + Default>(
 
         let conditioned_polyhedra = invariant.clone() * &guards_invariant;
 
-        for (id, conditioned_polyhedron) in conditioned_polyhedra.iter_with_ids() {
+        for conditioned_polyhedron in conditioned_polyhedra.iter() {
             farkas_assertion(
                 &pts.variables,
                 template_variables,
-                location,
-                id,
-                Some(transition_id),
                 conditioned_polyhedron,
                 Relation::new(lhs.clone(), RelationSign::LE, rhs.clone()),
                 domains,
                 restrictions,
+                seed
             )
         }
     }
@@ -457,14 +455,15 @@ fn nondeterministic_martingale_difference<'a, I, S: BuildHasher + Default>(
     branches: I,
     domains: &mut TemplateDomains,
     restrictions: &mut Predicate,
+    seed: &mut usize
 ) where
-    I: Iterator<Item = (TransitionID, &'a Transition)> + Clone,
+    I: Iterator<Item = &'a Transition> + Clone,
 {
     let invariant = pts.locations.get_invariant(location).unwrap();
     assert!(!invariant.is_empty());
 
-    for (polyhedron_id, polyhedron) in invariant.iter_with_ids() {
-        for (transition_id, transition) in branches.clone() {
+    for polyhedron in invariant.iter() {
+        for transition in branches.clone() {
             let mut lhs: Template = Default::default();
             let mut template = generate_template(
                 template_variables,
@@ -495,13 +494,11 @@ fn nondeterministic_martingale_difference<'a, I, S: BuildHasher + Default>(
             farkas_assertion(
                 &pts.variables,
                 template_variables,
-                location,
-                polyhedron_id,
-                Some(transition_id),
                 polyhedron,
                 Relation::new(lhs, RelationSign::LE, rhs),
                 domains,
                 restrictions,
+                seed
             )
         }
     }
@@ -590,6 +587,7 @@ impl Generator for FarkasBasedGenerator {
             -1.0,
         );
         let mut restrictions = system!();
+        let mut seed:usize = 0;
 
         for location in pts.locations.iter() {
             let invariant = pts.locations.get_invariant(location).unwrap();
@@ -615,6 +613,7 @@ impl Generator for FarkasBasedGenerator {
                     location,
                     &mut domains,
                     &mut restrictions,
+            &mut seed
                 );
                 non_terminating_non_negativity(
                     pts,
@@ -622,6 +621,7 @@ impl Generator for FarkasBasedGenerator {
                     location,
                     &mut domains,
                     &mut restrictions,
+            &mut seed
                 );
             }
         }
@@ -630,6 +630,7 @@ impl Generator for FarkasBasedGenerator {
             &mut template_variables,
             &mut domains,
             &mut restrictions,
+            &mut seed
         );
 
         let goal = Goal::Minimize({
@@ -813,7 +814,7 @@ mod tests {
             (
                 template_var!(
                     &mut template_variables,
-                    TemplateVariableData::FarkasVariable(Some(0), 0, 0, None),
+                    TemplateVariableData::FarkasVariable(0),
                 ),
                 Constant(3.0),
             ),
@@ -891,6 +892,7 @@ mod tests {
             &mut template_variables,
             &mut domains,
             &mut restrictions,
+            &mut 0
         );
 
         assert_eq!(
@@ -900,7 +902,8 @@ mod tests {
                     None,
                     program_var!(&mut pts.variables, "a")
                 ),
-                TemplateVariableData::FarkasVariable(None, 0, 0, None),
+                TemplateVariableData::FarkasVariable(0),
+                TemplateVariableData::FarkasVariable(1),
                 TemplateVariableData::RankingConstant(None),
                 TemplateVariableData::UpperBound,
                 TemplateVariableData::LowerBound,
@@ -911,7 +914,10 @@ mod tests {
             domains,
             template_domains!(
                 &mut template_variables,
-                TemplateVariableData::FarkasVariable(None, 0, 0, None),
+                TemplateVariableData::FarkasVariable(0),
+                0.0,
+                f64::INFINITY,
+                TemplateVariableData::FarkasVariable(1),
                 0.0,
                 f64::INFINITY,
             )
@@ -962,6 +968,7 @@ mod tests {
             &mut template_variables,
             &mut domains,
             &mut restrictions,
+            &mut 0
         );
         assert_eq!(
             template_variables,
@@ -970,7 +977,8 @@ mod tests {
                     None,
                     program_var!(&mut pts.variables, "a")
                 ),
-                TemplateVariableData::FarkasVariable(None, 0, 0, None),
+                TemplateVariableData::FarkasVariable(0),
+                TemplateVariableData::FarkasVariable(1),
                 TemplateVariableData::RankingConstant(None),
                 TemplateVariableData::UpperBound,
                 TemplateVariableData::LowerBound,
@@ -981,7 +989,10 @@ mod tests {
             domains,
             template_domains!(
                 &mut template_variables,
-                TemplateVariableData::FarkasVariable(None, 0, 0, None),
+                TemplateVariableData::FarkasVariable(0),
+                0.0,
+                f64::INFINITY,
+                TemplateVariableData::FarkasVariable(1),
                 0.0,
                 f64::INFINITY
             )
@@ -995,12 +1006,12 @@ mod tests {
                 -1.0,
                 TemplateVariableData::RankingCoefficient(None, program_var!(&mut pts.variables, "a")),
                 -2.0,
-                TemplateVariableData::FarkasVariable(None, 0, 0, None);
+                TemplateVariableData::FarkasVariable(0);
 
                 "<=",
                 0.0,
                 -5.0,
-                TemplateVariableData::FarkasVariable(None, 0, 0, None),
+                TemplateVariableData::FarkasVariable(0),
                 1.0,
                 TemplateVariableData::RankingConstant(None),
                 -1.0,
@@ -1011,12 +1022,12 @@ mod tests {
                 1.0,
                 TemplateVariableData::RankingCoefficient(None, program_var!(&mut pts.variables, "a")),
                 -2.0,
-                TemplateVariableData::FarkasVariable(None, 0, 0, None);
+                TemplateVariableData::FarkasVariable(1);
 
                 "<=",
                 0.0,
                 -5.0,
-                TemplateVariableData::FarkasVariable(None, 0, 0, None),
+                TemplateVariableData::FarkasVariable(1),
                 -1.0,
                 TemplateVariableData::RankingConstant(None),
                 1.0,
@@ -1042,6 +1053,7 @@ mod tests {
             location,
             &mut domains,
             &mut restrictions,
+            &mut 0
         );
         assert_eq!(
             template_variables,
@@ -1050,7 +1062,7 @@ mod tests {
                     Some(0),
                     program_var!(&mut pts.variables, "a")
                 ),
-                TemplateVariableData::FarkasVariable(Some(0), 0, 0, None),
+                TemplateVariableData::FarkasVariable(0),
                 TemplateVariableData::RankingConstant(Some(0)),
             )
         );
@@ -1059,7 +1071,7 @@ mod tests {
             domains,
             template_domains!(
                 &mut template_variables,
-                TemplateVariableData::FarkasVariable(Some(0), 0, 0, None),
+                TemplateVariableData::FarkasVariable(0),
                 0.0,
                 f64::INFINITY
             )
@@ -1073,12 +1085,12 @@ mod tests {
                 1.0,
                 TemplateVariableData::RankingCoefficient(Some(0), program_var!(&mut pts.variables, "a")),
                 -2.0,
-                TemplateVariableData::FarkasVariable(Some(0), 0, 0, None);
+                TemplateVariableData::FarkasVariable(0);
 
                 "<=",
                 0.0,
                 -5.0,
-                TemplateVariableData::FarkasVariable(Some(0), 0, 0, None),
+                TemplateVariableData::FarkasVariable(0),
                 -1.0,
                 TemplateVariableData::RankingConstant(Some(0));
 
@@ -1129,6 +1141,7 @@ mod tests {
                 start_location,
                 &mut domains,
                 &mut restrictions,
+                &mut 0
             );
             assert_eq!(
                 template_variables,
@@ -1145,7 +1158,7 @@ mod tests {
                         None,
                         program_var!(&mut pts.variables, "a")
                     ),
-                    TemplateVariableData::FarkasVariable(Some(0), 0, 0, Some(0)),
+                    TemplateVariableData::FarkasVariable(0),
                     TemplateVariableData::RankingConstant(Some(0)),
                     TemplateVariableData::RankingConstant(Some(1)),
                     TemplateVariableData::RankingConstant(None),
@@ -1157,7 +1170,7 @@ mod tests {
                 domains,
                 template_domains!(
                     &mut template_variables,
-                    TemplateVariableData::FarkasVariable(Some(0), 0, 0, Some(0)),
+                    TemplateVariableData::FarkasVariable(0),
                     0.0,
                     f64::INFINITY
                 )
@@ -1175,14 +1188,14 @@ mod tests {
                     -0.75,
                     TemplateVariableData::RankingCoefficient(None, program_var!(&mut pts.variables, "a")),
                     -2.0,
-                    TemplateVariableData::FarkasVariable(Some(0), 0, 0, Some(0));
+                    TemplateVariableData::FarkasVariable(0);
 
                     "<=",
                     0.0,
                     0.75,
                     TemplateVariableData::RankingCoefficient(Some(1), program_var!(&mut pts.variables, "a")),
                     -5.0,
-                    TemplateVariableData::FarkasVariable(Some(0), 0, 0, Some(0)),
+                    TemplateVariableData::FarkasVariable(0),
                     -1.0,
                     TemplateVariableData::RankingConstant(Some(0)),
                     0.25,
@@ -1225,6 +1238,7 @@ mod tests {
                 start_location,
                 &mut domains,
                 &mut restrictions,
+                &mut 0
             );
             assert_eq!(
                 template_variables,
@@ -1241,14 +1255,14 @@ mod tests {
                         None,
                         program_var!(&mut pts.variables, "a")
                     ),
-                    TemplateVariableData::FarkasVariable(Some(0), 0, 0, Some(0)),
-                    TemplateVariableData::FarkasVariable(Some(0), 0, 1, Some(0)),
-                    TemplateVariableData::FarkasVariable(Some(0), 1, 0, Some(0)),
-                    TemplateVariableData::FarkasVariable(Some(0), 1, 1, Some(0)),
-                    TemplateVariableData::FarkasVariable(Some(0), 0, 0, Some(1)),
-                    TemplateVariableData::FarkasVariable(Some(0), 0, 1, Some(1)),
-                    TemplateVariableData::FarkasVariable(Some(0), 1, 0, Some(1)),
-                    TemplateVariableData::FarkasVariable(Some(0), 1, 1, Some(1)),
+                    TemplateVariableData::FarkasVariable(0),
+                    TemplateVariableData::FarkasVariable(1),
+                    TemplateVariableData::FarkasVariable(2),
+                    TemplateVariableData::FarkasVariable(3),
+                    TemplateVariableData::FarkasVariable(4),
+                    TemplateVariableData::FarkasVariable(5),
+                    TemplateVariableData::FarkasVariable(6),
+                    TemplateVariableData::FarkasVariable(7),
                     TemplateVariableData::RankingConstant(Some(0)),
                     TemplateVariableData::RankingConstant(Some(1)),
                     TemplateVariableData::RankingConstant(None),
@@ -1260,28 +1274,28 @@ mod tests {
                 domains,
                 template_domains!(
                     &mut template_variables,
-                    TemplateVariableData::FarkasVariable(Some(0), 0, 0, Some(0)),
+                    TemplateVariableData::FarkasVariable(0),
                     0.0,
                     f64::INFINITY,
-                    TemplateVariableData::FarkasVariable(Some(0), 0, 1, Some(0)),
+                    TemplateVariableData::FarkasVariable(1),
                     0.0,
                     f64::INFINITY,
-                    TemplateVariableData::FarkasVariable(Some(0), 1, 0, Some(0)),
+                    TemplateVariableData::FarkasVariable(2),
                     0.0,
                     f64::INFINITY,
-                    TemplateVariableData::FarkasVariable(Some(0), 1, 1, Some(0)),
+                    TemplateVariableData::FarkasVariable(3),
                     0.0,
                     f64::INFINITY,
-                    TemplateVariableData::FarkasVariable(Some(0), 0, 0, Some(1)),
+                    TemplateVariableData::FarkasVariable(4),
                     0.0,
                     f64::INFINITY,
-                    TemplateVariableData::FarkasVariable(Some(0), 0, 1, Some(1)),
+                    TemplateVariableData::FarkasVariable(5),
                     0.0,
                     f64::INFINITY,
-                    TemplateVariableData::FarkasVariable(Some(0), 1, 0, Some(1)),
+                    TemplateVariableData::FarkasVariable(6),
                     0.0,
                     f64::INFINITY,
-                    TemplateVariableData::FarkasVariable(Some(0), 1, 1, Some(1)),
+                    TemplateVariableData::FarkasVariable(7),
                     0.0,
                     f64::INFINITY,
                 )
@@ -1297,18 +1311,18 @@ mod tests {
                     -7.0,
                     TemplateVariableData::RankingCoefficient(Some(1), program_var!(&mut pts.variables, "a")),
                     -2.0,
-                    TemplateVariableData::FarkasVariable(Some(0), 0, 0, Some(0)),
+                    TemplateVariableData::FarkasVariable(0),
                     -1.0,
-                    TemplateVariableData::FarkasVariable(Some(0), 0, 1, Some(0));
+                    TemplateVariableData::FarkasVariable(1);
 
                     "<=",
                     0.0,
                     3.0,
                     TemplateVariableData::RankingCoefficient(Some(1), program_var!(&mut pts.variables, "a")),
                     -5.0,
-                    TemplateVariableData::FarkasVariable(Some(0), 0, 0, Some(0)),
+                    TemplateVariableData::FarkasVariable(0),
                     -11.0,
-                    TemplateVariableData::FarkasVariable(Some(0), 0, 1, Some(0)),
+                    TemplateVariableData::FarkasVariable(1),
                     -1.0,
                     TemplateVariableData::RankingConstant(Some(0)),
                     1.0,
@@ -1323,9 +1337,9 @@ mod tests {
                     -7.0,
                     TemplateVariableData::RankingCoefficient(Some(1), program_var!(&mut pts.variables, "a")),
                     0.0,
-                    TemplateVariableData::FarkasVariable(Some(0), 1, 0, Some(0)),
+                    TemplateVariableData::FarkasVariable(2),
                     -1.0,
-                    TemplateVariableData::FarkasVariable(Some(0), 1, 1, Some(0));
+                    TemplateVariableData::FarkasVariable(3);
 
 
                     "<=",
@@ -1333,9 +1347,9 @@ mod tests {
                     3.0,
                     TemplateVariableData::RankingCoefficient(Some(1), program_var!(&mut pts.variables, "a")),
                     0.0,
-                    TemplateVariableData::FarkasVariable(Some(0), 1, 0, Some(0)),
-                    -11.0,
-                    TemplateVariableData::FarkasVariable(Some(0), 1, 1, Some(0)),
+                    TemplateVariableData::FarkasVariable(2),
+                    -11.0,                                
+                    TemplateVariableData::FarkasVariable(3),
                     -1.0,
                     TemplateVariableData::RankingConstant(Some(0)),
                     1.0,
@@ -1351,16 +1365,16 @@ mod tests {
                     -1.0,
                     TemplateVariableData::RankingCoefficient(None, program_var!(&mut pts.variables, "a")),
                     -2.0,
-                    TemplateVariableData::FarkasVariable(Some(0), 0, 0, Some(1)),
+                    TemplateVariableData::FarkasVariable(4),
                     1.0,
-                    TemplateVariableData::FarkasVariable(Some(0), 0, 1, Some(1));
+                    TemplateVariableData::FarkasVariable(5);
 
                     "<=",
                     0.0,
                     -5.0,
-                    TemplateVariableData::FarkasVariable(Some(0), 0, 0, Some(1)),
-                    11.0,
-                    TemplateVariableData::FarkasVariable(Some(0), 0, 1, Some(1)),
+                    TemplateVariableData::FarkasVariable(4),
+                    11.0,                                 
+                    TemplateVariableData::FarkasVariable(5),
                     -1.0,
                     TemplateVariableData::RankingConstant(Some(0)),
                     1.0,
@@ -1376,16 +1390,16 @@ mod tests {
                     -1.0,
                     TemplateVariableData::RankingCoefficient(None, program_var!(&mut pts.variables, "a")),
                     0.0,
-                    TemplateVariableData::FarkasVariable(Some(0), 1, 0, Some(1)),
+                    TemplateVariableData::FarkasVariable(6),
                     1.0,
-                    TemplateVariableData::FarkasVariable(Some(0), 1, 1, Some(1));
+                    TemplateVariableData::FarkasVariable(7);
 
                     "<=",
                     0.0,
                     0.0,
-                    TemplateVariableData::FarkasVariable(Some(0), 1, 0, Some(1)),
-                    11.0,
-                    TemplateVariableData::FarkasVariable(Some(0), 1, 1, Some(1)),
+                    TemplateVariableData::FarkasVariable(6),
+                    11.0,                                 
+                    TemplateVariableData::FarkasVariable(7),
                     -1.0,
                     TemplateVariableData::RankingConstant(Some(0)),
                     1.0,
@@ -1427,6 +1441,7 @@ mod tests {
                 start_location,
                 &mut domains,
                 &mut restrictions,
+                &mut 0
             );
             assert_eq!(
                 template_variables,
@@ -1443,8 +1458,8 @@ mod tests {
                         None,
                         program_var!(&mut pts.variables, "a")
                     ),
-                    TemplateVariableData::FarkasVariable(Some(0), 0, 0, Some(0)),
-                    TemplateVariableData::FarkasVariable(Some(0), 0, 0, Some(1)),
+                    TemplateVariableData::FarkasVariable(0),
+                    TemplateVariableData::FarkasVariable(1),
                     TemplateVariableData::RankingConstant(Some(0)),
                     TemplateVariableData::RankingConstant(Some(1)),
                     TemplateVariableData::RankingConstant(None),
@@ -1456,10 +1471,10 @@ mod tests {
                 domains,
                 template_domains!(
                     &mut template_variables,
-                    TemplateVariableData::FarkasVariable(Some(0), 0, 0, Some(0)),
+                    TemplateVariableData::FarkasVariable(0),
                     0.0,
                     f64::INFINITY,
-                    TemplateVariableData::FarkasVariable(Some(0), 0, 0, Some(1)),
+                    TemplateVariableData::FarkasVariable(1),
                     0.0,
                     f64::INFINITY
                 )
@@ -1475,14 +1490,14 @@ mod tests {
                     -7.0,
                     TemplateVariableData::RankingCoefficient(Some(1), program_var!(&mut pts.variables, "a")),
                     -2.0,
-                    TemplateVariableData::FarkasVariable(Some(0), 0, 0, Some(0));
+                    TemplateVariableData::FarkasVariable(0);
 
                     "<=",
                     0.0,
                     3.0,
                     TemplateVariableData::RankingCoefficient(Some(1), program_var!(&mut pts.variables, "a")),
                     -5.0,
-                    TemplateVariableData::FarkasVariable(Some(0), 0, 0, Some(0)),
+                    TemplateVariableData::FarkasVariable(0),
                     -1.0,
                     TemplateVariableData::RankingConstant(Some(0)),
                     1.0,
@@ -1497,12 +1512,12 @@ mod tests {
                     -1.0,
                     TemplateVariableData::RankingCoefficient(None, program_var!(&mut pts.variables, "a")),
                     -2.0,
-                    TemplateVariableData::FarkasVariable(Some(0), 0, 0, Some(1));
+                    TemplateVariableData::FarkasVariable(1);
 
                     "<=",
                     0.0,
                     -5.0,
-                    TemplateVariableData::FarkasVariable(Some(0), 0, 0, Some(1)),
+                    TemplateVariableData::FarkasVariable(1),
                     -1.0,
                     TemplateVariableData::RankingConstant(Some(0)),
                     1.0,
@@ -1541,6 +1556,7 @@ mod tests {
                 start_location,
                 &mut domains,
                 &mut restrictions,
+                &mut 0
             );
             assert_eq!(
                 template_variables,
@@ -1553,7 +1569,7 @@ mod tests {
                         Some(1),
                         program_var!(&mut pts.variables, "a")
                     ),
-                    TemplateVariableData::FarkasVariable(Some(0), 0, 0, start_location),
+                    TemplateVariableData::FarkasVariable(0),
                     TemplateVariableData::RankingConstant(Some(0)),
                     TemplateVariableData::RankingConstant(Some(1)),
                     TemplateVariableData::Eps,
@@ -1564,7 +1580,7 @@ mod tests {
                 domains,
                 template_domains!(
                     &mut template_variables,
-                    TemplateVariableData::FarkasVariable(Some(0), 0, 0, start_location),
+                    TemplateVariableData::FarkasVariable(0),
                     0.0,
                     f64::INFINITY
                 )
@@ -1580,14 +1596,14 @@ mod tests {
                     -7.0,
                     TemplateVariableData::RankingCoefficient(Some(1), program_var!(&mut pts.variables, "a")),
                     -2.0,
-                    TemplateVariableData::FarkasVariable(Some(0), 0, 0, start_location);
+                    TemplateVariableData::FarkasVariable(0);
 
                     "<=",
                     0.0,
                     3.0,
                     TemplateVariableData::RankingCoefficient(Some(1), program_var!(&mut pts.variables, "a")),
                     -5.0,
-                    TemplateVariableData::FarkasVariable(Some(0), 0, 0, start_location),
+                    TemplateVariableData::FarkasVariable(0),
                     -1.0,
                     TemplateVariableData::RankingConstant(Some(0)),
                     1.0,
@@ -1631,19 +1647,17 @@ mod tests {
                 farkas_assertion(
                     &program_variables,
                     &mut template_variables,
-                    Some(5),
-                    3,
-                    Some(1),
                     &state_system!(&mut program_variables; ">=", 0.0),
                     Relation::new(lhs, RelationSign::LE, rhs),
                     &mut domains,
                     &mut restrictions,
+                    &mut 8
                 );
                 assert_eq!(
                     domains,
                     template_domains!(
                         &mut template_variables,
-                        TemplateVariableData::FarkasVariable(Some(5), 3, 0, Some(1)),
+                        TemplateVariableData::FarkasVariable(8),
                         0.0,
                         f64::INFINITY,
                     )
@@ -1672,9 +1686,6 @@ mod tests {
                 farkas_assertion(
                     &program_variables,
                     &mut template_variables,
-                    Some(5),
-                    3,
-                    Some(1),
                     &state_system!(
                         &mut program_variables;
                         "<=", 0.0;
@@ -1683,19 +1694,20 @@ mod tests {
                     Relation::new(lhs, RelationSign::LE, rhs),
                     &mut domains,
                     &mut restrictions,
+                    &mut 0
                 );
                 assert_eq!(domains.len(), 3);
                 assert_eq!(
                     domains,
                     template_domains!(
                         &mut template_variables,
-                        TemplateVariableData::FarkasVariable(Some(5), 3, 0, Some(1)),
+                        TemplateVariableData::FarkasVariable(0),
                         0.0,
                         f64::INFINITY,
-                        TemplateVariableData::FarkasVariable(Some(5), 3, 1, Some(1)),
+                        TemplateVariableData::FarkasVariable(1),
                         0.0,
                         f64::INFINITY,
-                        TemplateVariableData::FarkasVariable(Some(5), 3, 2, Some(1)),
+                        TemplateVariableData::FarkasVariable(2),
                         0.0,
                         f64::INFINITY
                     )
@@ -1727,20 +1739,18 @@ mod tests {
                 farkas_assertion(
                     &program_variables,
                     &mut template_variables,
-                    Some(5),
-                    3,
-                    Some(1),
                     &state_system!(&mut program_variables; ">=", 0.0),
                     Relation::new(eps_pol.clone(), RelationSign::LE, Default::default()),
                     &mut domains,
                     &mut restrictions,
+                    &mut 0
                 );
 
                 assert_eq!(
                     domains,
                     template_domains!(
                         &mut template_variables,
-                        TemplateVariableData::FarkasVariable(Some(5), 3, 0, Some(1)),
+                        TemplateVariableData::FarkasVariable(0),
                         0.0,
                         f64::INFINITY,
                     )
@@ -1768,19 +1778,17 @@ mod tests {
                 farkas_assertion(
                     &program_variables,
                     &mut template_variables,
-                    Some(5),
-                    3,
-                    Some(1),
                     &state_system!(&mut program_variables; ">=", 0.0),
                     Relation::new(Default::default(), RelationSign::LE, eps_pol),
                     &mut domains,
                     &mut restrictions,
+                    &mut 0
                 );
                 assert_eq!(
                     domains,
                     template_domains!(
                         &mut template_variables,
-                        TemplateVariableData::FarkasVariable(Some(5), 3, 0, Some(1)),
+                        TemplateVariableData::FarkasVariable(0),
                         0.0,
                         f64::INFINITY,
                     )
@@ -1811,19 +1819,17 @@ mod tests {
             farkas_assertion(
                 &program_variables,
                 &mut template_variables,
-                Some(5),
-                3,
-                Some(1),
                 &state_system!(&mut program_variables; ">=", 0.0),
                 Relation::new(lhs, RelationSign::LE, rhs),
                 &mut domains,
                 &mut restrictions,
+                &mut 0
             );
             assert_eq!(
                 domains,
                 template_domains!(
                     &mut template_variables,
-                    TemplateVariableData::FarkasVariable(Some(5), 3, 0, Some(1)),
+                    TemplateVariableData::FarkasVariable(0),
                     0.0,
                     f64::INFINITY,
                 )
@@ -1879,19 +1885,17 @@ mod tests {
             farkas_assertion(
                 &program_variables,
                 &mut template_variables,
-                Some(5),
-                3,
-                Some(1),
                 &state_system!(&mut program_variables; ">=", 0.0),
                 Relation::new(lhs, RelationSign::LE, rhs),
                 &mut domains,
                 &mut restrictions,
+                &mut 0
             );
             assert_eq!(
                 domains,
                 template_domains!(
                     &mut template_variables,
-                    TemplateVariableData::FarkasVariable(Some(5), 3, 0, Some(1)),
+                    TemplateVariableData::FarkasVariable(0),
                     0.0,
                     f64::INFINITY,
                 )
@@ -1989,26 +1993,24 @@ mod tests {
             farkas_assertion(
                 &program_variables,
                 &mut template_variables,
-                Some(5),
-                3,
-                Some(1),
                 &polyhedron,
                 Relation::new(lhs, RelationSign::LE, rhs),
                 &mut domains,
                 &mut restrictions,
+                &mut 0
             );
             assert_eq!(domains.len(), 3);
             assert_eq!(
                 domains,
                 template_domains!(
                     &mut template_variables,
-                    TemplateVariableData::FarkasVariable(Some(5), 3, 0, Some(1)),
+                    TemplateVariableData::FarkasVariable(0),
                     0.0,
                     f64::INFINITY,
-                    TemplateVariableData::FarkasVariable(Some(5), 3, 1, Some(1)),
+                    TemplateVariableData::FarkasVariable(1),
                     0.0,
                     f64::INFINITY,
-                    TemplateVariableData::FarkasVariable(Some(5), 3, 2, Some(1)),
+                    TemplateVariableData::FarkasVariable(2),
                     0.0,
                     f64::INFINITY
                 )
@@ -2021,23 +2023,23 @@ mod tests {
                 "==",
                 0.0,
                 2.0,
-                TemplateVariableData::FarkasVariable(Some(5), 3, 0, Some(1));
+                TemplateVariableData::FarkasVariable(0);
                 "==",
                 0.0,
                 1.0,
-                TemplateVariableData::FarkasVariable(Some(5), 3, 0, Some(1)),
+                TemplateVariableData::FarkasVariable(0),
                 0.5,
-                TemplateVariableData::FarkasVariable(Some(5), 3, 2, Some(1));
+                TemplateVariableData::FarkasVariable(2);
                 "==",
                 0.0,
                 5.0,
-                TemplateVariableData::FarkasVariable(Some(5), 3, 1, Some(1));
+                TemplateVariableData::FarkasVariable(1);
                 "<=",
                 0.0,
                 1.0,
-                TemplateVariableData::FarkasVariable(Some(5), 3, 1, Some(1)),
+                TemplateVariableData::FarkasVariable(1),
                 -10.0,
-                TemplateVariableData::FarkasVariable(Some(5), 3, 2, Some(1));
+                TemplateVariableData::FarkasVariable(2);
                 )
             );
         }
@@ -2081,26 +2083,24 @@ mod tests {
             farkas_assertion(
                 &program_variables,
                 &mut template_variables,
-                Some(5),
-                3,
-                Some(1),
                 &polyhedron,
                 Relation::new(lhs, RelationSign::LE, rhs),
                 &mut domains,
                 &mut restrictions,
+                &mut 0
             );
             assert_eq!(domains.len(), 3);
             assert_eq!(
                 domains,
                 template_domains!(
                     &mut template_variables,
-                    TemplateVariableData::FarkasVariable(Some(5), 3, 0, Some(1)),
+                    TemplateVariableData::FarkasVariable(0),
                     0.0,
                     f64::INFINITY,
-                    TemplateVariableData::FarkasVariable(Some(5), 3, 1, Some(1)),
+                    TemplateVariableData::FarkasVariable(1),
                     0.0,
                     f64::INFINITY,
-                    TemplateVariableData::FarkasVariable(Some(5), 3, 2, Some(1)),
+                    TemplateVariableData::FarkasVariable(2),
                     0.0,
                     f64::INFINITY
                 )
@@ -2119,10 +2119,7 @@ mod tests {
                     ),
                     2.0,
                     TemplateVariableData::FarkasVariable(
-                        Some(5),
-                        3,
                         0,
-                        Some(1)
                     );
 
                     "==",
@@ -2134,17 +2131,11 @@ mod tests {
                     ),
                     1.0,
                     TemplateVariableData::FarkasVariable(
-                        Some(5),
-                        3,
                         0,
-                        Some(1)
                     ),
                     0.5,
                     TemplateVariableData::FarkasVariable(
-                        Some(5),
-                        3,
                         2,
-                        Some(1)
                     );
 
                     "==",
@@ -2156,27 +2147,18 @@ mod tests {
                     ),
                     5.0,
                     TemplateVariableData::FarkasVariable(
-                        Some(5),
-                        3,
                         1,
-                        Some(1)
                     );
 
                     "<=",
                     0.0,
                     1.0,
                     TemplateVariableData::FarkasVariable(
-                        Some(5),
-                        3,
                         1,
-                        Some(1)
                     ),
                     -10.0,
                     TemplateVariableData::FarkasVariable(
-                        Some(5),
-                        3,
                         2,
-                        Some(1)
                     ),
                     0.1,
                     TemplateVariableData::RankingConstant(Some(5))
